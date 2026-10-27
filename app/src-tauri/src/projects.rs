@@ -94,6 +94,24 @@ impl Projects {
         Ok(AddResult { project, hidden_folder, git_ignored })
     }
 
+    /// The GitHub repository of a project, as `owner/repo` (a full github.com address is accepted and shortened). Empty clears it.
+    pub fn set_github(&self, id: &str, value: &str) -> Result<Project, String> {
+        let v = value.trim().trim_end_matches('/').trim_end_matches(".git");
+        let v = v.strip_prefix("https://github.com/").or_else(|| v.strip_prefix("http://github.com/")).or_else(|| v.strip_prefix("git@github.com:")).unwrap_or(v);
+        let ok = v.is_empty() || {
+            let mut it = v.split('/');
+            let (a, b, c) = (it.next().unwrap_or(""), it.next().unwrap_or(""), it.next());
+            c.is_none() && [a, b].iter().all(|p| !p.is_empty() && p.len() <= 100 && p.chars().all(|ch| ch.is_ascii_alphanumeric() || "._-".contains(ch)))
+        };
+        if !ok { return Err("A GitHub repository looks like owner/name, for example BergasBintang/kona-space".into()); }
+        let mut list = self.list.lock().unwrap();
+        let p = list.iter_mut().find(|p| p.id == id).ok_or("That project does not exist any more")?;
+        p.github = if v.is_empty() { None } else { Some(v.to_string()) };
+        let out = p.clone();
+        self.save(&list)?;
+        Ok(out)
+    }
+
     pub fn remove(&self, id: &str) -> Result<(), String> {
         let mut list = self.list.lock().unwrap();
         list.retain(|p| p.id != id);

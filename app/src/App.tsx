@@ -20,10 +20,11 @@ import { Worktrees } from "./components/Worktrees";
 import { Leftovers } from "./components/Leftovers";
 import { BrainPlace } from "./components/brain/Brain";
 import { Servers } from "./components/Servers";
+import { Settings } from "./components/Settings";
 import { Glyph } from "./components/ui";
 import { autoNoteOn, buildDigest, writeSessionNote } from "./lib/brain/summary.ts";
 import { localDate, redact } from "./lib/brain/text.ts";
-import { saveNote, wantedRemove } from "./lib/api";
+import { earlierSessions, saveNote, wantedRemove, type Earlier } from "./lib/api";
 
 const remembered = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const remember = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* the choice is just not kept */ } };
@@ -48,6 +49,7 @@ export default function App() {
   const live = useRef({ state, projects, roles });
   live.current = { state, projects, roles };
   const noting = useRef(new Set<string>());
+  const [earlier, setEarlier] = useState<Earlier[]>([]); // sessions Claude Code saved earlier, for Resume
 
   // a notice goes away by itself after a few seconds
   useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(null), 9000); return () => clearTimeout(t); }, [notice]);
@@ -110,6 +112,27 @@ export default function App() {
   }, [state.order.length, place]);
   const leftBehind = useMemo(() => Object.fromEntries(lo.sessions.map((s) => [s.id, s.left_behind])) as Record<string, number>, [lo]);
   const leftTotal = lo.items.filter((i) => i.left_behind && !i.ignored).length;
+
+  // the earlier sessions of this project (read from Claude Code's own transcript files)
+  useEffect(() => {
+    if (!project || place !== "sessions") return;
+    let live = true;
+    earlierSessions(project.id).then((l) => { if (live) setEarlier(l); }).catch(() => { if (live) setEarlier([]); });
+    return () => { live = false; };
+  }, [project?.id, place, state.order.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  const shownEarlier = useMemo(() => earlier.filter((e) => !state.sessions[e.id]), [earlier, state.sessions]);
+
+  // Resume an earlier session: the same session id, in the same folder, with no role (the old session's role is not recorded)
+  const resume = async (e: Earlier) => {
+    if (!project || !persona) return;
+    setError(null);
+    try {
+      const status = await accountStatus(e.account_id);
+      if (!status.logged_in) throw new Error("The account of that session is not signed in. Open Accounts to sign in.");
+      await invoke<string>("start_session", { folder: project.folder, roleId: null, accountId: e.account_id, useVoice: persona.enabled, ticketId: null, brainDigest: null, model: "sonnet", mode: "default", resume: e.id });
+      setCreating(false); setPlace("sessions");
+    } catch (err) { setNotice(`Could not resume it: ${String(err)}`); }
+  };
 
   // keep the plan readings for the next time Kona opens
   useEffect(() => { savePlans(state.plans); }, [state.plans]);
@@ -181,6 +204,8 @@ export default function App() {
     content = <Files project={project} />;
   } else if (place === "roles") {
     content = <Roles roles={roles} accounts={accounts} tools={tools} onChanged={setRoles} />;
+  } else if (place === "settings") {
+    content = <Settings projects={projects} version={version} onProjects={(next) => { setProjects(next); if (projectId && !next.some((p) => p.id === projectId)) { setProjectId(next[0]?.id ?? null); remember("kona.project", next[0]?.id ?? ""); } }} />;
   } else if (place === "servers") {
     content = <Servers project={project} roles={roles} />;
   } else if (place === "brain") {
@@ -200,7 +225,7 @@ export default function App() {
   } else {
     content = (
       <>
-        <SessionList state={state} project={project} roles={roles} leftBehind={leftBehind} creating={creating || !current} onSelect={(id) => { setCreating(false); dispatch({ type: "select", id }); }} onNew={() => { setError(null); setCreating(true); }} />
+        <SessionList state={state} project={project} roles={roles} leftBehind={leftBehind} earlier={shownEarlier} onResume={(e) => void resume(e)} creating={creating || !current} onSelect={(id) => { setCreating(false); dispatch({ type: "select", id }); }} onNew={() => { setError(null); setCreating(true); }} />
         <div className="w-px bg-line-subtle" />
         <main className="flex min-w-0 flex-1 flex-col">
           {creating || !current ? <Welcome key={project.id} project={project} roles={roles} accounts={accounts} persona={persona} lastAccount={lastAccount} onOpenAccounts={() => setPlace("accounts")} onStart={start} error={error} /> : <Chat key={current.id} s={current} onNote={() => void noteSession(current.id, true)} onSaveAnswer={(t) => void saveAnswer(current.id, t)} role={roles.find((r) => r.id === current.roleId)} account={accounts.length > 1 ? accounts.find((a) => a.id === current.accountId)?.label : undefined} dispatch={dispatch} />}

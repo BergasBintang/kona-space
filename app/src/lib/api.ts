@@ -39,6 +39,9 @@ export type Wanted = { question: string; count: number; first: string; last: str
 export type Server = { id: string; project_id: string; label: string; host: string; port: number; user: string; key_path: string; fingerprints: string[]; roles: string[]; notes: string };
 export type Fingerprint = { kind: string; fingerprint: string };
 export type KeyState = { exists: boolean; is_file: boolean; inside_a_project: boolean; synced_folder: boolean };
+export type Settings = { max_sessions: number };
+export type BackupInfo = { name: string; path: string; files: number; bytes: number };
+export type Earlier = { id: string; title: string; modified: number; bytes: number; account_id: string };
 export type Entry = { name: string; path: string; is_dir: boolean; size: number; modified: number | null };
 export type FileView =
   | { kind: "text"; text: string; size: number; truncated: boolean }
@@ -48,7 +51,7 @@ export type FileView =
   | { kind: "toolarge"; size: number };
 
 export const listProjects = () => invoke<Project[]>("list_projects");
-export const addProject = (folder: string, name?: string) => invoke<AddResult>("add_project", { folder, name: name ?? null });
+export const addProject = (folder: string, name?: string, github?: string) => invoke<AddResult>("add_project", { folder, name: name ?? null, github: github ?? null });
 export const removeProject = (id: string) => invoke<void>("remove_project", { id });
 export const listTools = () => invoke<ToolInfo[]>("list_tools");
 export const checkTools = (ids: string[]) => invoke<ToolStatus[]>("check_tools", { ids });
@@ -84,6 +87,13 @@ export const saveServer = (host: Server) => invoke<Server>("ssh_save", { host })
 export const removeServer = (id: string) => invoke<void>("ssh_remove", { id });
 export const readFingerprints = (host: string, port: number) => invoke<Fingerprint[]>("ssh_fingerprints", { host, port });
 export const keyState = (path: string) => invoke<KeyState>("ssh_key_state", { path });
+export const getSettings = () => invoke<Settings>("get_settings");
+export const setSettings = (value: Settings) => invoke<Settings>("set_settings", { value });
+export const backupNow = () => invoke<BackupInfo>("backup_now");
+export const listBackups = () => invoke<BackupInfo[]>("list_backups");
+export const deleteBackup = (name: string) => invoke<void>("delete_backup", { name });
+export const setProjectGithub = (id: string, github: string) => invoke<Project>("set_project_github", { id, github });
+export const earlierSessions = (projectId: string) => invoke<Earlier[]>("earlier_sessions", { projectId });
 export const costRows = (sinceDay: string | null) => invoke<CostRow[]>("cost_rows", { sinceDay });
 export const listRoles = () => invoke<Role[]>("list_roles");
 export const saveRole = (role: Role) => invoke<Role>("save_role", { role });

@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::{mpsc, oneshot};
@@ -65,9 +65,12 @@ impl Sessions {
     }
 
     /// Answer a "may I run this?" card. `input` is what Claude asked to run, sent back unchanged when allowed.
-    pub fn answer_permission(&self, session_id: &str, request_id: &str, allow: bool, input: Option<Value>, message: Option<String>) -> Result<(), String> {
+    pub fn answer_permission(&self, session_id: &str, request_id: &str, allow: bool, input: Option<Value>, message: Option<String>, remember: Option<Value>) -> Result<(), String> {
         let body = if allow {
-            json!({"behavior": "allow", "updatedInput": input.unwrap_or(json!({}))})
+            let mut b = json!({"behavior": "allow", "updatedInput": input.unwrap_or(json!({}))});
+            // "Always allow here": Claude Code offered rules to remember with this question; handing them back makes it keep them (in the project's local settings)
+            if let Some(r) = remember { b["updatedPermissions"] = r; }
+            b
         } else {
             json!({"behavior": "deny", "message": message.unwrap_or_else(|| "The owner said no.".into())})
         };
@@ -116,6 +119,11 @@ pub fn claude_version(exe: &PathBuf) -> Option<String> {
 
 pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Option<Role>, account: Option<Account>, persona: Persona, project_name: String, ticket: Option<Ticket>, work_dir: String, digest: Option<String>, ssh_hosts: Vec<crate::ssh::Host>, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
     let exe = find_claude().ok_or("Claude Code was not found on this PC")?;
+    // each `claude` program takes about 225 MB; on this PC two at once is the limit (a setting)
+    let cap = app.try_state::<crate::backup::SettingsStore>().map(|s| s.get().max_sessions).unwrap_or(2) as usize;
+    if sessions.running().len() >= cap {
+        return Err(format!("{cap} sessions are already open. Stop one first: each uses about 225 MB of this PC's memory. (You can change the limit in Settings.)"));
+    }
     let id = resume.clone().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let mut cmd = Command::new(exe);
     cmd.args([
@@ -162,6 +170,7 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     let covered = child.raw_handle().map(|h| crate::job::adopt(h as _)).unwrap_or(false);
 
     sessions.tracker.register(&id, child.id().unwrap_or(0));
+    if resume.is_some() { sessions.ledger.seed_resume(&id); }
     let mut stdin = child.stdin.take().ok_or("no stdin")?;
     let stdout = child.stdout.take().ok_or("no stdout")?;
     let stderr = child.stderr.take().ok_or("no stderr")?;
@@ -243,6 +252,8 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
                 status = child.wait() => status.ok().and_then(|s| s.code()),
                 _ = stop_rx => { let _ = child.kill().await; None }
             };
+            // a session that has ended no longer counts against the limit
+            if let Some(s) = app.try_state::<Sessions>() { s.map.lock().unwrap().remove(&sid); }
             // look at once what the session leaves behind
             { let (t, s) = (tracker.clone(), sid.clone()); let _ = tauri::async_runtime::spawn_blocking(move || t.ended(&s)).await; }
             let _ = app.emit("session-event", json!({"sessionId": sid, "record": {"type": "kona/exited", "code": code}}));
@@ -250,6 +261,6 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     }
 
     sessions.map.lock().unwrap().insert(id.clone(), Handle { tx, stop: Some(stop_tx) });
-    let _ = app.emit("session-event", json!({"sessionId": id, "record": {"type": "kona/started", "folder": folder, "roleId": role.as_ref().map(|r| r.id.clone()), "accountId": account.as_ref().map(|a| a.id.clone()), "voice": persona.enabled, "ticketId": ticket.as_ref().map(|t| t.id.clone()), "workDir": work_dir, "lines": persona.lines_for(&project_name), "model": model, "mode": mode, "coveredByJob": covered}}));
+    let _ = app.emit("session-event", json!({"sessionId": id, "record": {"type": "kona/started", "folder": folder, "roleId": role.as_ref().map(|r| r.id.clone()), "accountId": account.as_ref().map(|a| a.id.clone()), "resumed": resume.is_some(), "voice": persona.enabled, "ticketId": ticket.as_ref().map(|t| t.id.clone()), "workDir": work_dir, "lines": persona.lines_for(&project_name), "model": model, "mode": mode, "coveredByJob": covered}}));
     Ok(id)
 }

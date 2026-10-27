@@ -136,3 +136,67 @@ pub async fn run_haiku(system: &str, prompt: &str, account_dir: Option<&str>) ->
     Ok((result, v))
 }
 
+/// A session that Claude Code saved earlier, for the list "Earlier sessions" (and Resume).
+#[derive(serde::Serialize)]
+pub struct Earlier {
+    pub id: String,
+    pub title: String,
+    /// last change, milliseconds since 1970
+    pub modified: u64,
+    pub bytes: u64,
+    /// which of Kona's accounts' folders it was found in ("main" for the PC's usual one)
+    pub account_id: String,
+}
+
+fn first_words(path: &std::path::Path) -> String {
+    use std::io::{BufRead, BufReader};
+    let Ok(f) = std::fs::File::open(path) else { return String::new() };
+    for line in BufReader::new(f).lines().take(400).filter_map(Result::ok) {
+        let Ok(v) = serde_json::from_str::<Value>(&line) else { continue };
+        if v.get("type").and_then(Value::as_str) != Some("user") || v.get("isMeta").and_then(Value::as_bool) == Some(true) { continue; }
+        let c = &v["message"]["content"];
+        let t = match c {
+            Value::String(s) => s.clone(),
+            Value::Array(a) => a.iter().filter(|b| b.get("type").and_then(Value::as_str) == Some("text")).filter_map(|b| b.get("text").and_then(Value::as_str)).collect::<Vec<_>>().join(" "),
+            _ => String::new(),
+        };
+        // slash commands and system reminders are not what the owner asked
+        if t.trim().is_empty() || t.trim_start().starts_with('<') { continue; }
+        return clip(&t, 90);
+    }
+    String::new()
+}
+
+/// The sessions Claude Code has saved for a working folder, newest first. `roots` pairs each account id with its login folder (None for Main).
+pub fn earlier(folder: &str, roots: &[(String, Option<String>)]) -> Vec<Earlier> {
+    let want = slug(folder).to_lowercase();
+    let mut out: Vec<Earlier> = vec![];
+    for (account_id, dir) in roots {
+        let Some(root) = config_root(dir.as_deref()) else { continue };
+        let Ok(rd) = std::fs::read_dir(root.join("projects")) else { continue };
+        for e in rd.filter_map(Result::ok) {
+            if e.file_name().to_string_lossy().to_lowercase() != want { continue; }
+            for f in std::fs::read_dir(e.path()).into_iter().flatten().filter_map(Result::ok) {
+                let p = f.path();
+                if p.extension().and_then(|x| x.to_str()) != Some("jsonl") { continue; }
+                let id = p.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+                if id.len() != 36 || !id.chars().all(|c| c.is_ascii_hexdigit() || c == '-') { continue; }
+                let Ok(m) = f.metadata() else { continue };
+                let modified = m.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as u64).unwrap_or(0);
+                out.push(Earlier { id, title: String::new(), modified, bytes: m.len(), account_id: account_id.clone() });
+            }
+        }
+    }
+    out.sort_by(|a, b| b.modified.cmp(&a.modified));
+    out.truncate(30);
+    // read the first words of only the ones that are shown
+    for e in out.iter_mut() {
+        if let Some(root) = roots.iter().find(|r| r.0 == e.account_id).and_then(|r| config_root(r.1.as_deref())) {
+            if let Some(dir) = std::fs::read_dir(root.join("projects")).ok().and_then(|rd| rd.filter_map(Result::ok).find(|d| d.file_name().to_string_lossy().to_lowercase() == want)) {
+                e.title = first_words(&dir.path().join(format!("{}.jsonl", e.id)));
+            }
+        }
+    }
+    out.retain(|e| e.bytes > 600); // an empty session (opened and closed) is not worth listing
+    out
+}

@@ -54,7 +54,7 @@ function ToolLine({ it }: { it: Extract<Item, { kind: "tool" }> }) {
   );
 }
 
-function PermissionCard({ it, onAnswer }: { it: Extract<Item, { kind: "permission" }>; onAnswer: (allow: boolean) => void }) {
+function PermissionCard({ it, onAnswer }: { it: Extract<Item, { kind: "permission" }>; onAnswer: (allow: boolean, remember?: unknown[]) => void }) {
   const open = it.status === "asking";
   return (
     <div className="flex max-w-[680px] flex-col gap-4 rounded-dialog border border-line-subtle bg-surface-2 p-6" role="group" aria-label={permissionTitle(it.toolName)}>
@@ -78,6 +78,7 @@ function PermissionCard({ it, onAnswer }: { it: Extract<Item, { kind: "permissio
       {open ? (
         <div className="flex justify-end gap-3">
           <Button variant="quiet" onClick={() => onAnswer(false)}>Don’t allow</Button>
+          {it.suggestions && !it.servers && <Button variant="quiet" onClick={() => onAnswer(true, it.suggestions)} title="Allow this, and remember it for this project so Claude does not ask again">Always allow here</Button>}
           <Button variant="primary" onClick={() => onAnswer(true)}>Allow once</Button>
         </div>
       ) : (
@@ -89,7 +90,7 @@ function PermissionCard({ it, onAnswer }: { it: Extract<Item, { kind: "permissio
   );
 }
 
-function Transcript({ s, onAnswer }: { s: Session; onAnswer: (it: Extract<Item, { kind: "permission" }>, allow: boolean) => void }) {
+function Transcript({ s, onAnswer }: { s: Session; onAnswer: (it: Extract<Item, { kind: "permission" }>, allow: boolean, remember?: unknown[]) => void }) {
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [s.items.length, s.draft]);
   return (
@@ -109,7 +110,7 @@ function Transcript({ s, onAnswer }: { s: Session; onAnswer: (it: Extract<Item, 
           );
         if (it.kind === "assistant") return <p key={it.id} className="m-0 max-w-[760px] whitespace-pre-wrap">{it.text}</p>;
         if (it.kind === "tool") return <ToolLine key={it.id} it={it} />;
-        if (it.kind === "permission") return <PermissionCard key={it.id} it={it} onAnswer={(a) => onAnswer(it, a)} />;
+        if (it.kind === "permission") return <PermissionCard key={it.id} it={it} onAnswer={(a, r) => onAnswer(it, a, r)} />;
         return (
           <div key={it.id} className={`flex max-w-[760px] items-start gap-2.5 text-[13px] leading-5 ${it.tone === "problem" ? "text-state-left" : "text-text-tertiary"}`}>
             <Glyph state={it.tone === "problem" ? "left" : "stopped"} size={16} /> <span className="whitespace-pre-wrap">{it.text}</span>
@@ -186,9 +187,9 @@ function Composer({ s, onSend }: { s: Session; onSend: (text: string, images: At
 export function Chat({ s, role, account, dispatch, onNote, onSaveAnswer }: { s: Session; role?: Role; account?: string; dispatch: (a: any) => void; onNote?: () => void; onSaveAnswer?: (text: string) => void }) {
   // a session started from the Brain to answer a question: when it has answered, offer to keep the answer as a note
   const lastAnswer = [...s.items].reverse().find((it) => it.kind === "assistant") as Extract<Item, { kind: "assistant" }> | undefined;
-  const answer = async (it: Extract<Item, { kind: "permission" }>, allow: boolean) => {
+  const answer = async (it: Extract<Item, { kind: "permission" }>, allow: boolean, remember?: unknown[]) => {
     dispatch({ type: "permission-answered", sessionId: s.id, requestId: it.requestId, allowed: allow });
-    await invoke("answer_permission", { sessionId: s.id, requestId: it.requestId, allow, input: allow ? it.input : null, message: allow ? null : "The owner said no." });
+    await invoke("answer_permission", { sessionId: s.id, requestId: it.requestId, allow, input: allow ? it.input : null, message: allow ? null : "The owner said no.", remember: allow && remember ? remember : null });
   };
   const send = async (text: string, images: Attached[]) => {
     // a private key never goes through a prompt (the core refuses it too)

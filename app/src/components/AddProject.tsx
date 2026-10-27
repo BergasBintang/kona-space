@@ -6,6 +6,7 @@ import { Button, Glyph } from "./ui";
 export function AddProject({ first, onDone, onCancel }: { first: boolean; onDone: (r: AddResult) => void; onCancel: () => void }) {
   const [folder, setFolder] = useState("");
   const [name, setName] = useState("");
+  const [github, setGithub] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -15,7 +16,7 @@ export function AddProject({ first, onDone, onCancel }: { first: boolean; onDone
   };
   const add = async () => {
     setBusy(true); setError(null);
-    try { onDone(await addProject(folder, name.trim() || undefined)); }
+    try { onDone(await addProject(folder, name.trim() || undefined, github.trim() || undefined)); }
     catch (e) { setError(String(e)); }
     finally { setBusy(false); }
   };
@@ -39,6 +40,10 @@ export function AddProject({ first, onDone, onCancel }: { first: boolean; onDone
         <label className="flex flex-col gap-2">
           <span className="text-[13px] leading-5 font-bold text-text-secondary">Name</span>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="shop-api" className="h-11 rounded-control border border-line-strong bg-inset px-3.5 text-[15px] text-text placeholder:text-text-tertiary" />
+        </label>
+        <label className="flex flex-col gap-2">
+          <span className="text-[13px] leading-5 font-bold text-text-secondary">GitHub address (optional)</span>
+          <input value={github} onChange={(e) => setGithub(e.target.value)} placeholder="owner/name" aria-label="GitHub address" className="h-11 rounded-control border border-line-strong bg-inset px-3.5 font-mono text-[15px] text-text placeholder:text-text-tertiary" />
         </label>
         {error && <div className="flex items-start gap-2.5 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
         <div className="flex justify-end gap-3">

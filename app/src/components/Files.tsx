@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { baseName, humanSize, listDir, readFile, type Entry, type FileView, type Project } from "../lib/api";
 import { Button, Glyph } from "./ui";
+import { Markdown } from "./brain/Markdown";
 
 const QUIET = new Set([".git", "node_modules", "target", "dist", ".kona", "__pycache__", ".next", ".venv"]);
 
@@ -41,6 +42,26 @@ function TreePanel({ project, selected, onPick }: { project: Project; selected: 
     setOpenDirs(next);
   };
 
+  // Arrow keys: Down and Up move through the rows that are showing; Right opens a folder (or steps into it); Left closes it (or steps out to its folder);
+  // Home and End jump to the first and last row; Enter and Space do what a click does.
+  const onKey = (ev: React.KeyboardEvent) => {
+    const cur = (ev.target as HTMLElement).closest<HTMLElement>("[data-path]");
+    if (!cur) return;
+    const all = [...ev.currentTarget.querySelectorAll<HTMLElement>("[data-path]")];
+    const i = all.indexOf(cur);
+    const focus = (el?: HTMLElement) => { if (el) { ev.preventDefault(); el.focus(); } };
+    const isDir = cur.dataset.dir === "1", isOpen = cur.getAttribute("aria-expanded") === "true";
+    const entry = (path: string) => { for (const v of Object.values(tree)) if (Array.isArray(v)) { const e = v.find((x) => x.path === path); if (e) return e; } return undefined; };
+    switch (ev.key) {
+      case "ArrowDown": focus(all[i + 1]); break;
+      case "ArrowUp": focus(all[i - 1]); break;
+      case "Home": focus(all[0]); break;
+      case "End": focus(all[all.length - 1]); break;
+      case "ArrowRight": if (isDir && !isOpen) { ev.preventDefault(); const e = entry(cur.dataset.path!); if (e) toggle(e); } else if (isDir) focus(all[i + 1]); break;
+      case "ArrowLeft": if (isDir && isOpen) { ev.preventDefault(); const e = entry(cur.dataset.path!); if (e) toggle(e); } else focus(all.find((x) => x.dataset.path === cur.dataset.parent)); break;
+    }
+  };
+
   const rows = (dir: string, depth: number): React.ReactNode => {
     const node = tree[dir];
     if (!node || node === "loading") return <div className="py-1 text-[13px] leading-5 text-text-tertiary" style={{ paddingLeft: 12 + depth * 18 }}>Reading…</div>;
@@ -53,6 +74,7 @@ function TreePanel({ project, selected, onPick }: { project: Project; selected: 
         <div key={e.path}>
           <button
             onClick={() => (e.is_dir ? toggle(e) : onPick(e))}
+            role="treeitem" data-path={e.path} data-parent={dir} data-dir={e.is_dir ? "1" : undefined} aria-level={depth + 1}
             aria-expanded={e.is_dir ? isOpen : undefined}
             aria-current={on ? "true" : undefined}
             title={e.path}
@@ -70,7 +92,7 @@ function TreePanel({ project, selected, onPick }: { project: Project; selected: 
   };
 
   return (
-    <div className="flex h-full w-[320px] shrink-0 flex-col gap-3 overflow-y-auto bg-ground px-2.5 pt-6 pb-5" role="tree" aria-label={`Files of ${project.name}`}>
+    <div className="flex h-full w-[320px] shrink-0 flex-col gap-3 overflow-y-auto bg-ground px-2.5 pt-6 pb-5" role="tree" aria-label={`Files of ${project.name}`} onKeyDown={onKey}>
       <div className="px-2.5 text-[17px] leading-6 font-bold">{project.name}</div>
       <div className="flex flex-col gap-px">{rows(project.folder, 0)}</div>
     </div>
@@ -89,6 +111,7 @@ function Gutter({ text }: { text: string }) {
 }
 
 function Viewer({ project, entry }: { project: Project; entry: Entry | null }) {
+  const [rendered, setRendered] = useState(true); // a markdown file is shown read as a page, with a switch to the plain text
   const [view, setView] = useState<FileView | { error: string } | "loading" | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
@@ -125,7 +148,13 @@ function Viewer({ project, entry }: { project: Project; entry: Entry | null }) {
   else if (view.kind === "text") {
     let text = view.text, tidy = false;
     if (ext === "json") { try { text = JSON.stringify(JSON.parse(view.text), null, 2); tidy = true; } catch { /* show it as it is */ } }
-    body = (
+    const md = ext === "md" || ext === "markdown";
+    body = md && rendered ? (
+      <div className="flex min-h-0 flex-1 flex-col">
+        {view.truncated && <div className="px-8 pb-2 text-[13px] leading-5 text-text-tertiary">Only the first 2 MB are shown.</div>}
+        <div className="min-h-0 flex-1 overflow-auto px-8 py-5"><div className="max-w-[760px]"><Markdown text={view.text} resolve={() => null} open={() => {}} wiki={false} /></div></div>
+      </div>
+    ) : (
       <div className="flex min-h-0 flex-1 flex-col">
         {(view.truncated || tidy) && <div className="px-8 pb-2 text-[13px] leading-5 text-text-tertiary">{view.truncated ? "Only the first 2 MB are shown." : "Shown with tidy spacing."}</div>}
         <div className="min-h-0 flex-1 overflow-auto py-3"><Gutter text={text} /></div>
@@ -146,6 +175,7 @@ function Viewer({ project, entry }: { project: Project; entry: Entry | null }) {
         <h2 className="m-0 truncate text-[22px] leading-[30px] font-bold">{entry.name}</h2>
         <div className="flex flex-wrap gap-x-4 text-[13px] leading-5 text-text-tertiary">
           <span className="truncate font-mono">{rel}</span>
+          {(ext === "md" || ext === "markdown") && <button type="button" onClick={() => setRendered((r) => !r)} aria-pressed={rendered} className="rounded font-bold text-text-secondary hover:text-text">{rendered ? "Show the text" : "Show it as a page"}</button>}
           <span>{humanSize(entry.size)}</span>
           {entry.modified && <span>changed {new Date(entry.modified * 1000).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</span>}
         </div>

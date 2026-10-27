@@ -1,6 +1,7 @@
 // Kona's core. The screen (React) asks, this program does: it starts and talks to `claude`, keeps the cost ledger,
 // and makes sure nothing it started outlives it.
 mod accounts;
+mod backup;
 mod brain;
 mod brain_search;
 mod files;
@@ -104,8 +105,8 @@ fn send_message(sessions: State<'_, Sessions>, session_id: String, text: String,
 }
 
 #[tauri::command]
-fn answer_permission(sessions: State<'_, Sessions>, session_id: String, request_id: String, allow: bool, input: Option<Value>, message: Option<String>) -> Result<(), String> {
-    sessions.answer_permission(&session_id, &request_id, allow, input, message)
+fn answer_permission(sessions: State<'_, Sessions>, session_id: String, request_id: String, allow: bool, input: Option<Value>, message: Option<String>, remember: Option<Value>) -> Result<(), String> {
+    sessions.answer_permission(&session_id, &request_id, allow, input, message, remember)
 }
 
 #[tauri::command]
@@ -119,8 +120,15 @@ fn list_projects(projects: State<'_, Projects>) -> Vec<Project> {
 }
 
 #[tauri::command]
-fn add_project(projects: State<'_, Projects>, folder: String, name: Option<String>) -> Result<AddResult, String> {
-    projects.add(&folder, name)
+fn add_project(projects: State<'_, Projects>, folder: String, name: Option<String>, github: Option<String>) -> Result<AddResult, String> {
+    let r = projects.add(&folder, name)?;
+    match github.filter(|g| !g.trim().is_empty()) {
+        Some(g) => match projects.set_github(&r.project.id, &g) {
+            Ok(p) => Ok(AddResult { project: p, ..r }),
+            Err(e) => { let _ = projects.remove(&r.project.id); Err(e) }
+        },
+        None => Ok(r),
+    }
 }
 
 /// Forget a project. Its files are never touched.
@@ -400,6 +408,53 @@ fn ssh_key_state(projects: State<'_, Projects>, path: String) -> ssh::KeyState {
     ssh::key_state(&path, &folders)
 }
 
+/// Change a project's GitHub repository (owner/name; empty clears it).
+#[tauri::command]
+fn set_project_github(projects: State<'_, Projects>, id: String, github: String) -> Result<Project, String> {
+    projects.set_github(&id, &github)
+}
+
+#[tauri::command]
+fn get_settings(settings: State<'_, backup::SettingsStore>) -> backup::Settings {
+    settings.get()
+}
+
+#[tauri::command]
+fn set_settings(settings: State<'_, backup::SettingsStore>, value: backup::Settings) -> Result<backup::Settings, String> {
+    settings.set(value)
+}
+
+fn kona_base(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+    app.path().app_data_dir().ok().and_then(|p| p.parent().map(|d| d.join("Kona"))).ok_or_else(|| "no app data folder".to_string())
+}
+
+/// Copy Kona's files, the cost ledger and every project's tickets and brain notes into a new backup folder.
+#[tauri::command]
+async fn backup_now(app: AppHandle, projects: State<'_, Projects>, sessions: State<'_, Sessions>) -> Result<backup::BackupInfo, String> {
+    let base = kona_base(&app)?;
+    let list: Vec<(String, String)> = projects.all().into_iter().map(|p| (p.name, p.folder)).collect();
+    let ledger = sessions.ledger.clone();
+    tauri::async_runtime::spawn_blocking(move || backup::make(&base, &list, |p| ledger.backup_to(p))).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn list_backups(app: AppHandle) -> Result<Vec<backup::BackupInfo>, String> {
+    Ok(backup::list(&kona_base(&app)?))
+}
+
+#[tauri::command]
+fn delete_backup(app: AppHandle, name: String) -> Result<(), String> {
+    backup::delete(&kona_base(&app)?, &name)
+}
+
+/// The sessions Claude Code saved earlier for a project, newest first, so one can be resumed.
+#[tauri::command]
+async fn earlier_sessions(projects: State<'_, Projects>, accounts: State<'_, Accounts>, project_id: String) -> Result<Vec<summary::Earlier>, String> {
+    let folder = project_path(&projects, &project_id)?.to_string_lossy().to_string();
+    let roots: Vec<(String, Option<String>)> = accounts.all().into_iter().map(|a| (a.id, a.config_dir)).collect();
+    tauri::async_runtime::spawn_blocking(move || summary::earlier(&folder, &roots)).await.map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn list_roles(roles: State<'_, Roles>) -> Vec<Role> {
     roles.all()
@@ -499,9 +554,10 @@ pub fn run() {
             app.manage(Accounts::load(&base));
             app.manage(Voice::load(&base));
             app.manage(ssh::Servers::load(&base));
+            app.manage(backup::SettingsStore::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
+        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, set_project_github, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

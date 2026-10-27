@@ -1,6 +1,7 @@
 // The second column of the Sessions place: this project's sessions, and the New button.
 import { Button, Glyph, RoleMark, type GlyphState } from "./ui";
-import { baseName, samePlace, type Project, type Role } from "../lib/api";
+import { baseName, samePlace, type Earlier, type Project, type Role } from "../lib/api";
+import { useState } from "react";
 import { dollars, type Session, type State } from "../lib/sessions";
 
 const RUN: Record<Session["run"], { state: GlyphState; word: string }> = {
@@ -8,7 +9,8 @@ const RUN: Record<Session["run"], { state: GlyphState; word: string }> = {
   waiting: { state: "waiting", word: "Waiting on you" }, ended: { state: "stopped", word: "Ended" },
 };
 
-export function SessionList({ state, project, roles, leftBehind, onSelect, onNew, creating }: { state: State; project: Project; roles: Role[]; leftBehind: Record<string, number>; onSelect: (id: string) => void; onNew: () => void; creating: boolean }) {
+export function SessionList({ state, project, roles, leftBehind, earlier, onResume, onSelect, onNew, creating }: { state: State; project: Project; roles: Role[]; leftBehind: Record<string, number>; earlier: Earlier[]; onResume: (e: Earlier) => void; onSelect: (id: string) => void; onNew: () => void; creating: boolean }) {
+  const [showEarlier, setShowEarlier] = useState(false);
   const mine = state.order.filter((id) => samePlace(state.sessions[id].folder, project.folder));
   return (
     <div className="flex h-full w-[320px] shrink-0 flex-col gap-3.5 bg-ground px-2.5 pt-6 pb-5">
@@ -36,6 +38,22 @@ export function SessionList({ state, project, roles, leftBehind, onSelect, onNew
             </button>
           );
         })}
+        {earlier.length > 0 && (
+          <div className="mt-3 flex flex-col gap-0.5 border-t border-line-subtle pt-3">
+            <button type="button" onClick={() => setShowEarlier((v) => !v)} aria-expanded={showEarlier} className="flex items-center justify-between rounded-lg px-3.5 py-2 text-left text-[14px] leading-5 font-bold text-text-secondary hover:text-text">
+              <span>Earlier sessions</span><span className="font-mono text-[12px] font-normal text-text-tertiary">{earlier.length}</span>
+            </button>
+            {showEarlier && earlier.map((e) => (
+              <div key={e.id} data-earlier={e.id} className="flex items-center gap-3 rounded-xl px-3.5 py-2 hover:bg-surface-2">
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate text-[14px] leading-5">{e.title || "(no first message)"}</span>
+                  <span className="text-[12px] leading-5 text-text-tertiary">{new Date(e.modified).toLocaleString([], { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</span>
+                </span>
+                <Button variant="quiet" small onClick={() => onResume(e)}>Resume</Button>
+              </div>
+            ))}
+          </div>
+        )}
       </nav>
     </div>
   );

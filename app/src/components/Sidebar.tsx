@@ -4,11 +4,12 @@ import { Select } from "./pick";
 import type { Project } from "../lib/api";
 import type { Plan } from "../lib/sessions";
 
-export type Place = "sessions" | "files" | "roles" | "accounts" | "costs" | "voice" | "board" | "worktrees" | "leftovers" | "brain" | "servers";
+export type Place = "sessions" | "files" | "roles" | "accounts" | "costs" | "voice" | "board" | "worktrees" | "leftovers" | "brain" | "servers" | "settings";
 
 const ICONS: Record<Place, React.ReactNode> = {
   sessions: <path d="M2.5 3.5 L13.5 3.5 L13.5 10.5 L7 10.5 L4 13 L4 10.5 L2.5 10.5 Z" />,
   files: <path d="M2 5 L2 12.5 L14 12.5 L14 6 L7.5 6 L6.5 4 L2 4 Z" />,
+  settings: <path d="M3 4.5 H13 M3 8 H13 M3 11.5 H13 M10 3 V6 M6 6.5 V9.5 M11 10 V13" />,
   servers: <path d="M2.5 3.5 H13.5 V7 H2.5 Z M2.5 9 H13.5 V12.5 H2.5 Z M5 5.25 H5.01 M5 10.75 H5.01" />,
   brain: <><circle cx="4" cy="4.5" r="1.6" /><circle cx="12" cy="4" r="1.6" /><circle cx="8" cy="12" r="1.6" /><path d="M5.4 5.2 L7 10.6 M10.6 5 L9 10.6 M5.6 4.4 H10.4" /></>,
   leftovers: <path d="M3 4 H13 M5 4 V12.5 H11 V4 M6.5 6.5 V10 M9.5 6.5 V10 M6 2.5 H10" />,
@@ -19,7 +20,7 @@ const ICONS: Record<Place, React.ReactNode> = {
   accounts: <><circle cx="6" cy="8" r="2.8" /><path d="M8.8 8 H14 M12 8 V10.5" /></>,
   roles: <><circle cx="8" cy="5.5" r="2.5" /><path d="M3 13 C3 10.2 5 9 8 9 C11 9 13 10.2 13 13 Z" /></>,
 };
-const PLACES: { id: Place; label: string }[] = [{ id: "sessions", label: "Sessions" }, { id: "board", label: "Board" }, { id: "worktrees", label: "Worktrees" }, { id: "brain", label: "Brain" }, { id: "files", label: "Files" }, { id: "leftovers", label: "Leftovers" }, { id: "servers", label: "Servers" }, { id: "costs", label: "Costs" }, { id: "roles", label: "Roles" }, { id: "voice", label: "Voice" }, { id: "accounts", label: "Accounts" }];
+const PLACES: { id: Place; label: string }[] = [{ id: "sessions", label: "Sessions" }, { id: "board", label: "Board" }, { id: "worktrees", label: "Worktrees" }, { id: "brain", label: "Brain" }, { id: "files", label: "Files" }, { id: "leftovers", label: "Leftovers" }, { id: "servers", label: "Servers" }, { id: "costs", label: "Costs" }, { id: "roles", label: "Roles" }, { id: "voice", label: "Voice" }, { id: "accounts", label: "Accounts" }, { id: "settings", label: "Settings" }];
 
 export function Sidebar({ projects, project, onProject, onAddProject, place, onPlace, attention, leftBehind, plan, accountLabel, limitLine, version }: {
   projects: Project[]; project: Project | null; onProject: (id: string) => void; onAddProject: () => void;

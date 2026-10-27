@@ -5,13 +5,14 @@ import { frontMatter } from "../../lib/brain/parse.ts";
 
 const LINK = /\[\[([^\]|#]+)(?:#([^\]|]+))?(?:\|([^\]]+))?\]\]|`([^`]+)`|\*\*([^*]+)\*\*/g;
 
-function inline(text: string, resolve: (raw: string) => string | null, open: (id: string) => void, key: string): ReactNode[] {
+function inline(text: string, resolve: (raw: string) => string | null, open: (id: string) => void, key: string, wiki = true): ReactNode[] {
   const out: ReactNode[] = [];
   let last = 0, i = 0;
   for (const m of text.matchAll(LINK)) {
     const at = m.index ?? 0;
     if (at > last) out.push(text.slice(last, at));
-    if (m[1] !== undefined) {
+    if (m[1] !== undefined && !wiki) out.push(m[0]);
+    else if (m[1] !== undefined) {
       const target = resolve(m[1]);
       const label = (m[3] ?? m[1]).trim();
       out.push(target
@@ -25,7 +26,7 @@ function inline(text: string, resolve: (raw: string) => string | null, open: (id
   return out;
 }
 
-export function Markdown({ text, resolve, open }: { text: string; resolve: (raw: string) => string | null; open: (id: string) => void }) {
+export function Markdown({ text, resolve, open, wiki = true }: { text: string; resolve: (raw: string) => string | null; open: (id: string) => void; wiki?: boolean }) {
   const { bodyStart } = frontMatter(text);
   const lines = text.replace(/\r/g, "").split("\n").slice(bodyStart);
   const blocks: ReactNode[] = [];
@@ -42,20 +43,20 @@ export function Markdown({ text, resolve, open }: { text: string; resolve: (raw:
       const body = l.replace(/^#+\s+/, "");
       const cls = level === 1 ? "m-0 mt-2 text-[24px] leading-8 font-bold" : level === 2 ? "m-0 mt-3 text-[18px] leading-7 font-bold" : "m-0 mt-2 text-[15px] leading-6 font-bold";
       const Tag = (`h${Math.min(level + 1, 6)}`) as "h2";
-      blocks.push(<Tag key={k++} className={cls}>{inline(body, resolve, open, `h${k}`)}</Tag>);
+      blocks.push(<Tag key={k++} className={cls}>{inline(body, resolve, open, `h${k}`, wiki)}</Tag>);
       i++;
     } else if (/^\s*([-*]|\d+[.)])\s+/.test(l)) {
       const ordered = /^\s*\d+[.)]/.test(l);
       const items: string[] = [];
       while (i < lines.length && /^\s*([-*]|\d+[.)])\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*([-*]|\d+[.)])\s+/, ""));
       const List = ordered ? "ol" : "ul";
-      blocks.push(<List key={k++} className={`m-0 flex flex-col gap-1.5 pl-6 ${ordered ? "list-decimal" : "list-disc"}`}>{items.map((t, j) => <li key={j} className="pl-1 leading-6">{inline(t, resolve, open, `l${k}-${j}`)}</li>)}</List>);
+      blocks.push(<List key={k++} className={`m-0 flex flex-col gap-1.5 pl-6 ${ordered ? "list-decimal" : "list-disc"}`}>{items.map((t, j) => <li key={j} className="pl-1 leading-6">{inline(t, resolve, open, `l${k}-${j}`, wiki)}</li>)}</List>);
     } else if (l.trim() === "") {
       i++;
     } else {
       const para: string[] = [];
       while (i < lines.length && lines[i].trim() !== "" && !/^(#{1,6}\s|\s*```|\s*([-*]|\d+[.)])\s+)/.test(lines[i])) para.push(lines[i++]);
-      blocks.push(<p key={k++} className="m-0 leading-6">{inline(para.join(" "), resolve, open, `p${k}`)}</p>);
+      blocks.push(<p key={k++} className="m-0 leading-6">{inline(para.join(" "), resolve, open, `p${k}`, wiki)}</p>);
     }
   }
   return <div className="flex flex-col gap-3 text-[15px] text-text-secondary">{blocks}</div>;

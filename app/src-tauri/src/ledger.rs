@@ -84,13 +84,14 @@ impl Ledger {
                 cost: u.get("costUSD").and_then(Value::as_f64).unwrap_or(0.0),
             };
             let before = per_model.get(model).cloned().unwrap_or_default();
-            let d = Running {
+            let mut d = Running {
                 input: now.input - before.input,
                 output: now.output - before.output,
                 cache_read: now.cache_read - before.cache_read,
                 cache_write: now.cache_write - before.cache_write,
                 cost: now.cost - before.cost,
             };
+            if d.input < 0 || d.output < 0 || d.cache_read < 0 || d.cache_write < 0 || d.cost < -1e-12 { d = now.clone(); }
             per_model.insert(model.clone(), now);
             if d.input == 0 && d.output == 0 && d.cache_read == 0 && d.cache_write == 0 && d.cost.abs() < 1e-12 {
                 continue;
@@ -126,6 +127,21 @@ pub struct CostRow {
 }
 
 impl Ledger {
+    /// A session is being resumed. Its turn numbers go on from where they stopped. (The running totals do NOT carry the earlier spend: seen on
+    /// 2026-10-28, after resuming a session that had cost $0.094 the first result's totals were $0.010, so a resumed process counts from zero
+    /// and the plain difference is already right.)
+    pub fn seed_resume(&self, session_id: &str) {
+        let conn = self.conn.lock().unwrap();
+        let n: i64 = conn.query_row("SELECT IFNULL(MAX(turn), 0) FROM usage_turn WHERE session_id = ?1", params![session_id], |r| r.get(0)).unwrap_or(0);
+        self.turns.lock().unwrap().insert(session_id.to_string(), n);
+    }
+
+    /// A whole copy of the ledger in a new file, made by SQLite itself (safe while Kona runs).
+    pub fn backup_to(&self, path: &Path) -> Result<(), String> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("VACUUM INTO ?1", params![path.to_string_lossy()]).map(|_| ()).map_err(|e| format!("Could not copy the ledger: {e}"))
+    }
+
     /// Record a one-shot call (a note written about a session): its dollars are its own, not a running total, so nothing is subtracted.
     /// It is saved under the session it was about, with kind `summary`, so the cost views can count it (and not as a turn).
     pub fn record_oneshot(&self, session_id: &str, folder: &str, role_id: Option<&str>, account_id: Option<&str>, kind: &str, result: &Value) -> f64 {

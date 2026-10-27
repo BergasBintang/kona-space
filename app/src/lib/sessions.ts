@@ -8,7 +8,7 @@ export type Item =
   | { kind: "user"; id: string; text: string; images: string[] }
   | { kind: "assistant"; id: string; text: string }
   | { kind: "tool"; id: string; toolUseId: string; name: string; summary: string; status: "running" | "done" | "error" | "denied"; preview?: string }
-  | { kind: "permission"; id: string; requestId: string; toolName: string; description: string; command?: string; where?: string; input: unknown; status: "asking" | "allowed" | "denied"; servers?: { label: string; host: string; user: string; checked: boolean }[] }
+  | { kind: "permission"; id: string; requestId: string; toolName: string; description: string; command?: string; where?: string; input: unknown; status: "asking" | "allowed" | "denied"; servers?: { label: string; host: string; user: string; checked: boolean }[]; suggestions?: unknown[] }
   | { kind: "note"; id: string; text: string; tone: "info" | "problem" };
 
 export type PlanWindow = { utilization: number; resetsAt: number };
@@ -123,7 +123,7 @@ function onEvent(state: State, sessionId: string, r: any): State {
   const type: string = r?.type ?? "";
 
   if (type === "kona/started") {
-    const session: Session = { id: sessionId, folder: r.folder, workDir: r.workDir ?? r.folder, roleId: r.roleId ?? null, accountId: r.accountId ?? "main", voice: !!r.voice, ticketId: r.ticketId ?? null, brainQuestion: null, endedLine: r.lines?.ended ?? "This session has ended.", model: r.model, mode: r.mode, title: "", run: "ready", items: r.lines?.started ? [{ kind: "note", id: nextId("n"), tone: "info", text: r.lines.started }] : [], draft: "", costTotal: 0, costLast: 0, turns: 0 };
+    const session: Session = { id: sessionId, folder: r.folder, workDir: r.workDir ?? r.folder, roleId: r.roleId ?? null, accountId: r.accountId ?? "main", voice: !!r.voice, ticketId: r.ticketId ?? null, brainQuestion: null, endedLine: r.lines?.ended ?? "This session has ended.", model: r.model, mode: r.mode, title: "", run: "ready", items: [...(r.lines?.started ? [{ kind: "note" as const, id: nextId("n"), tone: "info" as const, text: r.lines.started }] : []), ...(r.resumed ? [{ kind: "note" as const, id: nextId("n"), tone: "info" as const, text: "This is an earlier session you resumed. Claude remembers it; the earlier messages are not shown here." }] : [])], draft: "", costTotal: 0, costLast: 0, turns: 0 };
     return { ...state, sessions: { ...state.sessions, [sessionId]: session }, order: [...state.order, sessionId], selected: sessionId };
   }
   if (type === "rate_limit_event") {
@@ -169,7 +169,7 @@ function onEvent(state: State, sessionId: string, r: any): State {
           ...push(s, {
             kind: "permission", id: nextId("p"), requestId: r.request_id, toolName: q.tool_name, description: q.description ?? "",
             command: typeof input.command === "string" ? input.command : typeof input.file_path === "string" ? input.file_path : undefined,
-            where: s.folder, input, status: "asking", servers: Array.isArray(r.kona_ssh) ? r.kona_ssh : undefined,
+            where: s.folder, input, status: "asking", servers: Array.isArray(r.kona_ssh) ? r.kona_ssh : undefined, suggestions: Array.isArray(q.permission_suggestions) && q.permission_suggestions.length ? q.permission_suggestions : undefined,
           }),
           run: "waiting",
         };

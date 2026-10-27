@@ -2,6 +2,18 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.15.0, 2026-10-28
+
+Polish: limits, settings, backups, resume.
+
+- A Settings place: how many sessions may run at once (default 2, because each uses about 225 MB), each project's GitHub address, removing a project (its files and hidden folder are never touched), and where Kona keeps things.
+- Kona refuses to start more sessions than the limit, with a plain message. Sessions that ended no longer count.
+- Backups: one press copies Kona's own files, the cost ledger and each project's tickets and brain notes into a dated folder under `%APPDATA%\Kona\backups`. Kona never deletes a backup by itself; you can delete one after a confirmation.
+- Earlier sessions: the sessions Claude Code saved for a project are listed under Sessions, and Resume continues one. The ledger counts only what the resumed session spends from then on.
+- "Always allow here" on an approval card: Claude Code remembers the rule in the project's local settings and stops asking for the same thing. It is not offered for commands that reach a server.
+- Add a project with an optional GitHub address.
+- The file tree works with the arrow keys (Up, Down, Left, Right, Home, End), and a markdown file opens as a page, with a switch to the plain text.
+
 ## 0.14.0, 2026-10-28
 
 The SSH registry.

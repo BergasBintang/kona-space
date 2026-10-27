@@ -10,10 +10,27 @@ build-output/
 .env.*
 *.pem
 *.key
+.claude/settings.local.json
 
-# Kona's own per-project notes, if one is ever opened on this folder
+# Kona's own per-project notes (tickets, brain), if Kona is ever opened on this folder
 .kona/
 
-# Windows noise
+# local data and scratch files
+*.db
+*.db-wal
+*.db-shm
+*.bak
+*.tmp
+graphify-out/
+
+# the author's own evidence from trying other tools (screenshots of third-party apps); kept on the author's PC only
+docs/trials/
+
+# editor and Windows noise
+*.code-workspace
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
 Thumbs.db
 desktop.ini

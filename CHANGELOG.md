@@ -2,6 +2,16 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.8.1, 2026-10-28
+
+A cleaner repository for anyone who downloads it.
+
+- A `README.md` at the top: what Kona is, what works, what you need, how to run it, where things are.
+- A `.gitattributes`, so text files have the same line endings on every PC and pictures and the design file are never altered.
+- The design scripts no longer point at one person's temporary folder: their screenshots go to `docs/design/build/build-output/` (ignored by Git), and `FIGCRAFT_CLI` can name FigCraft's command line tool.
+- The author's own screenshots of other tools (`docs/trials/`) and the VS Code workspace file are no longer in the repository. They stay on the author's PC.
+- More things are ignored by Git: local Claude Code settings, local database files, backups and temporary files.
+
 ## 0.8.0, 2026-10-27
 
 Tickets and the board.

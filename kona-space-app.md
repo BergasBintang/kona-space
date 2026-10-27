@@ -112,11 +112,12 @@ This note holds no keys, tokens, passwords, IP addresses or e-mail addresses, on
 | 2026-10-27 | **Kona 0.6.0: the needs check**: tools per role and per project, checked on this PC, install commands shown as text, never run | section 12 (step 2), F12 |
 | 2026-10-27 | **Kona 0.7.0: the voice**: one persona (terse operator first), told to Claude as an appended prompt with a scope clause, plus four Kona lines, with an off switch per session | section 12 (step 2), F15 |
 | 2026-10-27 | **Kona 0.8.0: tickets and the board**: ticket files, five-column board, start a session from a card, a built-in tool server so agents raise and update tickets, cost by ticket | section 12 (step 4 begun), F10 |
+| 2026-10-28 | **Kona 0.8.1: repository clean-up**: pushed to GitHub (SSH, a key made for Kona); README, `.gitattributes`, wider `.gitignore`, design scripts no longer tied to one temporary folder, trial screenshots kept off the repository | this section |
 
 **Where the work lives**
 - Design file: `docs/design/kona-design.figcraft` (open in FigCraft; it is also the clickable prototype). Previews: `docs/design/previews/`. Rules and tokens: `docs/DESIGN.md`.
 - Scripts that draw it: `docs/design/build/`. `run-all.sh` rebuilds the whole file while FigCraft runs with its control port. `build-previews.mjs` writes the PNGs.
-- Trial evidence: `docs/trials/`. Reading material: `D:\kona-refs` (the two Untitled UI repos only).
+- Trial evidence: `docs/trials/` (screenshots and RAM samples of two other people's tools). It is on the author's PC only: since 2026-10-28 the folder is ignored by Git, so it is not in the repository. Reading material: `D:\kona-refs` (the two Untitled UI repos only).
 - Memory summary for future sessions: Claude's `kona-app-purpose` and `kona-ui-taste` memory files.
 
 **Spikes run on 2026-10-27:** S1 (streaming, cost, plan bars), S3 (transcripts) and S5 (worktrees) all passed, in plain TypeScript run by Node 22 with no install (`spikes/`). **Not done yet:** no app shell, no toolchain installed (Rust and C++ build tools), S1b approval cards and image paste untested, S2, S4, S6 to S12 not run. Git is initialised (first commit, tag `v0.0.1`, nothing pushed). Still open for the owner: are ten roles and their starting modes right, do the ten marks read at small size, how many Claude accounts, should dialogs dim the whole window, which mono font.

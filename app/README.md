@@ -4,13 +4,7 @@ A Tauri 2 desktop app: a Rust core (`src-tauri/`) and a React and TypeScript scr
 
 ## Run it
 
-The Rust tools live on D: (`D:\toolchain`). A new terminal needs these set (they are saved as user variables, so a fresh Windows session has them):
-
-```
-RUSTUP_HOME=D:\toolchain\rustup
-CARGO_HOME=D:\toolchain\cargo
-PATH includes D:\toolchain\cargo\bin
-```
+You need Node.js 22 or newer, Rust (through `rustup`) and the Microsoft C++ build tools. In a new terminal, `cargo` must be on the PATH. (The author keeps the Rust tools on the D: drive and points `RUSTUP_HOME`, `CARGO_HOME` and the PATH there; that is a choice, not a requirement.)
 
 ```
 npm install          once

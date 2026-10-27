@@ -1,7 +1,8 @@
 // Minimal MCP client for FigCraft (stdio JSON-RPC to `figcraft-cli mcp --attach PORT`).
 import { spawn } from 'node:child_process';
 
-const CLI = 'C:/Program Files/FigCraft/figcraft-cli.exe';
+// where FigCraft's command line tool is; set FIGCRAFT_CLI if it is installed somewhere else
+const CLI = process.env.FIGCRAFT_CLI ?? 'C:/Program Files/FigCraft/figcraft-cli.exe';
 
 export async function connect(port = 7979) {
   const child = spawn(CLI, ['mcp', '--attach', String(port)], { stdio: ['pipe', 'pipe', 'inherit'] });

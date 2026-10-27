@@ -1,0 +1,9 @@
+# Text files are stored with LF line endings, so a pull from any PC gives the same bytes and diffs stay quiet.
+* text=auto eol=lf
+*.sh text eol=lf
+
+# Binary files: never touched.
+*.png binary
+*.ico binary
+*.icns binary
+*.figcraft binary

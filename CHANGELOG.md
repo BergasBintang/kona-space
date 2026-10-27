@@ -2,6 +2,18 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.12.0, 2026-10-28
+
+The Brain.
+
+- A Brain place: a graph of linked notes. Three layers: your own notes (plain markdown in the project's hidden `.kona/brain` folder, which you can write, edit and delete), 14 starter notes that ship with Kona (how to work with Claude Code agents and how to use Kona), and Claude's memory for the project, read in read-only.
+- Ask the brain: every answer is Found in the brain, Partly in the brain, or Not in the brain, in words and a glyph. Found and partly answers show the note, the layer, the exact lines and how much of the question the section covers. A miss offers choices (ask Claude in a plan-only session, search the web after a confirmation, open the nearest topic, write the note) and never acts alone.
+- A wanted list: questions the brain could not answer are kept in the project, shown in the report, and come off the list when you write the note.
+- A map of the notes (dots, written and guessed links, soft groups), a notes list with a layer filter, and a note reader where `[[links]]` open notes and links to nothing are marked.
+- A health report: links that go nowhere, notes nothing links to, decisions with no source, open items older than 30 days, notes that look like they hold a secret, the most connected notes, and how the notes group compared with how they are filed.
+- Text that looks like a key, a password or an IP address is hidden from the search and from answers, and is never saved to the wanted list.
+- Not yet: a note written by a session when it ends, a digest at the start of a session, and a search tool for Claude itself (the next version).
+
 ## 0.11.0, 2026-10-28
 
 Leftovers.

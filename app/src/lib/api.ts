@@ -33,6 +33,9 @@ export type LeftoverItem = {
 };
 export type LeftoverOverview = { items: LeftoverItem[]; sessions: { id: string; ended: boolean; running: number; left_behind: number }[] };
 export type TempInfo = { session_id: string; path: string; bytes: number; files: number; partial: boolean };
+export type BrainNote = { id: string; layer: string; text: string; path: string; mtime: number; readonly: boolean };
+export type BrainData = { notes: BrainNote[]; memory_dir: string | null };
+export type Wanted = { question: string; count: number; first: string; last: string };
 export type Entry = { name: string; path: string; is_dir: boolean; size: number; modified: number | null };
 export type FileView =
   | { kind: "text"; text: string; size: number; truncated: boolean }
@@ -64,6 +67,12 @@ export const stopLeftover = (key: string) => invoke<string>("leftover_stop", { k
 export const ignoreLeftover = (key: string) => invoke<void>("leftover_ignore", { key });
 export const sessionTemp = (sessionIds: string[]) => invoke<TempInfo[]>("session_temp", { sessionIds });
 export const sessionTempClean = (sessionId: string) => invoke<string>("session_temp_clean", { sessionId });
+export const loadBrain = (projectId: string) => invoke<BrainData>("brain_load", { projectId });
+export const saveNote = (projectId: string, id: string, text: string) => invoke<BrainNote>("brain_save", { projectId, id, text });
+export const deleteNote = (projectId: string, id: string) => invoke<void>("brain_delete", { projectId, id });
+export const wantedList = (projectId: string) => invoke<Wanted[]>("brain_wanted", { projectId });
+export const wantedAdd = (projectId: string, question: string) => invoke<Wanted[]>("brain_wanted_add", { projectId, question });
+export const wantedRemove = (projectId: string, question: string) => invoke<Wanted[]>("brain_wanted_remove", { projectId, question });
 export const costRows = (sinceDay: string | null) => invoke<CostRow[]>("cost_rows", { sinceDay });
 export const listRoles = () => invoke<Role[]>("list_roles");
 export const saveRole = (role: Role) => invoke<Role>("save_role", { role });

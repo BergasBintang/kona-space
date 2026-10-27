@@ -1,6 +1,7 @@
 // Kona's core. The screen (React) asks, this program does: it starts and talks to `claude`, keeps the cost ledger,
 // and makes sure nothing it started outlives it.
 mod accounts;
+mod brain;
 mod files;
 mod job;
 mod leftovers;
@@ -315,6 +316,38 @@ async fn session_temp_clean(tracker: State<'_, std::sync::Arc<leftovers::Tracker
     tauri::async_runtime::spawn_blocking(move || leftovers::clean_temp(&t, &session_id)).await.map_err(|e| e.to_string())?
 }
 
+/// The notes of a project's brain: its own notes and Claude's memory for the project (read only).
+#[tauri::command]
+fn brain_load(projects: State<'_, Projects>, project_id: String) -> Result<brain::BrainData, String> {
+    Ok(brain::load(&project_path(&projects, &project_id)?))
+}
+
+#[tauri::command]
+fn brain_save(projects: State<'_, Projects>, project_id: String, id: String, text: String) -> Result<brain::RawNote, String> {
+    brain::save(&project_path(&projects, &project_id)?, &id, &text)
+}
+
+#[tauri::command]
+fn brain_delete(projects: State<'_, Projects>, project_id: String, id: String) -> Result<(), String> {
+    brain::delete(&project_path(&projects, &project_id)?, &id)
+}
+
+#[tauri::command]
+fn brain_wanted(projects: State<'_, Projects>, project_id: String) -> Result<Vec<brain::Wanted>, String> {
+    Ok(brain::wanted_list(&project_path(&projects, &project_id)?))
+}
+
+/// A question the brain could not answer goes on the wanted list. The text stays on this PC.
+#[tauri::command]
+fn brain_wanted_add(projects: State<'_, Projects>, project_id: String, question: String) -> Result<Vec<brain::Wanted>, String> {
+    brain::wanted_add(&project_path(&projects, &project_id)?, &question)
+}
+
+#[tauri::command]
+fn brain_wanted_remove(projects: State<'_, Projects>, project_id: String, question: String) -> Result<Vec<brain::Wanted>, String> {
+    brain::wanted_remove(&project_path(&projects, &project_id)?, &question)
+}
+
 #[tauri::command]
 fn list_roles(roles: State<'_, Roles>) -> Vec<Role> {
     roles.all()
@@ -415,7 +448,7 @@ pub fn run() {
             app.manage(Voice::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
+        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

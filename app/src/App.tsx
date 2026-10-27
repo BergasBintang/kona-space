@@ -18,6 +18,7 @@ import { Voice } from "./components/Voice";
 import { Board } from "./components/Board";
 import { Worktrees } from "./components/Worktrees";
 import { Leftovers } from "./components/Leftovers";
+import { BrainPlace } from "./components/brain/Brain";
 import { Glyph } from "./components/ui";
 
 const remembered = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -107,6 +108,18 @@ export default function App() {
     setCreating(false); setPlace("sessions");
   };
 
+  // Ask Claude a question from the Brain: a new session in plan-only mode (it can read, not change), with the question sent at once.
+  const askClaude = async (question: string) => {
+    if (!project) return;
+    const accountId = accounts.some((a) => a.id === lastAccount) ? lastAccount : "main";
+    const status = await accountStatus(accountId);
+    if (!status.logged_in) throw new Error("That account is not signed in. Open Accounts to sign in.");
+    const id = await invoke<string>("start_session", { folder: project.folder, roleId: null, accountId, useVoice: persona?.enabled ?? false, ticketId: null, model: "sonnet", mode: "plan", resume: null });
+    dispatch({ type: "user-sent", sessionId: id, text: question, images: [] });
+    await invoke("send_message", { sessionId: id, text: question, images: [] });
+    setCreating(false); setPlace("sessions");
+  };
+
   if (import.meta.env.DEV && window.location.hash === "#kit") return <Kit />; // the base pickers on show, development only
 
   if (projects === null || persona === null) return <div className="flex h-full items-center justify-center text-text-tertiary">Opening Kona…</div>;
@@ -118,6 +131,8 @@ export default function App() {
     content = <Files project={project} />;
   } else if (place === "roles") {
     content = <Roles roles={roles} accounts={accounts} tools={tools} onChanged={setRoles} />;
+  } else if (place === "brain") {
+    content = <BrainPlace project={project} onAsk={askClaude} />;
   } else if (place === "leftovers") {
     content = <Leftovers state={state} roles={roles} overview={lo} onRefresh={() => { void leftoverOverview().then(setLo); }} />;
   } else if (place === "worktrees") {

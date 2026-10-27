@@ -1,0 +1,19 @@
+# dependencies and build output
+node_modules/
+target/
+dist/
+build-output/
+*.log
+
+# secrets and local settings: never commit these
+.env
+.env.*
+*.pem
+*.key
+
+# Kona's own per-project notes, if one is ever opened on this folder
+.kona/
+
+# Windows noise
+Thumbs.db
+desktop.ini

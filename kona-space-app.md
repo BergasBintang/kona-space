@@ -102,7 +102,8 @@ This note holds no keys, tokens, passwords, IP addresses or e-mail addresses, on
 | 2026-10-26 | Every screen made a fixed 1440 by 900 window; taller or wider content scrolls inside it (chat, lists, diff, board columns, files, settings, roles and more). The scroll setting is applied but was not tried in the presenter | `docs/DESIGN.md` |
 | 2026-10-27 | Brain redrawn as a graph of linked notes (map, notes, report, three answers: found, partly, not in the brain). Plan: F7 and decisions 40 and 41. Starter brain, Claude memory folder read-only, gap awareness, wanted notes | F7, `docs/DESIGN.md` |
 | 2026-10-27 | Collapsed sidebar: a 72 px rail that keeps the Kona mark, with a fold button on every project screen, hover tooltips, and two collapsed twin screens (Chat and the Brain map). Design version 3. `run-all.sh` was not repeated end to end; the two new scripts were run on the open file | `docs/DESIGN.md` |
-| 2026-10-27 | Spikes S1, S3 and S5 run and passed (plain TypeScript in `spikes/`, no install). `git init` done, first commit and tag `v0.0.1`, version naming in `docs/VERSIONING.md` (decision 14). Owner chose the Tauri desktop app now; toolchain install not started yet | section 13, `CHANGELOG.md` |
+| 2026-10-27 | Spikes S1, S3 and S5 run and passed (plain TypeScript in `spikes/`, no install). `git init` done, first commit and tag `v0.0.1`, version naming in `docs/VERSIONING.md` (decision 14). Owner chose the Tauri desktop app now | section 13, `CHANGELOG.md` |
+| 2026-10-27 | Toolchain installed on D: (Rust 1.99.1, C++ build tools). Hello-world Tauri app in `app/`, version 0.0.2: first build 4 min 26 s, idle window about 450 MB (over the 200 MB budget, S6 and S7) | section 13 |
 
 **Where the work lives**
 - Design file: `docs/design/kona-design.figcraft` (open in FigCraft; it is also the clickable prototype). Previews: `docs/design/previews/`. Rules and tokens: `docs/DESIGN.md`.
@@ -1204,6 +1205,13 @@ Small experiments that prove the risky parts before any real building. None of t
 - **Question:** how long and how much memory does the first Tauri build take here?
 - **How:** time it, watch peak memory.
 - **Pass if:** acceptable to the owner. If not, start with the local server plus browser tab.
+
+**S6 and S7 result (2026-10-27; toolchain installed, hello-world built and run; `app/`).**
+- **Installed, with the owner's go:** Rust 1.99.1 (minimal profile) in `D:\toolchain\rustup` and `D:\toolchain\cargo` (user variables `RUSTUP_HOME`, `CARGO_HOME` and the `PATH` entry set); the C++ build tools 17.14 (MSVC 14.44) in `D:\toolchain\vsbuildtools` through winget, which also put shared parts on C:. Disk now: C: 23.6 to 21.4 GB free (about 2.2 GB used), D: about 4 GB used by the toolchain and 2.9 GB by the first build. The rustup installer was checked against the published checksum. The download folder is `D:\toolchain\downloads` (the installer file can be deleted; ask first).
+- **S7, first build:** a plain `cargo build` of the new Tauri 2 app took **4 min 26 s** on this PC. Free RAM fell to **191 MB** at the lowest point (the sampler read every 3 seconds; VS Code, Chrome and FigCraft were open). So it works, but close other apps before a big build. The `target` folder is 2.9 GB. Later builds are incremental (a rebuild after a one-line change took 6.6 s).
+- **S6, idle window (debug build, started with `npm run tauri dev`):** the Kona window was **about 450 MB**: `app.exe` 37 MB plus six `msedgewebview2` processes (18, 43, 133, 119, 20 and 83 MB). The dev server (Vite and the Tauri tool, four `node` processes) added about 260 MB more, which a shipped app does not have. That is **over the 200 MB idle budget** in section 9, and close to Claudette's 540 MB. A release build is lighter, but WebView2 alone looks likely to stay above 200 MB (to verify with a release build). The budget probably needs to be restated as "about 300 to 400 MB with no live session".
+- **Stopped afterwards:** the window and dev server were stopped by killing the process tree I had started; nothing else was touched.
+- **Not done:** a release build (`npm run tauri build`), the installer, the Kona look in the window, and whether a 1440 by 900 window (the size set in the app) fits this PC's screen (not checked).
 
 **S8. Per-role skills and MCP servers**
 - **Question:** what is the cleanest way to give one session only some skills and MCP servers?

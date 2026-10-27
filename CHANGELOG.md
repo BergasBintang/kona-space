@@ -2,6 +2,15 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.0.2, 2026-10-27
+
+A window opens. The build tools are in place.
+
+- Rust and the C++ build tools are installed on D:, so Kona can be built here.
+- `app/` holds the first Tauri window (React and TypeScript). It shows the starter page, not Kona yet.
+- First build: 4 minutes 26 seconds. The idle window uses about 450 MB, above the 200 MB aim (see the plan, test S6).
+- `VERSION` is the one place the version number is written; the app files copy it.
+
 ## 0.0.1, 2026-10-27
 
 Before the app runs. This is the plan, the design and the first tests.

@@ -13,6 +13,7 @@ import { Files } from "./components/Files";
 import { Roles } from "./components/Roles";
 import { Accounts } from "./components/Accounts";
 import { Kit } from "./components/Kit";
+import { Costs } from "./components/Costs";
 import { Glyph } from "./components/ui";
 
 const remembered = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -80,6 +81,8 @@ export default function App() {
     content = <Files project={project} />;
   } else if (place === "roles") {
     content = <Roles roles={roles} accounts={accounts} onChanged={setRoles} />;
+  } else if (place === "costs") {
+    content = <Costs projects={projects} roles={roles} accounts={accounts} />;
   } else if (place === "accounts") {
     content = <Accounts accounts={accounts} onChanged={setAccounts} />;
   } else {

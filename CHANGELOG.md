@@ -2,6 +2,14 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.5.0, 2026-10-27
+
+Costs.
+
+- A Costs place: what your sessions cost, from the ledger Kona keeps. Pick a period (today, 7 days, 30 days, all time) and group it by project, role, account, model, day or session. Each line shows its share, the tokens sent and written, and the dollars.
+- Dollars are an estimate at list price, not your bill, and the screen says so.
+- Only sessions Kona ran are counted.
+
 ## 0.4.0, 2026-10-27
 
 Accounts, and better lists.

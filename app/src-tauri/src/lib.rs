@@ -75,6 +75,12 @@ fn remove_project(projects: State<'_, Projects>, id: String) -> Result<(), Strin
     projects.remove(&id)
 }
 
+/// What the sessions cost, summed per session, model and day, from a day on (or everything).
+#[tauri::command]
+fn cost_rows(sessions: State<'_, Sessions>, since_day: Option<String>) -> Vec<ledger::CostRow> {
+    sessions.ledger.cost_rows(since_day.as_deref())
+}
+
 #[tauri::command]
 fn list_roles(roles: State<'_, Roles>) -> Vec<Role> {
     roles.all()
@@ -156,7 +162,7 @@ pub fn run() {
             app.manage(Accounts::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
+        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -106,3 +106,41 @@ impl Ledger {
         added
     }
 }
+
+/// One line of the cost views: what one session spent on one model on one (local) day.
+#[derive(serde::Serialize)]
+pub struct CostRow {
+    pub session_id: String,
+    pub folder: Option<String>,
+    pub role_id: Option<String>,
+    pub account_id: Option<String>,
+    pub model: String,
+    pub day: String,
+    pub first_at: String,
+    pub turns: i64,
+    pub input: i64,
+    pub output: i64,
+    pub cache_read: i64,
+    pub cache_write: i64,
+    pub cost: f64,
+}
+
+impl Ledger {
+    /// The ledger, summed per session, model and local day, from `since_day` (YYYY-MM-DD, local) on. The screen groups it any way it likes.
+    pub fn cost_rows(&self, since_day: Option<&str>) -> Vec<CostRow> {
+        let conn = self.conn.lock().unwrap();
+        let Ok(mut st) = conn.prepare(
+            "SELECT session_id, MAX(folder), MAX(role_id), MAX(account_id), model, date(at, 'localtime') AS day, MIN(at),
+                    COUNT(DISTINCT turn), SUM(input_tokens), SUM(output_tokens), SUM(cache_read), SUM(cache_write), SUM(cost_usd)
+             FROM usage_turn WHERE (?1 IS NULL OR date(at, 'localtime') >= ?1)
+             GROUP BY session_id, model, day ORDER BY MIN(at) DESC",
+        ) else { return vec![] };
+        let rows = st.query_map(params![since_day], |r| {
+            Ok(CostRow {
+                session_id: r.get(0)?, folder: r.get(1)?, role_id: r.get(2)?, account_id: r.get(3)?, model: r.get(4)?, day: r.get(5)?, first_at: r.get(6)?,
+                turns: r.get(7)?, input: r.get(8)?, output: r.get(9)?, cache_read: r.get(10)?, cache_write: r.get(11)?, cost: r.get(12)?,
+            })
+        });
+        match rows { Ok(it) => it.filter_map(Result::ok).collect(), Err(_) => vec![] }
+    }
+}

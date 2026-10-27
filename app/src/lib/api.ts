@@ -6,6 +6,10 @@ export type AddResult = { project: Project; hidden_folder: boolean; git_ignored:
 export type Role = { id: string; name: string; group: string; mark: string; model: string; mode: string; brief: string; account?: string | null };
 export type Account = { id: string; label: string; config_dir?: string | null };
 export type AccountStatus = { logged_in: boolean; method?: string | null; plan?: string | null; email?: string | null };
+export type CostRow = {
+  session_id: string; folder: string | null; role_id: string | null; account_id: string | null; model: string; day: string; first_at: string;
+  turns: number; input: number; output: number; cache_read: number; cache_write: number; cost: number;
+};
 export type Entry = { name: string; path: string; is_dir: boolean; size: number; modified: number | null };
 export type FileView =
   | { kind: "text"; text: string; size: number; truncated: boolean }
@@ -17,6 +21,7 @@ export type FileView =
 export const listProjects = () => invoke<Project[]>("list_projects");
 export const addProject = (folder: string, name?: string) => invoke<AddResult>("add_project", { folder, name: name ?? null });
 export const removeProject = (id: string) => invoke<void>("remove_project", { id });
+export const costRows = (sinceDay: string | null) => invoke<CostRow[]>("cost_rows", { sinceDay });
 export const listRoles = () => invoke<Role[]>("list_roles");
 export const saveRole = (role: Role) => invoke<Role>("save_role", { role });
 export const removeRole = (id: string) => invoke<void>("remove_role", { id });

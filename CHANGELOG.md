@@ -2,6 +2,18 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.1.0, 2026-10-27
+
+The first Kona that works: one session, in a real window.
+
+- Pick a folder and chat with Claude Code. Answers stream in as they are written.
+- Claude asks before it runs a command or changes a file. Two buttons: Allow once, Don't allow.
+- Paste or add a picture and send it along.
+- Each session shows what it has cost so far in dollars (an estimate at list price, not your bill), and every turn is saved in a local cost ledger.
+- The two plan bars (this 5-hour session and this week) fill in by themselves.
+- Closing or killing Kona stops every Claude it started, and every program Claude started from it.
+- Not yet: roles, accounts, files, the board, the Brain, leftovers, resuming old sessions.
+
 ## 0.0.2, 2026-10-27
 
 A window opens. The build tools are in place.

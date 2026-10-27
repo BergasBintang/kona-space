@@ -2,6 +2,17 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.10.0, 2026-10-28
+
+The worktree graph.
+
+- A Worktrees place: a picture of the project's branches (where each left the main branch, how many commits ahead, how far the main branch moved on) and one card per working copy.
+- Each card shows the branch, the folder, the ticket that owns it (or none), the last commit, how many files changed and are not committed, and a state: merges cleanly, would clash (with the files named), nothing to merge, or the folder is gone.
+- Merge a copy's branch into the main branch from the card. Git checks for clashes first, the main folder must have no uncommitted changes, and a half-done merge is undone. The ticket history records it.
+- Remove a copy from the card. A copy with uncommitted files is only removed after you tick a box that names what will be thrown away; a branch with unmerged commits is kept unless you choose to throw it away.
+- Moving a ticket to Done asks first when its own copy still has commits the main branch lacks.
+- A new confirmation dialog: one question, plain words, Cancel has the focus, Esc cancels.
+
 ## 0.9.0, 2026-10-28
 
 A worktree per ticket.

@@ -24,6 +24,10 @@ export type Ticket = {
 export type WorktreeStatus = { exists: boolean; branch: string; ahead: number; behind: number; changed: number; base: string };
 export type TicketView = Ticket & { cost: number };
 export type TicketPatch = Partial<{ title: string; description: string; acceptance: string; status: string; role: string; next: string; waiting: boolean; note: string; own_copy: string }>;
+export type WorktreeInfo = {
+  path: string; branch: string; head: string; is_main: boolean; missing: boolean; ahead: number; behind: number; changed: number;
+  conflicts: string[]; last_subject: string; last_when: string; ticket_id?: string | null; ticket_title?: string | null;
+};
 export type Entry = { name: string; path: string; is_dir: boolean; size: number; modified: number | null };
 export type FileView =
   | { kind: "text"; text: string; size: number; truncated: boolean }
@@ -47,6 +51,9 @@ export const savePersona = (persona: Persona) => invoke<Persona>("save_persona",
 export const personaPrompt = (persona: Persona) => invoke<string>("persona_prompt", { persona });
 export const defaultPersona = () => invoke<Persona>("default_persona");
 export const worktreeStatus = (projectId: string, ticketId: string) => invoke<WorktreeStatus>("worktree_status", { projectId, ticketId });
+export const worktreeOverview = (projectId: string) => invoke<WorktreeInfo[]>("worktree_overview", { projectId });
+export const mergeWorktree = (projectId: string, path: string) => invoke<string>("worktree_merge", { projectId, path });
+export const removeWorktree = (projectId: string, path: string, discard: boolean) => invoke<string>("worktree_remove", { projectId, path, discard });
 export const costRows = (sinceDay: string | null) => invoke<CostRow[]>("cost_rows", { sinceDay });
 export const listRoles = () => invoke<Role[]>("list_roles");
 export const saveRole = (role: Role) => invoke<Role>("save_role", { role });

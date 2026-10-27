@@ -6,6 +6,7 @@ import { createTicket, listTickets, removeTicket, updateTicket, worktreeStatus, 
 import { dollars, type State } from "../lib/sessions";
 import { Button, Glyph, RoleMark } from "./ui";
 import { Select } from "./pick";
+import { Confirm } from "./Confirm";
 
 export const COLUMNS = [
   { id: "backlog", name: "Backlog", says: "Ideas and things to do someday" },
@@ -55,8 +56,8 @@ type Draft = { title: string; description: string; acceptance: string; role: str
 const draftOf = (t: TicketView | null): Draft => ({ title: t?.title ?? "", description: t?.description ?? "", acceptance: t?.acceptance ?? "", role: t?.role ?? "", status: t?.status ?? "backlog", next: t?.next ?? "", waiting: t?.waiting ?? false, own_copy: t?.own_copy ?? "auto" });
 const field = "rounded-control border border-line-strong bg-inset px-3.5 text-[15px] text-text placeholder:text-text-tertiary";
 
-function Drawer({ project, roles, ticket, state, onClose, onSaved, onRemoved, onStart, onOpenSession }: {
-  project: Project; roles: Role[]; ticket: TicketView | null; state: State; onClose: () => void;
+function Drawer({ project, roles, ticket, state, guardDone, onClose, onSaved, onRemoved, onStart, onOpenSession }: {
+  project: Project; roles: Role[]; ticket: TicketView | null; state: State; guardDone: (t: TicketView) => Promise<boolean>; onClose: () => void;
   onSaved: (id: string) => void; onRemoved: () => void; onStart: (t: TicketView) => Promise<void>; onOpenSession: (id: string) => void;
 }) {
   const fresh = ticket === null;
@@ -87,6 +88,7 @@ function Drawer({ project, roles, ticket, state, onClose, onSaved, onRemoved, on
         const t = await createTicket(project.id, { title: draft.title, description: draft.description, acceptance: draft.acceptance, role: draft.role || null, status: draft.status, next: draft.next, own_copy: draft.own_copy });
         onSaved(t.id);
       } else {
+        if (draft.status === "done" && base.current.status !== "done" && !(await guardDone(ticket!))) { setBusy(false); return; }
         const b = base.current; const patch: Record<string, unknown> = {};
         (Object.keys(draft) as (keyof Draft)[]).forEach((k) => { if (draft[k] !== b[k]) patch[k] = draft[k]; });
         await updateTicket(project.id, ticket!.id, patch);
@@ -200,6 +202,15 @@ export function Board({ project, roles, state, onStart, onOpenSession }: {
   const [openId, setOpenId] = useState<string | null>(null); // "" is a new ticket
   const [over, setOver] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [unmerged, setUnmerged] = useState<{ t: TicketView; ahead: number; resolve: (go: boolean) => void } | null>(null);
+
+  // Done means merged: a ticket whose own copy still has commits the main branch lacks asks before it moves to Done
+  const guardDone = useCallback(async (t: TicketView): Promise<boolean> => {
+    if (!t.worktree) return true;
+    const st = await worktreeStatus(project.id, t.id).catch(() => null);
+    if (!st || !st.exists || st.ahead === 0) return true;
+    return new Promise<boolean>((resolve) => setUnmerged({ t, ahead: st.ahead, resolve }));
+  }, [project.id]);
 
   const load = useCallback(() => { listTickets(project.id).then((t) => { setTickets(t); setError(null); }).catch((e) => setError(String(e))); }, [project.id]);
   useEffect(() => { setTickets(null); setOpenId(null); load(); const t = setInterval(load, 2000); return () => clearInterval(t); }, [load]);
@@ -216,6 +227,7 @@ export function Board({ project, roles, state, onStart, onOpenSession }: {
     const id = e.dataTransfer.getData("text/kona-ticket");
     const t = tickets?.find((x) => x.id === id);
     if (!t || t.status === status) return;
+    if (status === "done" && !(await guardDone(t))) return;
     setTickets((cur) => cur?.map((x) => (x.id === id ? { ...x, status } : x)) ?? null); // show it at once; the file is the truth
     try { await updateTicket(project.id, id, { status }); } catch (err) { setError(String(err)); }
     load();
@@ -250,9 +262,15 @@ export function Board({ project, roles, state, onStart, onOpenSession }: {
           ))}
         </div>
       )}
+      {unmerged && (
+        <Confirm title="Move to Done without merging?" confirmLabel="Move to Done" onConfirm={() => { unmerged.resolve(true); setUnmerged(null); }} onCancel={() => { unmerged.resolve(false); setUnmerged(null); }}>
+          <p className="m-0">{unmerged.t.id} has {unmerged.ahead} {unmerged.ahead === 1 ? "commit" : "commits"} on its own branch that your main branch does not have. Done normally means merged.</p>
+          <p className="m-0">You can merge it first in Worktrees. Moving it to Done now leaves the branch as it is.</p>
+        </Confirm>
+      )}
       {openId !== null && (openId === "" || open) && (
         <Drawer key={openId} project={project} roles={roles} ticket={open} state={state} onClose={() => setOpenId(null)}
-          onSaved={(id) => { setOpenId(id); load(); }} onRemoved={() => { setOpenId(null); load(); }} onStart={onStart} onOpenSession={onOpenSession} />
+          guardDone={guardDone} onSaved={(id) => { setOpenId(id); load(); }} onRemoved={() => { setOpenId(null); load(); }} onStart={onStart} onOpenSession={onOpenSession} />
       )}
     </main>
   );

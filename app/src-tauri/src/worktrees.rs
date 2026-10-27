@@ -129,3 +129,128 @@ pub fn status(project: &Path, worktree: &Path, branch: &str) -> Status {
     }
     s
 }
+
+/// Run `git` and return the exit code with what it printed, for commands where a non-zero exit is an answer, not a failure.
+fn git_code(dir: &Path, args: &[&str]) -> (i32, String) {
+    match Command::new("git").args(args).current_dir(dir).env("GIT_TERMINAL_PROMPT", "0").creation_flags(0x0800_0000).output() {
+        Ok(o) => (o.status.code().unwrap_or(-1), String::from_utf8_lossy(&o.stdout).trim().to_string()),
+        Err(_) => (-1, String::new()),
+    }
+}
+
+/// One line of the worktree graph.
+#[derive(Serialize)]
+pub struct Info {
+    pub path: String,
+    pub branch: String,
+    pub head: String,
+    pub is_main: bool,
+    /// the folder is gone (deleted by hand); `git worktree prune` forgets it
+    pub missing: bool,
+    pub ahead: u32,
+    pub behind: u32,
+    pub changed: u32,
+    /// files that would clash if this branch were merged into the main folder's branch (empty when it merges cleanly)
+    pub conflicts: Vec<String>,
+    pub last_subject: String,
+    pub last_when: String,
+}
+
+fn counts(project: &Path, base: &str, branch: &str) -> (u32, u32) {
+    // `base...branch` with --left-right: the left number is what only the base has (behind), the right what only the branch has (ahead)
+    let (code, t) = git_code(project, &["rev-list", "--left-right", "--count", &format!("{base}...{branch}")]);
+    if code != 0 { return (0, 0); }
+    let mut it = t.split_whitespace();
+    let behind = it.next().and_then(|x| x.parse().ok()).unwrap_or(0);
+    let ahead = it.next().and_then(|x| x.parse().ok()).unwrap_or(0);
+    (ahead, behind)
+}
+
+/// What a merge of `branch` into `base` would clash on, without touching anything (`git merge-tree`, Git 2.38 or newer).
+pub fn conflicts_of(project: &Path, base: &str, branch: &str) -> Vec<String> {
+    let (code, out) = git_code(project, &["merge-tree", "--write-tree", "--name-only", "--no-messages", base, branch]);
+    if code != 1 { return vec![]; }
+    out.lines().skip(1).map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).collect()
+}
+
+pub fn overview(project: &Path) -> Result<Vec<Info>, String> {
+    let entries = list(project)?;
+    let base = entries.first().map(|e| e.branch.clone()).unwrap_or_default();
+    Ok(entries.into_iter().map(|e| {
+        let missing = !Path::new(&e.path).exists();
+        let mut i = Info { path: e.path.clone(), branch: e.branch.clone(), head: e.head.clone(), is_main: e.is_main, missing, ahead: 0, behind: 0, changed: 0, conflicts: vec![], last_subject: String::new(), last_when: String::new() };
+        if !missing {
+            if let Ok(t) = git(Path::new(&e.path), &["status", "--porcelain", "--untracked-files=normal"]) {
+                i.changed = t.lines().filter(|l| !l.trim().is_empty()).count() as u32;
+            }
+            let (_, log) = git_code(Path::new(&e.path), &["log", "-1", "--format=%s%x1f%cr"]);
+            let mut parts = log.split('\u{1f}');
+            i.last_subject = parts.next().unwrap_or("").to_string();
+            i.last_when = parts.next().unwrap_or("").to_string();
+        }
+        if !e.is_main && !e.branch.is_empty() && !base.is_empty() {
+            let (a, b) = counts(project, &base, &e.branch);
+            i.ahead = a;
+            i.behind = b;
+            if a > 0 { i.conflicts = conflicts_of(project, &base, &e.branch); }
+        }
+        i
+    }).collect())
+}
+
+fn find(project: &Path, path: &str) -> Result<(Entry, String), String> {
+    let entries = list(project)?;
+    let base = entries.first().map(|e| e.branch.clone()).unwrap_or_default();
+    let want = norm(path);
+    let e = entries.into_iter().find(|e| norm(&e.path) == want).ok_or("That folder is not one of this project's worktrees")?;
+    if e.is_main { return Err("That is the main folder, not a copy".into()); }
+    Ok((e, base))
+}
+
+/// Merge a copy's branch into the main folder's branch with a merge commit. Refuses unless the main folder has no uncommitted changes
+/// to tracked files and the merge would be clean; if Git fails half way, the merge is undone.
+pub fn merge(project: &Path, path: &str, label: &str) -> Result<String, String> {
+    let (e, base) = find(project, path)?;
+    if e.branch.is_empty() { return Err("That copy is not on a branch".into()); }
+    if base.is_empty() { return Err("The main folder is not on a branch".into()); }
+    let dirty = git(project, &["status", "--porcelain", "--untracked-files=no"])?;
+    if !dirty.trim().is_empty() { return Err(format!("The main folder has changes that are not committed. Commit or put them away first, then merge. (Branch: {base})")); }
+    let (ahead, _) = counts(project, &base, &e.branch);
+    if ahead == 0 { return Err("There is nothing to merge: the branch has no commits the main folder lacks".into()); }
+    let clash = conflicts_of(project, &base, &e.branch);
+    if !clash.is_empty() { return Err(format!("The merge would clash on: {}", clash.join(", "))); }
+    let msg = if label.is_empty() { format!("Merge branch '{}'", e.branch) } else { format!("Merge branch '{}' ({label})", e.branch) };
+    match git(project, &["merge", "--no-ff", "-m", &msg, &e.branch]) {
+        Ok(_) => Ok(format!("Merged {} into {} ({} {}).", e.branch, base, ahead, if ahead == 1 { "commit" } else { "commits" })),
+        Err(err) => { let _ = git(project, &["merge", "--abort"]); Err(format!("Git could not merge, and the merge was undone: {err}")) }
+    }
+}
+
+/// Remove a copy's folder. Without `discard` it refuses while files are changed and not committed, and keeps a branch that has
+/// commits the main folder lacks. With `discard` it throws the changes and the unmerged branch away.
+pub fn remove(project: &Path, path: &str, discard: bool) -> Result<String, String> {
+    let (e, base) = find(project, path)?;
+    let exists = Path::new(&e.path).exists();
+    let changed = if exists { git(Path::new(&e.path), &["status", "--porcelain", "--untracked-files=normal"]).map(|t| t.lines().filter(|l| !l.trim().is_empty()).count()).unwrap_or(0) } else { 0 };
+    if changed > 0 && !discard {
+        return Err(format!("{changed} {} changed and not committed in that copy. Commit them, or choose to discard them.", if changed == 1 { "file is" } else { "files are" }));
+    }
+    let (ahead, _) = if !e.branch.is_empty() && !base.is_empty() { counts(project, &base, &e.branch) } else { (0, 0) };
+    if exists {
+        let mut args = vec!["worktree", "remove"];
+        if discard { args.push("--force"); }
+        args.push(&e.path);
+        git(project, &args)?;
+    }
+    let _ = git(project, &["worktree", "prune"]);
+    if e.branch.is_empty() { return Ok("Removed the copy.".into()); }
+    if ahead == 0 {
+        let _ = git(project, &["branch", "-d", &e.branch]);
+        Ok(format!("Removed the copy and its branch {} (it was merged).", e.branch))
+    } else if discard {
+        let _ = git(project, &["branch", "-D", &e.branch]);
+        Ok(format!("Removed the copy and threw away its branch {} with {} unmerged {}.", e.branch, ahead, if ahead == 1 { "commit" } else { "commits" }))
+    } else {
+        Ok(format!("Removed the copy. The branch {} is kept because it has {} {} that are not merged.", e.branch, ahead, if ahead == 1 { "commit" } else { "commits" }))
+    }
+}

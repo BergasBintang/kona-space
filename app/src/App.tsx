@@ -16,6 +16,7 @@ import { Kit } from "./components/Kit";
 import { Costs } from "./components/Costs";
 import { Voice } from "./components/Voice";
 import { Board } from "./components/Board";
+import { Worktrees } from "./components/Worktrees";
 import { Glyph } from "./components/ui";
 
 const remembered = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -103,6 +104,8 @@ export default function App() {
     content = <Files project={project} />;
   } else if (place === "roles") {
     content = <Roles roles={roles} accounts={accounts} tools={tools} onChanged={setRoles} />;
+  } else if (place === "worktrees") {
+    content = <Worktrees project={project} onChanged={() => {}} />;
   } else if (place === "board") {
     content = <Board project={project} roles={roles} state={state} onStart={startTicket} onOpenSession={(id) => { dispatch({ type: "select", id }); setCreating(false); setPlace("sessions"); }} />;
   } else if (place === "voice") {

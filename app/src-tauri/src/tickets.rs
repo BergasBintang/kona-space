@@ -301,6 +301,18 @@ pub fn set_worktree(dir: &Path, id: &str, branch: &str, path: &str, who: &str) -
     Ok(t)
 }
 
+/// The ticket's own copy was removed: forget the folder and branch, and say so in the history.
+pub fn clear_worktree(dir: &Path, id: &str, why: &str) -> Result<Ticket, String> {
+    let mut t = get(dir, id)?;
+    let at = now();
+    t.branch = String::new();
+    t.worktree = String::new();
+    t.updated = at.clone();
+    t.history.push(format!("{at} {why}"));
+    write(dir, &t)?;
+    Ok(t)
+}
+
 /// Record that a session works on this ticket. A card still in Backlog or Ready moves to In progress.
 pub fn link_session(dir: &Path, id: &str, session_id: &str, who: &str) -> Result<Ticket, String> {
     let mut t = get(dir, id)?;

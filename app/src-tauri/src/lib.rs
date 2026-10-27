@@ -218,6 +218,66 @@ fn worktree_status(projects: State<'_, Projects>, project_id: String, ticket_id:
     Ok(worktrees::status(std::path::Path::new(&project.folder), std::path::Path::new(&t.worktree), &t.branch))
 }
 
+/// One line of the worktree graph, with the ticket that owns the copy (if any).
+#[derive(serde::Serialize)]
+struct WorktreeView {
+    #[serde(flatten)]
+    info: worktrees::Info,
+    ticket_id: Option<String>,
+    ticket_title: Option<String>,
+}
+
+fn project_path(projects: &Projects, id: &str) -> Result<std::path::PathBuf, String> {
+    projects.all().into_iter().find(|p| p.id == id).map(|p| std::path::PathBuf::from(p.folder)).ok_or_else(|| "That project does not exist any more".to_string())
+}
+
+#[tauri::command]
+async fn worktree_overview(projects: State<'_, Projects>, project_id: String) -> Result<Vec<WorktreeView>, String> {
+    let folder = project_path(&projects, &project_id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        if !worktrees::is_repo(&folder) {
+            return Err("This project is not a Git repository".to_string());
+        }
+        let tix = tickets::list(&tickets::dir(&folder));
+        Ok(worktrees::overview(&folder)?.into_iter().map(|info| {
+            let t = tix.iter().find(|t| !t.worktree.is_empty() && worktrees::norm(&t.worktree) == worktrees::norm(&info.path));
+            WorktreeView { ticket_id: t.map(|t| t.id.clone()), ticket_title: t.map(|t| t.title.clone()), info }
+        }).collect())
+    }).await.map_err(|e| e.to_string())?
+}
+
+/// Merge a copy's branch into the main folder's branch. Changes the owner's main folder, so the screen asks first.
+#[tauri::command]
+async fn worktree_merge(projects: State<'_, Projects>, project_id: String, path: String) -> Result<String, String> {
+    let folder = project_path(&projects, &project_id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let tix = tickets::list(&tickets::dir(&folder));
+        let t = tix.iter().find(|t| !t.worktree.is_empty() && worktrees::norm(&t.worktree) == worktrees::norm(&path)).cloned();
+        let label = t.as_ref().map(|t| format!("{}: {}", t.id, t.title)).unwrap_or_default();
+        let msg = worktrees::merge(&folder, &path, &label)?;
+        if let Some(t) = t {
+            let _ = tickets::update(&tickets::dir(&folder), &t.id, tickets::Patch { note: Some(msg.clone()), ..Default::default() }, "the owner");
+        }
+        Ok(msg)
+    }).await.map_err(|e| e.to_string())?
+}
+
+/// Remove a copy's folder (and its branch when that is safe). `discard` throws away changes and unmerged commits.
+#[tauri::command]
+async fn worktree_remove(projects: State<'_, Projects>, project_id: String, path: String, discard: bool) -> Result<String, String> {
+    let folder = project_path(&projects, &project_id)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let tix = tickets::list(&tickets::dir(&folder));
+        let t = tix.iter().find(|t| !t.worktree.is_empty() && worktrees::norm(&t.worktree) == worktrees::norm(&path)).cloned();
+        let msg = worktrees::remove(&folder, &path, discard)?;
+        if let Some(t) = t {
+            // the ticket no longer has a copy; a later session may make a new one
+            let _ = tickets::clear_worktree(&tickets::dir(&folder), &t.id, &msg);
+        }
+        Ok(msg)
+    }).await.map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 fn list_roles(roles: State<'_, Roles>) -> Vec<Role> {
     roles.all()
@@ -305,7 +365,7 @@ pub fn run() {
             app.manage(Voice::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, worktree_status, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
+        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

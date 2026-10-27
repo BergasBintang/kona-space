@@ -1,8 +1,8 @@
 // The Roles place: the team. Each role is a saved setup for a session: its mark, model, permission mode and a short brief.
 import { useEffect, useMemo, useState } from "react";
-import { removeRole, saveRole, type Account, type Role } from "../lib/api";
+import { removeRole, saveRole, type Account, type Role, type ToolInfo } from "../lib/api";
 import { Button, Glyph, MARKS, RoleMark } from "./ui";
-import { Select } from "./pick";
+import { MultiSelect, Select } from "./pick";
 import { modeWord } from "../lib/sessions";
 
 export const GROUPS = ["Plan", "Build", "Ship", "Grow"];
@@ -13,9 +13,9 @@ export const MODE_CHOICES: { id: string; word: string; says: string }[] = [
 ];
 export const MODEL_CHOICES = [["sonnet", "Sonnet (the usual choice)"], ["opus", "Opus (the most capable, slower)"], ["haiku", "Haiku (the quickest and cheapest)"]];
 
-const blank = (): Role => ({ id: "", name: "", group: "Build", mark: "dot", model: "sonnet", mode: "default", brief: "", account: null });
+const blank = (): Role => ({ id: "", name: "", group: "Build", mark: "dot", model: "sonnet", mode: "default", brief: "", account: null, needs: [] });
 
-export function Roles({ roles, accounts, onChanged }: { roles: Role[]; accounts: Account[]; onChanged: (next: Role[]) => void }) {
+export function Roles({ roles, accounts, tools, onChanged }: { roles: Role[]; accounts: Account[]; tools: ToolInfo[]; onChanged: (next: Role[]) => void }) {
   const [pickedId, setPickedId] = useState<string | null>(roles[0]?.id ?? null); // "" is a role not saved yet
   const saved = roles.find((r) => r.id === pickedId) ?? null;
   const [draft, setDraft] = useState<Role | null>(saved);
@@ -134,6 +134,11 @@ export function Roles({ roles, accounts, onChanged }: { roles: Role[]; accounts:
                 );
               })}
             </fieldset>
+
+            <div className="flex flex-col gap-2">
+              <MultiSelect label="Tools this role needs" values={draft.needs} onChange={(v) => set({ needs: v })} placeholder="None" options={tools.map((t) => ({ value: t.id, label: t.name }))} />
+              <span className="text-[13px] leading-5 text-text-tertiary">Kona checks these are on this PC before a session starts. It only looks; it never installs.</span>
+            </div>
 
             <label className="flex flex-col gap-2">
               <span className="text-[13px] leading-5 font-bold text-text-secondary">Brief</span>

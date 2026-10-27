@@ -3,7 +3,10 @@ import { invoke } from "@tauri-apps/api/core";
 
 export type Project = { id: string; name: string; folder: string; github?: string | null };
 export type AddResult = { project: Project; hidden_folder: boolean; git_ignored: boolean };
-export type Role = { id: string; name: string; group: string; mark: string; model: string; mode: string; brief: string; account?: string | null };
+export type Role = { id: string; name: string; group: string; mark: string; model: string; mode: string; brief: string; account?: string | null; needs: string[] };
+export type ToolInfo = { id: string; name: string; install: string };
+export type ToolStatus = { id: string; name: string; installed: boolean; version?: string | null; install: string };
+export type Hint = { id: string; because: string };
 export type Account = { id: string; label: string; config_dir?: string | null };
 export type AccountStatus = { logged_in: boolean; method?: string | null; plan?: string | null; email?: string | null };
 export type CostRow = {
@@ -21,6 +24,9 @@ export type FileView =
 export const listProjects = () => invoke<Project[]>("list_projects");
 export const addProject = (folder: string, name?: string) => invoke<AddResult>("add_project", { folder, name: name ?? null });
 export const removeProject = (id: string) => invoke<void>("remove_project", { id });
+export const listTools = () => invoke<ToolInfo[]>("list_tools");
+export const checkTools = (ids: string[]) => invoke<ToolStatus[]>("check_tools", { ids });
+export const projectHints = (folder: string) => invoke<Hint[]>("project_hints", { folder });
 export const costRows = (sinceDay: string | null) => invoke<CostRow[]>("cost_rows", { sinceDay });
 export const listRoles = () => invoke<Role[]>("list_roles");
 export const saveRole = (role: Role) => invoke<Role>("save_role", { role });

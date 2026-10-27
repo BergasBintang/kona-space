@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { initialState, loadPlans, reducer, savePlans } from "./lib/sessions";
-import { listAccounts, listProjects, listRoles, samePlace, type Account, type AddResult, type Project, type Role } from "./lib/api";
+import { listAccounts, listProjects, listRoles, listTools, samePlace, type Account, type AddResult, type Project, type Role, type ToolInfo } from "./lib/api";
 import { Sidebar, type Place } from "./components/Sidebar";
 import { SessionList } from "./components/SessionList";
 import { Welcome } from "./components/Welcome";
@@ -24,6 +24,7 @@ export default function App() {
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [projectId, setProjectId] = useState<string | null>(remembered("kona.project"));
   const [roles, setRoles] = useState<Role[]>([]);
+  const [tools, setTools] = useState<ToolInfo[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [lastAccount, setLastAccount] = useState(remembered("kona.account") ?? "main"); // the account used last
   const [place, setPlace] = useState<Place>("sessions");
@@ -40,6 +41,7 @@ export default function App() {
     getVersion().then(setVersion).catch(() => {});
     listProjects().then(setProjects).catch(() => setProjects([]));
     listRoles().then(setRoles).catch(() => setRoles([]));
+    listTools().then(setTools).catch(() => setTools([]));
     listAccounts().then(setAccounts).catch(() => setAccounts([]));
     // every message from every running `claude`, forwarded by the Rust core
     const un = listen<{ sessionId: string; record: unknown }>("session-event", (e) => dispatch({ type: "event", sessionId: e.payload.sessionId, record: e.payload.record }));
@@ -80,7 +82,7 @@ export default function App() {
   } else if (place === "files") {
     content = <Files project={project} />;
   } else if (place === "roles") {
-    content = <Roles roles={roles} accounts={accounts} onChanged={setRoles} />;
+    content = <Roles roles={roles} accounts={accounts} tools={tools} onChanged={setRoles} />;
   } else if (place === "costs") {
     content = <Costs projects={projects} roles={roles} accounts={accounts} />;
   } else if (place === "accounts") {

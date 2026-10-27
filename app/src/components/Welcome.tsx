@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button, Glyph, RoleMark } from "./ui";
 import { Select } from "./pick";
+import { Needs } from "./Needs";
 import { accountStatus, type Account, type AccountStatus, type Project, type Role } from "../lib/api";
 
 type ClaudeInfo = { path: string; version: string | null };
@@ -74,6 +75,7 @@ export function Welcome({ project, roles, accounts, lastAccount, onStart, onOpen
           <Select label="Model" value={model} onChange={setModel} options={opts(MODELS)} />
           <Select label="What Claude may do on its own" value={mode} onChange={setMode} options={opts(MODES)} />
         </div>
+        <Needs project={project} role={role} />
         {error && <div className="flex items-start gap-2.5 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
         <div className="flex justify-end"><Button onClick={start} disabled={claude === "missing" || claude === null || busy || signedIn === null || !signedIn.logged_in}>{busy ? "Starting…" : "Start session"}</Button></div>
       </div>

@@ -3,6 +3,7 @@
 mod accounts;
 mod files;
 mod job;
+mod needs;
 mod ledger;
 mod projects;
 mod roles;
@@ -79,6 +80,28 @@ fn remove_project(projects: State<'_, Projects>, id: String) -> Result<(), Strin
 #[tauri::command]
 fn cost_rows(sessions: State<'_, Sessions>, since_day: Option<String>) -> Vec<ledger::CostRow> {
     sessions.ledger.cost_rows(since_day.as_deref())
+}
+
+/// The tools Kona knows how to look for.
+#[tauri::command]
+fn list_tools() -> Vec<needs::ToolInfo> {
+    needs::catalog()
+}
+
+/// Is each of these tools installed on this PC? Looks only; installs nothing.
+#[tauri::command]
+async fn check_tools(ids: Vec<String>) -> Result<Vec<needs::ToolStatus>, String> {
+    tauri::async_runtime::spawn_blocking(move || needs::check(&ids)).await.map_err(|e| e.to_string())
+}
+
+/// What the files in a project folder suggest it needs.
+#[tauri::command]
+fn project_hints(projects: State<'_, Projects>, folder: String) -> Result<Vec<needs::Hint>, String> {
+    let path = std::path::Path::new(&folder);
+    if !projects.allows(path) {
+        return Err("That folder is not inside a project".into());
+    }
+    Ok(needs::hints(path))
 }
 
 #[tauri::command]
@@ -162,7 +185,7 @@ pub fn run() {
             app.manage(Accounts::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
+        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, list_tools, check_tools, project_hints, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

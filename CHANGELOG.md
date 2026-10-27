@@ -2,6 +2,14 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.6.0, 2026-10-27
+
+The needs check.
+
+- Each role lists the tools it needs (Git, Node.js, npm, PHP, Composer, Python, Docker, Rust and Cargo, GitHub CLI, OpenSSH). The starting roles come with sensible lists, and you can change them in the Roles place.
+- The start screen shows what the role and the project need, which are on this PC (with their version) and which are missing. The project's own files add to the list: for example a `package.json` suggests Node.js and npm.
+- For a missing tool Kona shows the install command as text, with a Copy button. It never installs anything, and you can still start the session.
+
 ## 0.5.0, 2026-10-27
 
 Costs.

@@ -126,6 +126,25 @@ pub struct CostRow {
 }
 
 impl Ledger {
+    /// Record a one-shot call (a note written about a session): its dollars are its own, not a running total, so nothing is subtracted.
+    /// It is saved under the session it was about, with kind `summary`, so the cost views can count it (and not as a turn).
+    pub fn record_oneshot(&self, session_id: &str, folder: &str, role_id: Option<&str>, account_id: Option<&str>, kind: &str, result: &Value) -> f64 {
+        let Some(models) = result.get("modelUsage").and_then(Value::as_object) else { return 0.0 };
+        let conn = self.conn.lock().unwrap();
+        let mut added = 0.0;
+        for (model, u) in models {
+            let g = |k: &str| u.get(k).and_then(Value::as_i64).unwrap_or(0);
+            let cost = u.get("costUSD").and_then(Value::as_f64).unwrap_or(0.0);
+            let _ = conn.execute(
+                "INSERT INTO usage_turn (session_id, folder, turn, model, input_tokens, output_tokens, cache_read, cache_write, cost_usd, cost_basis, role_id, account_id, kind)
+                 VALUES (?1, ?2, 0, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                params![session_id, folder, model, g("inputTokens"), g("outputTokens"), g("cacheReadInputTokens"), g("cacheCreationInputTokens"), cost, u.get("costBasis").and_then(Value::as_str), role_id, account_id, kind],
+            );
+            added += cost;
+        }
+        added
+    }
+
     /// What these sessions cost in all, in dollars (for the cost shown on a ticket).
     pub fn cost_for_sessions(&self, ids: &[String]) -> f64 {
         let conn = self.conn.lock().unwrap();
@@ -137,7 +156,7 @@ impl Ledger {
         let conn = self.conn.lock().unwrap();
         let Ok(mut st) = conn.prepare(
             "SELECT session_id, MAX(folder), MAX(role_id), MAX(account_id), model, date(at, 'localtime') AS day, MIN(at),
-                    COUNT(DISTINCT turn), SUM(input_tokens), SUM(output_tokens), SUM(cache_read), SUM(cache_write), SUM(cost_usd)
+                    COUNT(DISTINCT CASE WHEN kind = 'turn' THEN turn END), SUM(input_tokens), SUM(output_tokens), SUM(cache_read), SUM(cache_write), SUM(cost_usd)
              FROM usage_turn WHERE (?1 IS NULL OR date(at, 'localtime') >= ?1)
              GROUP BY session_id, model, day ORDER BY MIN(at) DESC",
         ) else { return vec![] };

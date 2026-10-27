@@ -5,6 +5,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { loadBrain, wantedAdd, wantedList, wantedRemove, type BrainData, type Project, type Wanted } from "../../lib/api";
 import { Brain as Engine, type SearchResult } from "../../lib/brain/engine.ts";
 import { starterNotes } from "../../lib/brain/starter.ts";
+import { autoNoteOn, setAutoNote } from "../../lib/brain/summary.ts";
 import type { Layer, RawNote } from "../../lib/brain/parse.ts";
 import { redact } from "../../lib/brain/text.ts";
 import { Button, Glyph } from "../ui";
@@ -29,6 +30,7 @@ export function BrainPlace({ project, onAsk }: { project: Project; onAsk: (quest
   const [web, setWeb] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [auto, setAuto] = useState(autoNoteOn());
 
   const load = useCallback(() => {
     loadBrain(project.id).then((d) => { setData(d); setError(null); }).catch((e) => setError(String(e)));
@@ -107,6 +109,11 @@ export function BrainPlace({ project, onAsk }: { project: Project; onAsk: (quest
           </div>
           <Button variant="quiet" small onClick={() => writeNote("")}>New note</Button>
         </div>
+
+        <label className="flex cursor-pointer items-start gap-3">
+          <input type="checkbox" checked={auto} onChange={(e) => { setAuto(e.target.checked); setAutoNote(e.target.checked); }} className="mt-1.5 h-4 w-4 accent-[var(--color-accent)]" />
+          <span className="flex flex-col"><span className="font-bold">Write a note when a session ends</span><span className="text-[13px] leading-5 text-text-secondary">One cheap Haiku call per session, using your plan. The conversation is cleaned of secrets first. You can also press Write a note in any session.</span></span>
+        </label>
 
         <form className="flex gap-3" onSubmit={(e) => { e.preventDefault(); void ask(); }} role="search">
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ask the brain, for example: what is a worktree?" aria-label="Ask the brain" className="h-12 min-w-0 flex-1 rounded-control border border-line-strong bg-inset px-4 text-[15px] text-text placeholder:text-text-tertiary" />

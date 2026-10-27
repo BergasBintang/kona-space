@@ -110,7 +110,7 @@ pub fn claude_version(exe: &PathBuf) -> Option<String> {
     Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Option<Role>, account: Option<Account>, persona: Persona, project_name: String, ticket: Option<Ticket>, work_dir: String, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
+pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Option<Role>, account: Option<Account>, persona: Persona, project_name: String, ticket: Option<Ticket>, work_dir: String, digest: Option<String>, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
     let exe = find_claude().ok_or("Claude Code was not found on this PC")?;
     let id = resume.clone().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let mut cmd = Command::new(exe);
@@ -120,7 +120,7 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     ]);
     // the role's brief is added to Claude's own instructions; the mode and model come from the role unless the owner changed them
     // and the voice, when it is on for this session (it changes wording only; see persona.rs for the scope clause)
-    let extra: Vec<String> = role.as_ref().map(|r| r.brief.trim().to_string()).filter(|b| !b.is_empty()).into_iter().chain(ticket.as_ref().map(tickets::prompt_for)).chain(persona.prompt()).collect();
+    let extra: Vec<String> = role.as_ref().map(|r| r.brief.trim().to_string()).filter(|b| !b.is_empty()).into_iter().chain(ticket.as_ref().map(tickets::prompt_for)).chain(digest.filter(|d| !d.trim().is_empty())).chain(persona.prompt()).collect();
     if !extra.is_empty() {
         cmd.args(["--append-system-prompt", &extra.join("\n\n")]);
     }

@@ -25,7 +25,9 @@ export function Sidebar({ projects, project, onProject, onAddProject, place, onP
   place: Place; onPlace: (p: Place) => void; attention: number; leftBehind: number; plan: Plan | undefined; accountLabel: string | null; limitLine: string; version: string;
 }) {
   return (
-    <aside className="flex w-[248px] shrink-0 flex-col gap-5 bg-surface-1 px-3.5 pt-7 pb-[22px]">
+    <aside className="flex h-full min-h-0 w-[248px] shrink-0 flex-col bg-surface-1">
+      {/* the logo, the project and the places scroll when the window is short; the two plan bars stay in view below */}
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-3.5 pt-7 pb-3">
       <div className="flex items-center gap-2.5 px-1.5">
         <Glyph state="live" size={24} color="var(--color-accent)" />
         <span className="text-[22px] leading-[30px] font-bold">Kona</span>
@@ -59,9 +61,9 @@ export function Sidebar({ projects, project, onProject, onAddProject, place, onP
           })}
         </nav>
       )}
+      </div>
 
-      <div className="flex-1" />
-      <div className="flex flex-col gap-4 px-1.5">
+      <div className="flex shrink-0 flex-col gap-4 border-t border-line-subtle px-5 pt-4 pb-[18px]">
         {accountLabel && <span className="text-[13px] leading-5 font-bold text-text-secondary">Account: {accountLabel}</span>}
         <PlanBar label="This session" window={plan?.fiveHour} readAt={plan?.at} warnLine={limitLine} />
         <PlanBar label="This week" window={plan?.sevenDay} readAt={plan?.at} warnLine={limitLine} />

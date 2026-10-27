@@ -2,6 +2,17 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.13.0, 2026-10-28
+
+The Brain learns from sessions.
+
+- When a session ends, Kona writes a short note about it into the project's brain: what happened, decisions, open items and what was touched. One cheap Haiku call, after the conversation is cleaned of secrets. You can turn it off in Brain, and press "Write a note" in any session to do it by hand.
+- A note says where it came from (the session, the role, the ticket, `source: summary`). Claude may link only to notes that exist; any other link it made up is turned back into plain words. The call's dollars are saved in the cost ledger under that session.
+- A new session starts with a short digest from the brain: open items and recent sessions for its role and ticket, and a hint that it can look things up.
+- Claude can search the brain itself with two new tools, `search_brain` and `read_note`. The answer says Found, Partly or Not in the brain, with the note and lines, and a miss goes on the wanted list. A note or section that looks like it holds a secret is never shown to it.
+- "Ask Claude in a session" from the Brain now offers to save the answer as a note when it arrives.
+- The sidebar scrolls when the window is short: the places scroll, the two plan bars stay in view.
+
 ## 0.12.0, 2026-10-28
 
 The Brain.

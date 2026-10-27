@@ -6,6 +6,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { Brain } from "./engine.ts";
 import { redact, terms } from "./text.ts";
 import { frontMatter, sectionsOf } from "./parse.ts";
+import { cleanBody } from "./clean.ts";
 import type { RawNote } from "./parse.ts";
 
 const dir = new URL("../../brain/starter/", import.meta.url);
@@ -139,4 +140,16 @@ test("front matter, sections and a heading inside a code fence", () => {
 test("terms fold accents, plurals and filler words", () => {
   assert.deepEqual(terms("The Servers, and a server's costs"), ["server", "server", "cost"]);
   assert.deepEqual(terms("Café"), ["cafe"]);
+});
+
+test("a note written by the model: invented links become plain words, real ones stay, and the title is taken out", () => {
+  const known = new Set(["context-and-cost", "release-plan"]);
+  const text = "TITLE: Fixed the login redirect\n---\nfoo: bar\n---\n# A repeated title\n\n## What happened\nSee [[context-and-cost]] and [[Made Up Note]] and [[release-plan|the plan]] and [[ghost|shown words]].\n";
+  const { title, body } = cleanBody(text, known);
+  assert.equal(title, "Fixed the login redirect");
+  assert.ok(body.includes("[[context-and-cost]]"));
+  assert.ok(body.includes("[[release-plan]]"));
+  assert.ok(!body.includes("[[Made Up Note]]") && body.includes("Made Up Note"));
+  assert.ok(!body.includes("[[ghost") && body.includes("shown words"));
+  assert.ok(!body.includes("foo: bar") && !body.includes("A repeated title"));
 });

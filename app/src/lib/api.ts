@@ -73,6 +73,9 @@ export const deleteNote = (projectId: string, id: string) => invoke<void>("brain
 export const wantedList = (projectId: string) => invoke<Wanted[]>("brain_wanted", { projectId });
 export const wantedAdd = (projectId: string, question: string) => invoke<Wanted[]>("brain_wanted_add", { projectId, question });
 export const wantedRemove = (projectId: string, question: string) => invoke<Wanted[]>("brain_wanted_remove", { projectId, question });
+export const sessionTranscript = (sessionId: string, workDir: string, accountId: string) => invoke<string>("session_transcript", { sessionId, workDir, accountId });
+export const writeNoteWithHaiku = (a: { system: string; prompt: string; sessionId: string; folder: string; roleId: string | null; accountId: string }) =>
+  invoke<string>("write_note_with_haiku", { system: a.system, prompt: a.prompt, sessionId: a.sessionId, folder: a.folder, roleId: a.roleId, accountId: a.accountId });
 export const costRows = (sinceDay: string | null) => invoke<CostRow[]>("cost_rows", { sinceDay });
 export const listRoles = () => invoke<Role[]>("list_roles");
 export const saveRole = (role: Role) => invoke<Role>("save_role", { role });

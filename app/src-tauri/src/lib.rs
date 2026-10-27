@@ -2,6 +2,7 @@
 // and makes sure nothing it started outlives it.
 mod accounts;
 mod brain;
+mod brain_search;
 mod files;
 mod job;
 mod leftovers;
@@ -12,6 +13,7 @@ mod ledger;
 mod projects;
 mod roles;
 mod session;
+mod summary;
 mod tickets;
 mod winproc;
 mod worktrees;
@@ -42,7 +44,7 @@ fn check_claude() -> Result<ClaudeInfo, String> {
 }
 
 #[tauri::command]
-async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: State<'_, Roles>, accounts: State<'_, Accounts>, voice: State<'_, Voice>, projects: State<'_, Projects>, folder: String, role_id: Option<String>, account_id: Option<String>, use_voice: bool, ticket_id: Option<String>, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
+async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: State<'_, Roles>, accounts: State<'_, Accounts>, voice: State<'_, Voice>, projects: State<'_, Projects>, folder: String, role_id: Option<String>, account_id: Option<String>, use_voice: bool, ticket_id: Option<String>, brain_digest: Option<String>, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
     let role = match role_id {
         Some(id) => Some(roles.get(&id).ok_or("That role does not exist any more")?),
         None => None,
@@ -87,7 +89,7 @@ async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: Sta
         }
         None => None,
     };
-    let id = session::start(app, &sessions, folder.clone(), role, account, persona, project_name, ticket, work_dir, model, mode, resume).await?;
+    let id = session::start(app, &sessions, folder.clone(), role, account, persona, project_name, ticket, work_dir, brain_digest, model, mode, resume).await?;
     if let Some(t) = ticket_id {
         let _ = tickets::link_session(&tickets::dir(std::path::Path::new(&folder)), &t, &id, &who);
     }
@@ -348,6 +350,25 @@ fn brain_wanted_remove(projects: State<'_, Projects>, project_id: String, questi
     brain::wanted_remove(&project_path(&projects, &project_id)?, &question)
 }
 
+/// A session's conversation boiled down for a summary (the owner's messages, Claude's replies, one line per tool call).
+#[tauri::command]
+fn session_transcript(accounts: State<'_, Accounts>, session_id: String, work_dir: String, account_id: Option<String>) -> Result<String, String> {
+    let dir = account_id.and_then(|id| accounts.get(&id)).and_then(|a| a.config_dir);
+    summary::condensed(&session_id, &work_dir, dir.as_deref())
+}
+
+/// One cheap Haiku call that writes a note about a session. The prompt was cleaned of secrets on the screen. Its dollars go in the ledger.
+#[tauri::command]
+async fn write_note_with_haiku(
+    sessions: State<'_, Sessions>, accounts: State<'_, Accounts>, system: String, prompt: String,
+    session_id: String, folder: String, role_id: Option<String>, account_id: Option<String>,
+) -> Result<String, String> {
+    let dir = account_id.as_ref().and_then(|id| accounts.get(id)).and_then(|a| a.config_dir);
+    let (text, record) = summary::run_haiku(&system, &prompt, dir.as_deref()).await?;
+    sessions.ledger.record_oneshot(&session_id, &folder, role_id.as_deref(), account_id.as_deref(), "summary", &record);
+    Ok(text)
+}
+
 #[tauri::command]
 fn list_roles(roles: State<'_, Roles>) -> Vec<Role> {
     roles.all()
@@ -448,7 +469,7 @@ pub fn run() {
             app.manage(Voice::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
+        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, session_transcript, write_note_with_haiku, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

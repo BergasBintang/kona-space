@@ -7,13 +7,14 @@ import { frontMatter, type Note } from "../../lib/brain/parse.ts";
 import { Button, Glyph } from "../ui";
 import { Confirm } from "../Confirm";
 import { Markdown } from "./Markdown";
+import { localDate } from "../../lib/brain/text.ts";
 
 export const LAYER_WORD: Record<string, string> = { project: "Project", starter: "Starter", memory: "Claude's memory" };
 
 export const Chip = ({ children, tone = "" }: { children: React.ReactNode; tone?: string }) => <span className={`rounded-full bg-surface-3 px-2.5 py-0.5 text-[12px] leading-5 font-bold ${tone || "text-text-secondary"}`}>{children}</span>;
 
 const slug = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDate();
 
 /** A note that the owner changed gets a mark in its front matter, so it is never taken for something a session wrote. */
 function ownerMark(text: string): string {

@@ -52,3 +52,8 @@ export function redact(text: string): { text: string; found: string[] } {
   }
   return { text: out, found };
 }
+
+/** Today as YYYY-MM-DD on this PC's clock (not UTC, which can be the day before in the morning). */
+export function localDate(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}

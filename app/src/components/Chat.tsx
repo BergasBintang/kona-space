@@ -15,7 +15,7 @@ const RUN_BADGE: Record<Session["run"], { state: GlyphState; label: string }> = 
 
 const folderName = (p: string) => p.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || p;
 
-export function Header({ s, role, account, onStop }: { s: Session; role?: Role; account?: string; onStop: () => void }) {
+export function Header({ s, role, account, onStop, onNote }: { s: Session; role?: Role; account?: string; onStop: () => void; onNote?: () => void }) {
   const b = RUN_BADGE[s.run];
   return (
     <div className="flex items-center justify-between gap-4 px-8 pt-[22px] pb-[18px]">
@@ -35,6 +35,7 @@ export function Header({ s, role, account, onStop }: { s: Session; role?: Role; 
           <span className="font-mono text-[14px] font-bold">{dollars(s.costTotal)} so far</span>
           <span className="text-[13px] leading-5 text-text-tertiary">An estimate, not your bill</span>
         </div>
+        {onNote && s.turns > 0 && s.run !== "working" && <Button variant="ghost" small onClick={onNote}>Write a note</Button>}
         {s.run !== "ended" && <Button variant="quiet" small onClick={onStop}>Stop</Button>}
       </div>
     </div>
@@ -176,7 +177,9 @@ function Composer({ s, onSend }: { s: Session; onSend: (text: string, images: At
   );
 }
 
-export function Chat({ s, role, account, dispatch }: { s: Session; role?: Role; account?: string; dispatch: (a: any) => void }) {
+export function Chat({ s, role, account, dispatch, onNote, onSaveAnswer }: { s: Session; role?: Role; account?: string; dispatch: (a: any) => void; onNote?: () => void; onSaveAnswer?: (text: string) => void }) {
+  // a session started from the Brain to answer a question: when it has answered, offer to keep the answer as a note
+  const lastAnswer = [...s.items].reverse().find((it) => it.kind === "assistant") as Extract<Item, { kind: "assistant" }> | undefined;
   const answer = async (it: Extract<Item, { kind: "permission" }>, allow: boolean) => {
     dispatch({ type: "permission-answered", sessionId: s.id, requestId: it.requestId, allowed: allow });
     await invoke("answer_permission", { sessionId: s.id, requestId: it.requestId, allow, input: allow ? it.input : null, message: allow ? null : "The owner said no." });
@@ -187,9 +190,15 @@ export function Chat({ s, role, account, dispatch }: { s: Session; role?: Role; 
   };
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col">
-      <Header s={s} role={role} account={account} onStop={() => void invoke("stop_session", { sessionId: s.id })} />
+      <Header s={s} role={role} account={account} onNote={onNote} onStop={() => void invoke("stop_session", { sessionId: s.id })} />
       <div className="mx-8 h-px bg-line-subtle" />
       <Transcript s={s} onAnswer={answer} />
+      {s.brainQuestion && s.run === "ready" && lastAnswer && onSaveAnswer && (
+        <div className="mx-8 mb-3 flex items-center justify-between gap-4 rounded-control border border-line-subtle bg-surface-2 px-4 py-3">
+          <span className="text-[14px] leading-5 text-text-secondary">Save this answer to the brain? It becomes a note you can edit. Anything that looks like a secret is hidden first.</span>
+          <span className="flex shrink-0 gap-2"><Button variant="ghost" small onClick={() => dispatch({ type: "brain-question", sessionId: s.id, question: null })}>Not now</Button><Button small onClick={() => onSaveAnswer(lastAnswer.text)}>Save to the brain</Button></span>
+        </div>
+      )}
       <Composer s={s} onSend={send} />
     </div>
   );

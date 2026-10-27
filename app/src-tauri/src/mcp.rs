@@ -4,12 +4,14 @@
 // Because the server is started for one known session, "who raised this ticket" is exact: it is the session id and role given here.
 // The server only touches that project's ticket files, through tickets.rs, and an agent can never move a ticket to Done or remove one.
 use crate::tickets::{self, NewTicket, Patch, Ticket};
+use crate::{brain, brain_search};
 use serde_json::{json, Value};
 use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
 
 struct Ctx {
     dir: PathBuf,
+    project: PathBuf,
     who: String,
     roles: Vec<(String, String)>, // id, name
 }
@@ -42,7 +44,11 @@ fn tools() -> Value {
             "id": {"type": "string"}, "status": status_any, "next": {"type": "string", "description": "One line: what should happen next."},
             "note": {"type": "string", "description": "A short note added to the history."},
             "waiting": {"type": "boolean", "description": "true when you need the owner's answer or decision before going on."},
-            "title": {"type": "string"}, "description": {"type": "string"}, "done_when": {"type": "string"}, "role": {"type": "string"}}, "required": ["id"]}}
+            "title": {"type": "string"}, "description": {"type": "string"}, "done_when": {"type": "string"}, "role": {"type": "string"}}, "required": ["id"]}},
+        {"name": "search_brain", "description": "Look something up in this project's brain: the owner's notes about earlier sessions and decisions, Claude's memory for the project and Kona's starter notes. The answer says plainly whether it is Found, Partly in the brain or Not in the brain, and names the note and the lines. Use it before assuming how this project was done.",
+         "inputSchema": {"type": "object", "properties": {"query": {"type": "string", "description": "The question or the words to look for."}}, "required": ["query"]}},
+        {"name": "read_note", "description": "Read some lines of one note of the brain, by the note id and line numbers that search_brain gave.",
+         "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}, "from_line": {"type": "integer"}, "to_line": {"type": "integer"}}, "required": ["id"]}}
     ])
 }
 
@@ -105,6 +111,24 @@ fn call(ctx: &Ctx, name: &str, a: &Value) -> Result<String, String> {
             }, &ctx.who)?;
             Ok(format!("Updated. {}", line(ctx, &t)))
         }
+        "search_brain" => {
+            let q = text_of(a, "query").unwrap_or_default();
+            if q.trim().is_empty() {
+                return Err("Give the words to look for".into());
+            }
+            let notes = brain_search::load_notes(&ctx.project);
+            let ans = brain_search::search(&notes, &q);
+            // a miss goes on the owner's wanted list (unless the words look like a secret), so the gap is not forgotten
+            if ans.state == "none" && !brain_search::contains_secret(&q) {
+                let _ = brain::wanted_add(&ctx.project, &format!("(asked by a session) {}", q.trim()));
+            }
+            Ok(brain_search::describe(&ans))
+        }
+        "read_note" => {
+            let notes = brain_search::load_notes(&ctx.project);
+            let n = |k: &str| a.get(k).and_then(Value::as_u64).map(|v| v as usize);
+            brain_search::read(&notes, &text_of(a, "id").unwrap_or_default(), n("from_line"), n("to_line"))
+        }
         _ => Err(format!("There is no tool called {name}")),
     }
 }
@@ -140,7 +164,7 @@ pub fn run(args: &[String]) {
     let roles = read_roles(Path::new(&arg(args, "--data")));
     let role_name = roles.iter().find(|r| r.0 == role).map(|r| r.1.clone());
     let who = format!("session {}{}", &session[..session.len().min(8)], role_name.map(|n| format!(" (role: {n})")).unwrap_or_default());
-    let ctx = Ctx { dir: tickets::dir(Path::new(&folder)), who, roles };
+    let ctx = Ctx { dir: tickets::dir(Path::new(&folder)), project: PathBuf::from(&folder), who, roles };
     let stdin = std::io::stdin();
     let mut out = std::io::stdout();
     for line in stdin.lock().lines() {

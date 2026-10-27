@@ -4,6 +4,7 @@
 // "may I run this?", a stop).
 use crate::ledger::Ledger;
 use crate::accounts::Account;
+use crate::persona::Persona;
 use crate::roles::Role;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -104,7 +105,7 @@ pub fn claude_version(exe: &PathBuf) -> Option<String> {
     Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Option<Role>, account: Option<Account>, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
+pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Option<Role>, account: Option<Account>, persona: Persona, project_name: String, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
     let exe = find_claude().ok_or("Claude Code was not found on this PC")?;
     let id = resume.clone().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let mut cmd = Command::new(exe);
@@ -113,8 +114,10 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
         "--permission-prompt-tool", "stdio", "--permission-mode", &mode, "--model", &model,
     ]);
     // the role's brief is added to Claude's own instructions; the mode and model come from the role unless the owner changed them
-    if let Some(r) = role.as_ref().filter(|r| !r.brief.trim().is_empty()) {
-        cmd.args(["--append-system-prompt", &r.brief]);
+    // and the voice, when it is on for this session (it changes wording only; see persona.rs for the scope clause)
+    let extra: Vec<String> = role.as_ref().map(|r| r.brief.trim().to_string()).filter(|b| !b.is_empty()).into_iter().chain(persona.prompt()).collect();
+    if !extra.is_empty() {
+        cmd.args(["--append-system-prompt", &extra.join("\n\n")]);
     }
     if resume.is_some() {
         cmd.args(["--resume", &id]);
@@ -186,6 +189,6 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     }
 
     sessions.map.lock().unwrap().insert(id.clone(), Handle { tx, stop: Some(stop_tx) });
-    let _ = app.emit("session-event", json!({"sessionId": id, "record": {"type": "kona/started", "folder": folder, "roleId": role.as_ref().map(|r| r.id.clone()), "accountId": account.as_ref().map(|a| a.id.clone()), "model": model, "mode": mode, "coveredByJob": covered}}));
+    let _ = app.emit("session-event", json!({"sessionId": id, "record": {"type": "kona/started", "folder": folder, "roleId": role.as_ref().map(|r| r.id.clone()), "accountId": account.as_ref().map(|a| a.id.clone()), "voice": persona.enabled, "lines": persona.lines_for(&project_name), "model": model, "mode": mode, "coveredByJob": covered}}));
     Ok(id)
 }

@@ -13,6 +13,9 @@ export type CostRow = {
   session_id: string; folder: string | null; role_id: string | null; account_id: string | null; model: string; day: string; first_at: string;
   turns: number; input: number; output: number; cache_read: number; cache_write: number; cost: number;
 };
+export type Lines = { greeting: string; started: string; ended: string; limit: string };
+export type Persona = { enabled: boolean; name: string; language: string; verbosity: string; humor: string; emoji: boolean; address: string; plain: boolean; voice: string; lines: Lines };
+export const PLAIN_LINES: Lines = { greeting: "Choose a role and start a session.", started: "Session started in {project}.", ended: "This session has ended.", limit: "Close to the limit." };
 export type Entry = { name: string; path: string; is_dir: boolean; size: number; modified: number | null };
 export type FileView =
   | { kind: "text"; text: string; size: number; truncated: boolean }
@@ -27,6 +30,10 @@ export const removeProject = (id: string) => invoke<void>("remove_project", { id
 export const listTools = () => invoke<ToolInfo[]>("list_tools");
 export const checkTools = (ids: string[]) => invoke<ToolStatus[]>("check_tools", { ids });
 export const projectHints = (folder: string) => invoke<Hint[]>("project_hints", { folder });
+export const getPersona = () => invoke<Persona>("get_persona");
+export const savePersona = (persona: Persona) => invoke<Persona>("save_persona", { persona });
+export const personaPrompt = (persona: Persona) => invoke<string>("persona_prompt", { persona });
+export const defaultPersona = () => invoke<Persona>("default_persona");
 export const costRows = (sinceDay: string | null) => invoke<CostRow[]>("cost_rows", { sinceDay });
 export const listRoles = () => invoke<Role[]>("list_roles");
 export const saveRole = (role: Role) => invoke<Role>("save_role", { role });

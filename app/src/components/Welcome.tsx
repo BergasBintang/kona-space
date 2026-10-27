@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Button, Glyph, RoleMark } from "./ui";
 import { Select } from "./pick";
 import { Needs } from "./Needs";
-import { accountStatus, type Account, type AccountStatus, type Project, type Role } from "../lib/api";
+import { accountStatus, PLAIN_LINES, type Account, type Persona, type AccountStatus, type Project, type Role } from "../lib/api";
 
 type ClaudeInfo = { path: string; version: string | null };
 const MODELS = [["sonnet", "Sonnet (the usual choice)"], ["opus", "Opus (the most capable, slower)"], ["haiku", "Haiku (the quickest and cheapest)"]];
@@ -12,9 +12,9 @@ const MODES = [["default", "Ask every time"], ["acceptEdits", "Edits free, comma
 
 const opts = (pairs: string[][]) => pairs.map(([value, label]) => ({ value, label }));
 
-export function Welcome({ project, roles, accounts, lastAccount, onStart, onOpenAccounts, error }: {
-  project: Project; roles: Role[]; accounts: Account[]; lastAccount: string; onOpenAccounts: () => void;
-  onStart: (folder: string, roleId: string | null, accountId: string, model: string, mode: string) => Promise<void>; error: string | null;
+export function Welcome({ project, roles, accounts, persona, lastAccount, onStart, onOpenAccounts, error }: {
+  project: Project; roles: Role[]; accounts: Account[]; persona: Persona; lastAccount: string; onOpenAccounts: () => void;
+  onStart: (folder: string, roleId: string | null, accountId: string, voice: boolean, model: string, mode: string) => Promise<void>; error: string | null;
 }) {
   const [claude, setClaude] = useState<ClaudeInfo | "missing" | null>(null);
   const [model, setModel] = useState("sonnet");
@@ -22,19 +22,21 @@ export function Welcome({ project, roles, accounts, lastAccount, onStart, onOpen
   const [roleId, setRoleId] = useState<string | null>(null);
   const [accountId, setAccountId] = useState(accounts.some((a) => a.id === lastAccount) ? lastAccount : accounts[0]?.id ?? "main");
   const [signedIn, setSignedIn] = useState<AccountStatus | null>(null); // null while asking
+  const [voice, setVoice] = useState(persona.enabled);
   const [busy, setBusy] = useState(false);
   const role = roles.find((r) => r.id === roleId) ?? null;
   const pickRole = (r: Role | null) => { setRoleId(r?.id ?? null); setModel(r?.model ?? "sonnet"); setMode(r?.mode ?? "default"); if (r?.account && accounts.some((a) => a.id === r.account)) setAccountId(r.account); };
 
   useEffect(() => { setSignedIn(null); accountStatus(accountId).then(setSignedIn).catch(() => setSignedIn({ logged_in: false })); }, [accountId]);
   useEffect(() => { invoke<ClaudeInfo>("check_claude").then(setClaude).catch(() => setClaude("missing")); }, []);
-  const start = async () => { setBusy(true); try { await onStart(project.folder, roleId, accountId, model, mode); } finally { setBusy(false); } };
+  const start = async () => { setBusy(true); try { await onStart(project.folder, roleId, accountId, voice, model, mode); } finally { setBusy(false); } };
 
   return (
     <div className="flex h-full flex-1 items-center justify-center overflow-y-auto p-8">
       <div className="flex w-full max-w-[560px] flex-col gap-6">
         <div className="flex flex-col gap-3">
           <h1 className="m-0 text-[30px] leading-[38px] font-bold">Start a session</h1>
+          <p className="m-0 text-[15px] leading-6 text-text-tertiary">{(voice ? persona.lines.greeting : PLAIN_LINES.greeting)}</p>
           <p className="m-0 text-text-secondary">Claude will work inside this project. Nothing leaves this PC except what Claude itself sends to Anthropic.</p>
         </div>
 
@@ -71,6 +73,7 @@ export function Welcome({ project, roles, accounts, lastAccount, onStart, onOpen
               <button type="button" onClick={onOpenAccounts} className="font-bold underline">Open Accounts</button></div>
           )}
         </div>
+        <Select label="Voice" value={voice ? "on" : "off"} onChange={(v) => setVoice(v === "on")} options={[{ value: "on", label: `${persona.name || "Kona"}'s voice`, hint: "How Claude talks to you, set in Voice" }, { value: "off", label: "Plain Claude", hint: "No voice for this session" }]} />
         <div className="grid grid-cols-2 gap-4">
           <Select label="Model" value={model} onChange={setModel} options={opts(MODELS)} />
           <Select label="What Claude may do on its own" value={mode} onChange={setMode} options={opts(MODES)} />

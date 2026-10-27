@@ -2,6 +2,16 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.7.0, 2026-10-27
+
+The voice.
+
+- A Voice place where you describe how Claude talks to you: a short description, language, length of answers, humor, emoji, plain words, and what to call you. The first voice is the terse operator you chose: short, plain words, no jokes, no emoji, no nickname.
+- Kona's own lines on four screens (the start screen, a session starting, a session ending, near the plan limit) are in the same voice, and you can rewrite them.
+- The voice is told to Claude at the start of a session, with a fixed rule that it only changes wording: never code, files, commit or ticket text, commands, warnings, errors or numbers, and never the facts or the advice.
+- A "What Claude is told" box shows the exact text. When you start a session you can switch the voice off for that session.
+- Permission questions, warnings and error messages always stay plain.
+
 ## 0.6.0, 2026-10-27
 
 The needs check.

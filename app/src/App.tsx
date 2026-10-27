@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { initialState, loadPlans, reducer, savePlans } from "./lib/sessions";
-import { listAccounts, listProjects, listRoles, listTools, samePlace, type Account, type AddResult, type Project, type Role, type ToolInfo } from "./lib/api";
+import { PLAIN_LINES, listAccounts, listProjects, getPersona, listRoles, listTools, samePlace, type Account, type AddResult, type Project, type Persona, type Role, type ToolInfo } from "./lib/api";
 import { Sidebar, type Place } from "./components/Sidebar";
 import { SessionList } from "./components/SessionList";
 import { Welcome } from "./components/Welcome";
@@ -14,6 +14,7 @@ import { Roles } from "./components/Roles";
 import { Accounts } from "./components/Accounts";
 import { Kit } from "./components/Kit";
 import { Costs } from "./components/Costs";
+import { Voice } from "./components/Voice";
 import { Glyph } from "./components/ui";
 
 const remembered = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -24,6 +25,7 @@ export default function App() {
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [projectId, setProjectId] = useState<string | null>(remembered("kona.project"));
   const [roles, setRoles] = useState<Role[]>([]);
+  const [persona, setPersona] = useState<Persona | null>(null);
   const [tools, setTools] = useState<ToolInfo[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [lastAccount, setLastAccount] = useState(remembered("kona.account") ?? "main"); // the account used last
@@ -41,6 +43,7 @@ export default function App() {
     getVersion().then(setVersion).catch(() => {});
     listProjects().then(setProjects).catch(() => setProjects([]));
     listRoles().then(setRoles).catch(() => setRoles([]));
+    getPersona().then(setPersona).catch(() => setPersona(null));
     listTools().then(setTools).catch(() => setTools([]));
     listAccounts().then(setAccounts).catch(() => setAccounts([]));
     // every message from every running `claude`, forwarded by the Rust core
@@ -66,15 +69,15 @@ export default function App() {
   // keep the plan readings for the next time Kona opens
   useEffect(() => { savePlans(state.plans); }, [state.plans]);
 
-  const start = async (folder: string, roleId: string | null, accountId: string, model: string, mode: string) => {
+  const start = async (folder: string, roleId: string | null, accountId: string, useVoice: boolean, model: string, mode: string) => {
     setError(null);
-    try { await invoke<string>("start_session", { folder, roleId, accountId, model, mode, resume: null }); setLastAccount(accountId); remember("kona.account", accountId); setCreating(false); }
+    try { await invoke<string>("start_session", { folder, roleId, accountId, useVoice, model, mode, resume: null }); setLastAccount(accountId); remember("kona.account", accountId); setCreating(false); }
     catch (e) { setError(String(e)); }
   };
 
   if (import.meta.env.DEV && window.location.hash === "#kit") return <Kit />; // the base pickers on show, development only
 
-  if (projects === null) return <div className="flex h-full items-center justify-center text-text-tertiary">Opening Kona…</div>;
+  if (projects === null || persona === null) return <div className="flex h-full items-center justify-center text-text-tertiary">Opening Kona…</div>;
 
   let content: React.ReactNode;
   if (adding || !project) {
@@ -83,6 +86,8 @@ export default function App() {
     content = <Files project={project} />;
   } else if (place === "roles") {
     content = <Roles roles={roles} accounts={accounts} tools={tools} onChanged={setRoles} />;
+  } else if (place === "voice") {
+    content = <Voice persona={persona} onChanged={setPersona} />;
   } else if (place === "costs") {
     content = <Costs projects={projects} roles={roles} accounts={accounts} />;
   } else if (place === "accounts") {
@@ -93,7 +98,7 @@ export default function App() {
         <SessionList state={state} project={project} roles={roles} creating={creating || !current} onSelect={(id) => { setCreating(false); dispatch({ type: "select", id }); }} onNew={() => { setError(null); setCreating(true); }} />
         <div className="w-px bg-line-subtle" />
         <main className="flex min-w-0 flex-1 flex-col">
-          {creating || !current ? <Welcome key={project.id} project={project} roles={roles} accounts={accounts} lastAccount={lastAccount} onOpenAccounts={() => setPlace("accounts")} onStart={start} error={error} /> : <Chat key={current.id} s={current} role={roles.find((r) => r.id === current.roleId)} account={accounts.length > 1 ? accounts.find((a) => a.id === current.accountId)?.label : undefined} dispatch={dispatch} />}
+          {creating || !current ? <Welcome key={project.id} project={project} roles={roles} accounts={accounts} persona={persona} lastAccount={lastAccount} onOpenAccounts={() => setPlace("accounts")} onStart={start} error={error} /> : <Chat key={current.id} s={current} role={roles.find((r) => r.id === current.roleId)} account={accounts.length > 1 ? accounts.find((a) => a.id === current.accountId)?.label : undefined} dispatch={dispatch} />}
         </main>
       </>
     );
@@ -102,7 +107,7 @@ export default function App() {
   return (
     <div className="flex h-full">
       <Sidebar projects={projects} project={project} onProject={pickProject} onAddProject={() => setAdding(true)} place={place}
-        onPlace={(p) => { setAdding(false); setPlace(p); }} attention={attention} plan={state.plans[current?.accountId ?? lastAccount]} accountLabel={accounts.length > 1 ? accounts.find((a) => a.id === (current?.accountId ?? lastAccount))?.label ?? null : null} version={version} />
+        onPlace={(p) => { setAdding(false); setPlace(p); }} attention={attention} plan={state.plans[current?.accountId ?? lastAccount]} limitLine={persona.enabled ? persona.lines.limit : PLAIN_LINES.limit} accountLabel={accounts.length > 1 ? accounts.find((a) => a.id === (current?.accountId ?? lastAccount))?.label ?? null : null} version={version} />
       <div className="relative flex min-w-0 flex-1">
         {content}
         {notice && (

@@ -4,6 +4,7 @@ mod accounts;
 mod files;
 mod job;
 mod needs;
+mod persona;
 mod ledger;
 mod projects;
 mod roles;
@@ -14,6 +15,7 @@ use serde_json::Value;
 use accounts::{Account, AccountStatus, Accounts};
 use files::{Entry, FileView};
 use projects::{AddResult, Project, Projects};
+use persona::{Persona, Voice};
 use roles::{Role, Roles};
 use session::{ImageIn, Sessions};
 use tauri::{AppHandle, Manager, State};
@@ -33,7 +35,7 @@ fn check_claude() -> Result<ClaudeInfo, String> {
 }
 
 #[tauri::command]
-async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: State<'_, Roles>, accounts: State<'_, Accounts>, folder: String, role_id: Option<String>, account_id: Option<String>, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
+async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: State<'_, Roles>, accounts: State<'_, Accounts>, voice: State<'_, Voice>, projects: State<'_, Projects>, folder: String, role_id: Option<String>, account_id: Option<String>, use_voice: bool, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
     let role = match role_id {
         Some(id) => Some(roles.get(&id).ok_or("That role does not exist any more")?),
         None => None,
@@ -42,7 +44,11 @@ async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: Sta
         Some(id) => Some(accounts.get(&id).ok_or("That account does not exist any more")?),
         None => None,
     };
-    session::start(app, &sessions, folder, role, account, model, mode, resume).await
+    let mut persona = voice.get();
+    persona.enabled = use_voice;
+    let project_name = projects.all().into_iter().find(|p| projects::norm(std::path::Path::new(&p.folder)) == projects::norm(std::path::Path::new(&folder))).map(|p| p.name)
+        .unwrap_or_else(|| std::path::Path::new(&folder).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default());
+    session::start(app, &sessions, folder, role, account, persona, project_name, model, mode, resume).await
 }
 
 #[tauri::command]
@@ -102,6 +108,28 @@ fn project_hints(projects: State<'_, Projects>, folder: String) -> Result<Vec<ne
         return Err("That folder is not inside a project".into());
     }
     Ok(needs::hints(path))
+}
+
+/// The voice (persona). `lines` are the words for Kona's own screens, ready to show.
+#[tauri::command]
+fn get_persona(voice: State<'_, Voice>) -> Persona {
+    voice.get()
+}
+
+#[tauri::command]
+fn save_persona(voice: State<'_, Voice>, persona: Persona) -> Result<Persona, String> {
+    voice.set(persona)
+}
+
+/// What the voice would send to Claude, so the owner can read it before trusting it.
+#[tauri::command]
+fn persona_prompt(persona: Persona) -> String {
+    Persona { enabled: true, ..persona }.prompt().unwrap_or_default()
+}
+
+#[tauri::command]
+fn default_persona() -> Persona {
+    persona::default_persona()
 }
 
 #[tauri::command]
@@ -183,9 +211,10 @@ pub fn run() {
             app.manage(Projects::load(&base));
             app.manage(Roles::load(&base));
             app.manage(Accounts::load(&base));
+            app.manage(Voice::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, list_tools, check_tools, project_hints, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
+        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

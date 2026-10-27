@@ -49,11 +49,16 @@ impl Ledger {
              );
              CREATE INDEX IF NOT EXISTS usage_turn_session ON usage_turn (session_id);",
         )?;
+        // the role a turn was run as (added in 0.3.0; older files get the column now, with no value for old rows)
+        let has_role = conn.prepare("SELECT 1 FROM pragma_table_info('usage_turn') WHERE name = 'role_id'")?.exists([])?;
+        if !has_role {
+            conn.execute("ALTER TABLE usage_turn ADD COLUMN role_id TEXT", [])?;
+        }
         Ok(Self { conn: Mutex::new(conn), last: Mutex::new(HashMap::new()), turns: Mutex::new(HashMap::new()) })
     }
 
     /// Record one `result` message. Returns the dollars this turn added (the difference), for the screen.
-    pub fn record_result(&self, session_id: &str, folder: &str, result: &Value) -> f64 {
+    pub fn record_result(&self, session_id: &str, folder: &str, role_id: Option<&str>, result: &Value) -> f64 {
         let Some(models) = result.get("modelUsage").and_then(Value::as_object) else { return 0.0 };
         let turn = {
             let mut t = self.turns.lock().unwrap();
@@ -87,9 +92,9 @@ impl Ledger {
             }
             let basis = u.get("costBasis").and_then(Value::as_str);
             let _ = conn.execute(
-                "INSERT INTO usage_turn (session_id, folder, turn, model, input_tokens, output_tokens, cache_read, cache_write, cost_usd, cost_basis)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-                params![session_id, folder, turn, model, d.input, d.output, d.cache_read, d.cache_write, d.cost, basis],
+                "INSERT INTO usage_turn (session_id, folder, turn, model, input_tokens, output_tokens, cache_read, cache_write, cost_usd, cost_basis, role_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                params![session_id, folder, turn, model, d.input, d.output, d.cache_read, d.cache_write, d.cost, basis, role_id],
             );
             added += d.cost;
         }

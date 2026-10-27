@@ -2,6 +2,17 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.3.0, 2026-10-27
+
+Roles.
+
+- A Roles place with ten starting roles: Product, Design, Frontend, Backend, QA, Security, DevOps, Marketing, Content and SEO, Support. Each has a mark, a model, a permission mode and a short brief.
+- You can change any role, add your own and remove one. The list is kept on this PC.
+- Start a session "as" a role: it starts with that role's model and permission mode, and Claude is told the role's brief. You can still change the mode for one session.
+- The session list and the chat header show the role. Each paid turn in the cost ledger now records its role, ready for cost views.
+- Only the three safe modes are offered (ask every time, edits free, plan only).
+- Not yet: skills and tool servers per role, accounts, the board, the Brain, leftovers, resuming old sessions.
+
 ## 0.2.0, 2026-10-27
 
 Projects and files.

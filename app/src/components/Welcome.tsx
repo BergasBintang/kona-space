@@ -1,8 +1,8 @@
 // The screen before a session: check that Claude Code is here, pick a folder, start.
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Button, Glyph } from "./ui";
-import type { Project } from "../lib/api";
+import { Button, Glyph, RoleMark } from "./ui";
+import type { Project, Role } from "../lib/api";
 
 type ClaudeInfo = { path: string; version: string | null };
 const MODELS = [["sonnet", "Sonnet (the usual choice)"], ["opus", "Opus (the most capable, slower)"], ["haiku", "Haiku (the quickest and cheapest)"]];
@@ -19,14 +19,17 @@ function Select({ label, value, onChange, options }: { label: string; value: str
   );
 }
 
-export function Welcome({ project, onStart, error }: { project: Project; onStart: (folder: string, model: string, mode: string) => Promise<void>; error: string | null }) {
+export function Welcome({ project, roles, onStart, error }: { project: Project; roles: Role[]; onStart: (folder: string, roleId: string | null, model: string, mode: string) => Promise<void>; error: string | null }) {
   const [claude, setClaude] = useState<ClaudeInfo | "missing" | null>(null);
   const [model, setModel] = useState("sonnet");
   const [mode, setMode] = useState("default");
+  const [roleId, setRoleId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const role = roles.find((r) => r.id === roleId) ?? null;
+  const pickRole = (r: Role | null) => { setRoleId(r?.id ?? null); setModel(r?.model ?? "sonnet"); setMode(r?.mode ?? "default"); };
 
   useEffect(() => { invoke<ClaudeInfo>("check_claude").then(setClaude).catch(() => setClaude("missing")); }, []);
-  const start = async () => { setBusy(true); try { await onStart(project.folder, model, mode); } finally { setBusy(false); } };
+  const start = async () => { setBusy(true); try { await onStart(project.folder, roleId, model, mode); } finally { setBusy(false); } };
 
   return (
     <div className="flex h-full flex-1 items-center justify-center overflow-y-auto p-8">
@@ -46,6 +49,22 @@ export function Welcome({ project, onStart, error }: { project: Project; onStart
           <span className="text-[15px] leading-6 font-bold">{project.name}</span>
           <span className="truncate font-mono text-[13px] leading-5 text-text-tertiary" title={project.folder}>{project.folder}</span>
         </div>
+        <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
+          <legend className="mb-2 p-0 text-[13px] leading-5 font-bold text-text-secondary">Start as</legend>
+          <div className="flex flex-wrap gap-2">
+            {[null, ...roles].map((r) => {
+              const on = (r?.id ?? null) === roleId;
+              return (
+                <button key={r?.id ?? "none"} type="button" onClick={() => pickRole(r)} aria-pressed={on}
+                  className={`flex h-11 items-center gap-2.5 rounded-control border pr-4 pl-2 text-[15px] ${on ? "border-accent bg-surface-3 font-bold" : "border-line-strong text-text-secondary hover:bg-surface-2"}`}>
+                  {r ? <RoleMark mark={r.mark} size={28} /> : <span className="w-2" />}
+                  {r?.name ?? "No role"}
+                </button>
+              );
+            })}
+          </div>
+          <p className="m-0 text-[13px] leading-5 text-text-tertiary">{role ? role.brief || "This role has no brief." : "A plain session. Claude gets no role and you choose what it may do."}</p>
+        </fieldset>
         <div className="grid grid-cols-2 gap-4">
           <Select label="Model" value={model} onChange={setModel} options={MODELS} />
           <Select label="What Claude may do on its own" value={mode} onChange={setMode} options={MODES} />

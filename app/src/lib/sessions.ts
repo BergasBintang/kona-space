@@ -16,6 +16,7 @@ export type PlanWindow = { utilization: number; resetsAt: number };
 export type Session = {
   id: string;
   folder: string;
+  roleId: string | null; // the role it runs as, if any
   model: string;
   mode: string;
   title: string; // the first thing you asked, shortened
@@ -103,7 +104,7 @@ function onEvent(state: State, sessionId: string, r: any): State {
   const type: string = r?.type ?? "";
 
   if (type === "kona/started") {
-    const session: Session = { id: sessionId, folder: r.folder, model: r.model, mode: r.mode, title: "", run: "ready", items: [], draft: "", costTotal: 0, costLast: 0, turns: 0 };
+    const session: Session = { id: sessionId, folder: r.folder, roleId: r.roleId ?? null, model: r.model, mode: r.mode, title: "", run: "ready", items: [], draft: "", costTotal: 0, costLast: 0, turns: 0 };
     return { ...state, sessions: { ...state.sessions, [sessionId]: session }, order: [...state.order, sessionId], selected: sessionId };
   }
   if (type === "rate_limit_event") {

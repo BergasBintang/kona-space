@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 export type Project = { id: string; name: string; folder: string; github?: string | null };
 export type AddResult = { project: Project; hidden_folder: boolean; git_ignored: boolean };
+export type Role = { id: string; name: string; group: string; mark: string; model: string; mode: string; brief: string };
 export type Entry = { name: string; path: string; is_dir: boolean; size: number; modified: number | null };
 export type FileView =
   | { kind: "text"; text: string; size: number; truncated: boolean }
@@ -14,6 +15,9 @@ export type FileView =
 export const listProjects = () => invoke<Project[]>("list_projects");
 export const addProject = (folder: string, name?: string) => invoke<AddResult>("add_project", { folder, name: name ?? null });
 export const removeProject = (id: string) => invoke<void>("remove_project", { id });
+export const listRoles = () => invoke<Role[]>("list_roles");
+export const saveRole = (role: Role) => invoke<Role>("save_role", { role });
+export const removeRole = (id: string) => invoke<void>("remove_role", { id });
 export const listDir = (path: string) => invoke<Entry[]>("list_dir", { path });
 export const readFile = (path: string) => invoke<FileView>("read_file", { path });
 

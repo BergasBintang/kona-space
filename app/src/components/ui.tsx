@@ -77,6 +77,30 @@ export function PlanBar({ label, window: w }: { label: string; window?: { utiliz
   );
 }
 
+export const MARKS = ["ring", "halfdisc", "roundsq", "square", "triangle", "plus", "diamond", "ringdot", "lines", "dot"] as const;
+
+/** A role's mark: one shape on a neutral tile. Shape, not colour, tells roles apart. */
+export function RoleMark({ mark, size = 28 }: { mark: string; size?: number }) {
+  const c = "currentColor";
+  const shape: Record<string, ReactNode> = {
+    ring: <circle cx="8" cy="8" r="4.6" fill="none" stroke={c} strokeWidth="1.6" />,
+    halfdisc: <path d="M3.4 8 A4.6 4.6 0 0 1 12.6 8 Z" fill={c} />,
+    roundsq: <rect x="3.6" y="3.6" width="8.8" height="8.8" rx="2.2" fill="none" stroke={c} strokeWidth="1.6" />,
+    square: <rect x="3.6" y="3.6" width="8.8" height="8.8" rx="1" fill={c} />,
+    triangle: <path d="M8 3.4 L12.6 12 L3.4 12 Z" fill="none" stroke={c} strokeWidth="1.6" strokeLinejoin="round" />,
+    plus: <path d="M8 3.4 V12.6 M3.4 8 H12.6" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" />,
+    diamond: <path d="M8 3 L13 8 L8 13 L3 8 Z" fill="none" stroke={c} strokeWidth="1.6" strokeLinejoin="round" />,
+    ringdot: <><circle cx="8" cy="8" r="4.8" fill="none" stroke={c} strokeWidth="1.5" /><circle cx="8" cy="8" r="1.5" fill={c} /></>,
+    lines: <path d="M3.6 5 H12.4 M3.6 8 H12.4 M3.6 11 H12.4" fill="none" stroke={c} strokeWidth="1.6" strokeLinecap="round" />,
+    dot: <circle cx="8" cy="8" r="3.2" fill={c} />,
+  };
+  return (
+    <span className="inline-flex shrink-0 items-center justify-center rounded-lg bg-surface-3 text-text" style={{ width: size, height: size }}>
+      <svg width={size * 0.62} height={size * 0.62} viewBox="0 0 16 16" aria-hidden="true">{shape[mark] ?? shape.dot}</svg>
+    </span>
+  );
+}
+
 export const Card = ({ children, className = "" }: { children: ReactNode; className?: string }) => (
   <div className={`rounded-card border border-line-subtle bg-surface-1 ${className}`}>{children}</div>
 );

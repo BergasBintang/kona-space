@@ -3,13 +3,14 @@ import { Glyph, PlanBar } from "./ui";
 import type { Project } from "../lib/api";
 import type { PlanWindow } from "../lib/sessions";
 
-export type Place = "sessions" | "files";
+export type Place = "sessions" | "files" | "roles";
 
 const ICONS: Record<Place, React.ReactNode> = {
   sessions: <path d="M2.5 3.5 L13.5 3.5 L13.5 10.5 L7 10.5 L4 13 L4 10.5 L2.5 10.5 Z" />,
   files: <path d="M2 5 L2 12.5 L14 12.5 L14 6 L7.5 6 L6.5 4 L2 4 Z" />,
+  roles: <><circle cx="8" cy="5.5" r="2.5" /><path d="M3 13 C3 10.2 5 9 8 9 C11 9 13 10.2 13 13 Z" /></>,
 };
-const PLACES: { id: Place; label: string }[] = [{ id: "sessions", label: "Sessions" }, { id: "files", label: "Files" }];
+const PLACES: { id: Place; label: string }[] = [{ id: "sessions", label: "Sessions" }, { id: "files", label: "Files" }, { id: "roles", label: "Roles" }];
 
 export function Sidebar({ projects, project, onProject, onAddProject, place, onPlace, attention, plan, version }: {
   projects: Project[]; project: Project | null; onProject: (id: string) => void; onAddProject: () => void;

@@ -26,6 +26,9 @@ pub struct Role {
     /// local tools this role needs, by id from needs.rs (the needs check looks for them)
     #[serde(default)]
     pub needs: Vec<String>,
+    /// tickets run as this role work in their own copy of the repo (a worktree) unless the ticket says otherwise
+    #[serde(default)]
+    pub own_copy: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -40,7 +43,7 @@ pub struct Roles {
 }
 
 fn starting(id: &str, name: &str, group: &str, mark: &str, mode: &str, needs: &[&str], brief: &str) -> Role {
-    Role { id: id.into(), name: name.into(), group: group.into(), mark: mark.into(), model: "sonnet".into(), mode: mode.into(), brief: brief.into(), account: None, needs: needs.iter().map(|s| s.to_string()).collect() }
+    Role { id: id.into(), name: name.into(), group: group.into(), mark: mark.into(), model: "sonnet".into(), mode: mode.into(), brief: brief.into(), account: None, needs: needs.iter().map(|s| s.to_string()).collect(), own_copy: id == "frontend" || id == "backend" }
 }
 
 /// The ten starting roles. The modes are the safe default (ask every time); only the two that edit files are loosened.
@@ -64,13 +67,13 @@ impl Roles {
         let file = base.join("roles.json");
         let found = fs::read_to_string(&file).ok().and_then(|t| serde_json::from_str::<FileData>(&t).ok());
         // a file from before the needs check (version 1): the starting roles get their starting needs
-        let old = found.as_ref().map_or(false, |d| d.version < 2);
+        let old = found.as_ref().map_or(false, |d| d.version < 3);
         let fresh = found.is_none() || old;
         let mut list = found.map(|d| d.roles).unwrap_or_else(starting_roles);
         if old {
             let stock = starting_roles();
             for r in list.iter_mut() {
-                if let Some(s) = stock.iter().find(|s| s.id == r.id) { r.needs = s.needs.clone(); }
+                if let Some(s) = stock.iter().find(|s| s.id == r.id) { if r.needs.is_empty() { r.needs = s.needs.clone(); } r.own_copy = s.own_copy; }
             }
         }
         let me = Self { file, list: Mutex::new(list) };
@@ -85,7 +88,7 @@ impl Roles {
         if let Some(dir) = self.file.parent() {
             fs::create_dir_all(dir).map_err(|e| e.to_string())?;
         }
-        let data = FileData { version: 2, roles: list.to_vec() };
+        let data = FileData { version: 3, roles: list.to_vec() };
         fs::write(&self.file, serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?).map_err(|e| e.to_string())
     }
 

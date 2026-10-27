@@ -2,7 +2,7 @@
 // core. Agents raise and update cards through the built-in tool server, so the board polls every two seconds while it is open.
 // Agents may move a card up to Review; only the owner moves one to Done (the core and the tool server both enforce that for agents).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createTicket, listTickets, removeTicket, updateTicket, type Project, type Role, type TicketView } from "../lib/api";
+import { createTicket, listTickets, removeTicket, updateTicket, worktreeStatus, type Project, type Role, type TicketView, type WorktreeStatus } from "../lib/api";
 import { dollars, type State } from "../lib/sessions";
 import { Button, Glyph, RoleMark } from "./ui";
 import { Select } from "./pick";
@@ -41,6 +41,7 @@ function Card({ t, role, live, active, onOpen }: { t: TicketView; role?: Role; l
         )}
       </div>
       <span className="line-clamp-3 text-[15px] leading-5 font-bold">{t.title}</span>
+      {t.branch && <span className="truncate font-mono text-[12px] leading-4 text-text-tertiary" title={t.branch}>{t.branch}</span>}
       {t.next && <span className="line-clamp-2 text-[13px] leading-[18px] text-text-secondary">Next: {t.next}</span>}
       <div className="flex items-center justify-between gap-2 text-[13px] leading-5 text-text-tertiary">
         <span className="flex min-w-0 items-center gap-2">{role ? (<><RoleMark mark={role.mark} size={22} /><span className="truncate">{role.name}</span></>) : <span>No role</span>}</span>
@@ -50,8 +51,8 @@ function Card({ t, role, live, active, onOpen }: { t: TicketView; role?: Role; l
   );
 }
 
-type Draft = { title: string; description: string; acceptance: string; role: string; status: string; next: string; waiting: boolean };
-const draftOf = (t: TicketView | null): Draft => ({ title: t?.title ?? "", description: t?.description ?? "", acceptance: t?.acceptance ?? "", role: t?.role ?? "", status: t?.status ?? "backlog", next: t?.next ?? "", waiting: t?.waiting ?? false });
+type Draft = { title: string; description: string; acceptance: string; role: string; status: string; next: string; waiting: boolean; own_copy: string };
+const draftOf = (t: TicketView | null): Draft => ({ title: t?.title ?? "", description: t?.description ?? "", acceptance: t?.acceptance ?? "", role: t?.role ?? "", status: t?.status ?? "backlog", next: t?.next ?? "", waiting: t?.waiting ?? false, own_copy: t?.own_copy ?? "auto" });
 const field = "rounded-control border border-line-strong bg-inset px-3.5 text-[15px] text-text placeholder:text-text-tertiary";
 
 function Drawer({ project, roles, ticket, state, onClose, onSaved, onRemoved, onStart, onOpenSession }: {
@@ -64,8 +65,10 @@ function Drawer({ project, roles, ticket, state, onClose, onSaved, onRemoved, on
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
   const base = useRef<Draft>(draftOf(ticket));
+  const [wt, setWt] = useState<WorktreeStatus | null>(null);
+  useEffect(() => { if (!ticket?.worktree) { setWt(null); return; } worktreeStatus(project.id, ticket.id).then(setWt).catch(() => setWt(null)); }, [ticket?.id, ticket?.worktree, ticket?.updated, project.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // changes whenever anything the drawer shows changes (the time alone is only to the minute)
-  const stamp = ticket ? JSON.stringify([ticket.id, ticket.updated, ticket.title, ticket.status, ticket.role, ticket.next, ticket.waiting, ticket.description, ticket.acceptance, ticket.history.length]) : "new";
+  const stamp = ticket ? JSON.stringify([ticket.id, ticket.updated, ticket.title, ticket.status, ticket.role, ticket.next, ticket.waiting, ticket.description, ticket.acceptance, ticket.history.length, ticket.own_copy, ticket.branch]) : "new";
   const dirty = JSON.stringify(draft) !== JSON.stringify(base.current);
 
   // a card changed by an agent shows up here, unless the owner is in the middle of typing
@@ -81,7 +84,7 @@ function Drawer({ project, roles, ticket, state, onClose, onSaved, onRemoved, on
     setBusy(true); setError(null);
     try {
       if (fresh) {
-        const t = await createTicket(project.id, { title: draft.title, description: draft.description, acceptance: draft.acceptance, role: draft.role || null, status: draft.status, next: draft.next });
+        const t = await createTicket(project.id, { title: draft.title, description: draft.description, acceptance: draft.acceptance, role: draft.role || null, status: draft.status, next: draft.next, own_copy: draft.own_copy });
         onSaved(t.id);
       } else {
         const b = base.current; const patch: Record<string, unknown> = {};
@@ -118,6 +121,19 @@ function Drawer({ project, roles, ticket, state, onClose, onSaved, onRemoved, on
         <div className="grid grid-cols-2 gap-4">
           <Select label="Column" value={draft.status} onChange={(v) => set({ status: v })} options={COLUMNS.filter((c) => !fresh || c.id === "backlog" || c.id === "ready").map((c) => ({ value: c.id, label: c.name, hint: c.says }))} />
           <Select label="Role" value={draft.role} onChange={(v) => set({ role: v })} options={[{ value: "", label: "No role" }, ...roles.map((r) => ({ value: r.id, label: r.name, hint: r.group }))]} />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Select label="Where its sessions work" value={draft.own_copy} onChange={(v) => set({ own_copy: v })} options={[
+            { value: "auto", label: role?.own_copy ? "Follow the role: its own copy of the repo" : "Follow the role: the main folder", hint: "Set on the role in Roles" },
+            { value: "yes", label: "Its own copy of the repo", hint: "A separate folder on its own branch" },
+            { value: "no", label: "The main folder", hint: "Claude works in your project folder itself" }]} />
+          {!fresh && ticket!.branch && (
+            <div className="flex flex-col gap-1 rounded-control border border-line-subtle bg-inset px-3.5 py-2.5 text-[13px] leading-5">
+              <span className="font-mono text-text-secondary">{ticket!.branch}</span>
+              <span className="truncate font-mono text-text-tertiary" title={ticket!.worktree}>{ticket!.worktree}</span>
+              {wt?.exists ? <span className="text-text-secondary">{wt.ahead} {wt.ahead === 1 ? "commit" : "commits"} ahead of {wt.base}, {wt.behind} behind · {wt.changed} {wt.changed === 1 ? "file" : "files"} changed, not committed</span> : <span className="text-text-tertiary">The folder is gone. A new session makes it again.</span>}
+            </div>
+          )}
         </div>
         <label className="flex flex-col gap-2">
           <span className="text-[13px] leading-5 font-bold text-text-secondary">What needs doing</span>

@@ -2,6 +2,16 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.9.0, 2026-10-28
+
+A worktree per ticket.
+
+- A ticket's session can work in its own copy of the repo: a separate folder inside the project's hidden `.kona/worktrees`, on its own branch `feat/T-0012-login-page`. It cannot step on your main folder or on another ticket.
+- Frontend and Backend work in their own copy by default (a setting on the role), and a ticket can override it: follow the role, its own copy, or the main folder.
+- A second session on the same ticket continues in the same copy. The card and the ticket show the branch, how many commits it is ahead or behind, and how many files changed and are not committed.
+- The chat header says "Own copy" and shows the folder Claude is working in. Costs, the session list and the board still group by project.
+- Claude is told it is in the ticket's own copy and on which branch. Merging and clean-up come with the worktree graph.
+
 ## 0.8.1, 2026-10-28
 
 A cleaner repository for anyone who downloads it.

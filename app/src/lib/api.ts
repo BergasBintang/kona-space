@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 export type Project = { id: string; name: string; folder: string; github?: string | null };
 export type AddResult = { project: Project; hidden_folder: boolean; git_ignored: boolean };
-export type Role = { id: string; name: string; group: string; mark: string; model: string; mode: string; brief: string; account?: string | null; needs: string[] };
+export type Role = { id: string; name: string; group: string; mark: string; model: string; mode: string; brief: string; account?: string | null; needs: string[]; own_copy?: boolean };
 export type ToolInfo = { id: string; name: string; install: string };
 export type ToolStatus = { id: string; name: string; installed: boolean; version?: string | null; install: string };
 export type Hint = { id: string; because: string };
@@ -19,9 +19,11 @@ export const PLAIN_LINES: Lines = { greeting: "Choose a role and start a session
 export type Ticket = {
   id: string; title: string; status: string; role: string | null; raised_by: string; sessions: string[]; next: string; waiting: boolean;
   created: string; updated: string; description: string; acceptance: string; history: string[];
+  own_copy: string; branch: string; worktree: string; // where its sessions work: auto, yes (own copy of the repo) or no (main folder)
 };
+export type WorktreeStatus = { exists: boolean; branch: string; ahead: number; behind: number; changed: number; base: string };
 export type TicketView = Ticket & { cost: number };
-export type TicketPatch = Partial<{ title: string; description: string; acceptance: string; status: string; role: string; next: string; waiting: boolean; note: string }>;
+export type TicketPatch = Partial<{ title: string; description: string; acceptance: string; status: string; role: string; next: string; waiting: boolean; note: string; own_copy: string }>;
 export type Entry = { name: string; path: string; is_dir: boolean; size: number; modified: number | null };
 export type FileView =
   | { kind: "text"; text: string; size: number; truncated: boolean }
@@ -37,13 +39,14 @@ export const listTools = () => invoke<ToolInfo[]>("list_tools");
 export const checkTools = (ids: string[]) => invoke<ToolStatus[]>("check_tools", { ids });
 export const projectHints = (folder: string) => invoke<Hint[]>("project_hints", { folder });
 export const listTickets = (projectId: string) => invoke<TicketView[]>("list_tickets", { projectId });
-export const createTicket = (projectId: string, n: { title: string; description?: string; acceptance?: string; role?: string | null; status?: string; next?: string }) => invoke<Ticket>("create_ticket", { projectId, new: n });
+export const createTicket = (projectId: string, n: { title: string; description?: string; acceptance?: string; role?: string | null; status?: string; next?: string; own_copy?: string }) => invoke<Ticket>("create_ticket", { projectId, new: n });
 export const updateTicket = (projectId: string, id: string, patch: TicketPatch) => invoke<Ticket>("update_ticket", { projectId, id, patch });
 export const removeTicket = (projectId: string, id: string) => invoke<void>("remove_ticket", { projectId, id });
 export const getPersona = () => invoke<Persona>("get_persona");
 export const savePersona = (persona: Persona) => invoke<Persona>("save_persona", { persona });
 export const personaPrompt = (persona: Persona) => invoke<string>("persona_prompt", { persona });
 export const defaultPersona = () => invoke<Persona>("default_persona");
+export const worktreeStatus = (projectId: string, ticketId: string) => invoke<WorktreeStatus>("worktree_status", { projectId, ticketId });
 export const costRows = (sinceDay: string | null) => invoke<CostRow[]>("cost_rows", { sinceDay });
 export const listRoles = () => invoke<Role[]>("list_roles");
 export const saveRole = (role: Role) => invoke<Role>("save_role", { role });

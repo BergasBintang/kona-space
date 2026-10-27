@@ -27,7 +27,7 @@ export function Header({ s, role, account, onStop }: { s: Session; role?: Role; 
           {account && <span>Account: {account}</span>}
           <span>{s.model}</span>
           <span>{modeWord(s.mode)}</span>
-          <span className="truncate font-mono text-text-tertiary" title={s.folder}>{s.folder}</span>
+          <span className="truncate font-mono text-text-tertiary" title={s.workDir}>{s.workDir !== s.folder && <span className="mr-2 font-sans font-bold text-text-secondary">Own copy</span>}{s.workDir}</span>
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-5">

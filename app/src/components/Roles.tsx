@@ -13,7 +13,7 @@ export const MODE_CHOICES: { id: string; word: string; says: string }[] = [
 ];
 export const MODEL_CHOICES = [["sonnet", "Sonnet (the usual choice)"], ["opus", "Opus (the most capable, slower)"], ["haiku", "Haiku (the quickest and cheapest)"]];
 
-const blank = (): Role => ({ id: "", name: "", group: "Build", mark: "dot", model: "sonnet", mode: "default", brief: "", account: null, needs: [] });
+const blank = (): Role => ({ id: "", name: "", group: "Build", mark: "dot", model: "sonnet", mode: "default", brief: "", account: null, needs: [], own_copy: false });
 
 export function Roles({ roles, accounts, tools, onChanged }: { roles: Role[]; accounts: Account[]; tools: ToolInfo[]; onChanged: (next: Role[]) => void }) {
   const [pickedId, setPickedId] = useState<string | null>(roles[0]?.id ?? null); // "" is a role not saved yet
@@ -139,6 +139,11 @@ export function Roles({ roles, accounts, tools, onChanged }: { roles: Role[]; ac
               <MultiSelect label="Tools this role needs" values={draft.needs} onChange={(v) => set({ needs: v })} placeholder="None" options={tools.map((t) => ({ value: t.id, label: t.name }))} />
               <span className="text-[13px] leading-5 text-text-tertiary">Kona checks these are on this PC before a session starts. It only looks; it never installs.</span>
             </div>
+
+            <label className="flex cursor-pointer items-start gap-3">
+              <input type="checkbox" checked={!!draft.own_copy} onChange={(e) => set({ own_copy: e.target.checked })} className="mt-1.5 h-4 w-4 accent-[var(--color-accent)]" />
+              <span className="flex flex-col"><span className="font-bold">Tickets work in their own copy of the repo</span><span className="text-[13px] leading-5 text-text-secondary">A separate folder on its own branch, so this role cannot step on your main folder or on another ticket. A ticket can override it.</span></span>
+            </label>
 
             <label className="flex flex-col gap-2">
               <span className="text-[13px] leading-5 font-bold text-text-secondary">Brief</span>

@@ -11,6 +11,7 @@ mod projects;
 mod roles;
 mod session;
 mod tickets;
+mod worktrees;
 
 use serde::Serialize;
 use serde_json::Value;
@@ -51,12 +52,39 @@ async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: Sta
     persona.enabled = use_voice;
     let project_name = projects.all().into_iter().find(|p| projects::norm(std::path::Path::new(&p.folder)) == projects::norm(std::path::Path::new(&folder))).map(|p| p.name)
         .unwrap_or_else(|| std::path::Path::new(&folder).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default());
+    let who = format!("the owner{}", role.as_ref().map(|r| format!(", as {}", r.name)).unwrap_or_default());
+    let tdir = tickets::dir(std::path::Path::new(&folder));
+    let mut work_dir = folder.clone();
     let ticket = match &ticket_id {
-        Some(id) => Some(tickets::get(&tickets::dir(std::path::Path::new(&folder)), id)?),
+        Some(id) => {
+            let t = tickets::get(&tdir, id)?;
+            // does this ticket work in its own copy of the repo? (its own choice, else the role's setting)
+            let want = match t.own_copy.as_str() { "yes" => true, "no" => false, _ => role.as_ref().is_some_and(|r| r.own_copy) };
+            if want {
+                match worktrees::ensure(std::path::Path::new(&folder), &t.id, &t.title) {
+                    Ok(c) => {
+                        let p = c.path.to_string_lossy().to_string();
+                        work_dir = p.clone();
+                        Some(tickets::set_worktree(&tdir, id, &c.branch, &p, &who)?)
+                    }
+                    // the owner asked for an own copy: say why not. Left to the role's setting: work in the main folder and note it.
+                    Err(e) if t.own_copy == "yes" => return Err(e),
+                    Err(e) => {
+                        let _ = tickets::update(&tdir, id, tickets::Patch { note: Some(format!("no own copy, working in the main folder: {e}")), ..Default::default() }, "Kona");
+                        Some(t)
+                    }
+                }
+            } else if !t.worktree.is_empty() && std::path::Path::new(&t.worktree).exists() {
+                // an earlier session made a copy: keep working there
+                work_dir = t.worktree.clone();
+                Some(t)
+            } else {
+                Some(t)
+            }
+        }
         None => None,
     };
-    let who = format!("the owner{}", role.as_ref().map(|r| format!(", as {}", r.name)).unwrap_or_default());
-    let id = session::start(app, &sessions, folder.clone(), role, account, persona, project_name, ticket, model, mode, resume).await?;
+    let id = session::start(app, &sessions, folder.clone(), role, account, persona, project_name, ticket, work_dir, model, mode, resume).await?;
     if let Some(t) = ticket_id {
         let _ = tickets::link_session(&tickets::dir(std::path::Path::new(&folder)), &t, &id, &who);
     }
@@ -179,6 +207,17 @@ fn remove_ticket(projects: State<'_, Projects>, project_id: String, id: String) 
     tickets::remove(&project_dir(&projects, &project_id)?, &id)
 }
 
+/// Where a ticket's own copy stands: its branch, commits ahead or behind the main folder's branch, files changed and not committed.
+#[tauri::command]
+fn worktree_status(projects: State<'_, Projects>, project_id: String, ticket_id: String) -> Result<worktrees::Status, String> {
+    let project = projects.all().into_iter().find(|p| p.id == project_id).ok_or("That project does not exist any more")?;
+    let t = tickets::get(&tickets::dir(std::path::Path::new(&project.folder)), &ticket_id)?;
+    if t.worktree.is_empty() {
+        return Ok(worktrees::Status::default());
+    }
+    Ok(worktrees::status(std::path::Path::new(&project.folder), std::path::Path::new(&t.worktree), &t.branch))
+}
+
 #[tauri::command]
 fn list_roles(roles: State<'_, Roles>) -> Vec<Role> {
     roles.all()
@@ -266,7 +305,7 @@ pub fn run() {
             app.manage(Voice::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
+        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, worktree_status, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

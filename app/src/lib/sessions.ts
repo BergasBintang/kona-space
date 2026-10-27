@@ -16,6 +16,7 @@ export type PlanWindow = { utilization: number; resetsAt: number };
 export type Session = {
   id: string;
   folder: string;
+  workDir: string; // where Claude runs: the project folder, or the ticket's own copy of the repo
   roleId: string | null; // the role it runs as, if any
   accountId: string; // the Claude login it runs on
   voice: boolean; // the voice is on for this session
@@ -119,7 +120,7 @@ function onEvent(state: State, sessionId: string, r: any): State {
   const type: string = r?.type ?? "";
 
   if (type === "kona/started") {
-    const session: Session = { id: sessionId, folder: r.folder, roleId: r.roleId ?? null, accountId: r.accountId ?? "main", voice: !!r.voice, ticketId: r.ticketId ?? null, endedLine: r.lines?.ended ?? "This session has ended.", model: r.model, mode: r.mode, title: "", run: "ready", items: r.lines?.started ? [{ kind: "note", id: nextId("n"), tone: "info", text: r.lines.started }] : [], draft: "", costTotal: 0, costLast: 0, turns: 0 };
+    const session: Session = { id: sessionId, folder: r.folder, workDir: r.workDir ?? r.folder, roleId: r.roleId ?? null, accountId: r.accountId ?? "main", voice: !!r.voice, ticketId: r.ticketId ?? null, endedLine: r.lines?.ended ?? "This session has ended.", model: r.model, mode: r.mode, title: "", run: "ready", items: r.lines?.started ? [{ kind: "note", id: nextId("n"), tone: "info", text: r.lines.started }] : [], draft: "", costTotal: 0, costLast: 0, turns: 0 };
     return { ...state, sessions: { ...state.sessions, [sessionId]: session }, order: [...state.order, sessionId], selected: sessionId };
   }
   if (type === "rate_limit_event") {

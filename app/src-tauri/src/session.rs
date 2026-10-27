@@ -108,7 +108,7 @@ pub fn claude_version(exe: &PathBuf) -> Option<String> {
     Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Option<Role>, account: Option<Account>, persona: Persona, project_name: String, ticket: Option<Ticket>, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
+pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Option<Role>, account: Option<Account>, persona: Persona, project_name: String, ticket: Option<Ticket>, work_dir: String, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
     let exe = find_claude().ok_or("Claude Code was not found on this PC")?;
     let id = resume.clone().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let mut cmd = Command::new(exe);
@@ -138,7 +138,7 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     if let Some(dir) = account.as_ref().and_then(|a| a.config_dir.as_ref()) {
         cmd.env("CLAUDE_CONFIG_DIR", dir);
     }
-    cmd.current_dir(&folder)
+    cmd.current_dir(&work_dir)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -211,6 +211,6 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     }
 
     sessions.map.lock().unwrap().insert(id.clone(), Handle { tx, stop: Some(stop_tx) });
-    let _ = app.emit("session-event", json!({"sessionId": id, "record": {"type": "kona/started", "folder": folder, "roleId": role.as_ref().map(|r| r.id.clone()), "accountId": account.as_ref().map(|a| a.id.clone()), "voice": persona.enabled, "ticketId": ticket.as_ref().map(|t| t.id.clone()), "lines": persona.lines_for(&project_name), "model": model, "mode": mode, "coveredByJob": covered}}));
+    let _ = app.emit("session-event", json!({"sessionId": id, "record": {"type": "kona/started", "folder": folder, "roleId": role.as_ref().map(|r| r.id.clone()), "accountId": account.as_ref().map(|a| a.id.clone()), "voice": persona.enabled, "ticketId": ticket.as_ref().map(|t| t.id.clone()), "workDir": work_dir, "lines": persona.lines_for(&project_name), "model": model, "mode": mode, "coveredByJob": covered}}));
     Ok(id)
 }

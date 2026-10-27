@@ -12,6 +12,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 pub const STATUSES: [&str; 5] = ["backlog", "ready", "in-progress", "review", "done"];
+pub const COPY_CHOICES: [&str; 3] = ["auto", "yes", "no"];
 
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub struct Ticket {
@@ -30,6 +31,11 @@ pub struct Ticket {
     pub description: String,
     pub acceptance: String,
     pub history: Vec<String>,
+    /// where its sessions work: "auto" (the role's setting), "yes" (its own copy of the repo) or "no" (the main folder)
+    pub own_copy: String,
+    /// the branch and the folder of its own copy, once one was made
+    pub branch: String,
+    pub worktree: String,
 }
 
 #[derive(Deserialize, Default)]
@@ -45,6 +51,8 @@ pub struct NewTicket {
     pub status: Option<String>,
     #[serde(default)]
     pub next: String,
+    #[serde(default)]
+    pub own_copy: Option<String>,
 }
 
 /// What to change. Every field is optional; only the ones present are touched. `role: ""` clears the role.
@@ -59,6 +67,7 @@ pub struct Patch {
     pub waiting: Option<bool>,
     /// a line added to the history
     pub note: Option<String>,
+    pub own_copy: Option<String>,
 }
 
 /// Local date and time as `2026-10-27 21:40`, asked of the SQLite already bundled (no time library needed).
@@ -91,6 +100,9 @@ fn render(t: &Ticket) -> String {
     kv("sessions", &t.sessions.join(", "));
     kv("next", &t.next);
     kv("waiting", if t.waiting { "true" } else { "false" });
+    kv("own_copy", &t.own_copy);
+    kv("branch", &t.branch);
+    kv("worktree", &t.worktree);
     kv("created", &t.created);
     kv("updated", &t.updated);
     s.push_str("---\n");
@@ -121,6 +133,9 @@ fn parse(text: &str) -> Option<Ticket> {
             "sessions" => t.sessions = v.split(',').map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).collect(),
             "next" => t.next = v,
             "waiting" => t.waiting = v == "true",
+            "own_copy" => t.own_copy = v,
+            "branch" => t.branch = v,
+            "worktree" => t.worktree = v,
             "created" => t.created = v,
             "updated" => t.updated = v,
             _ => {}
@@ -131,6 +146,9 @@ fn parse(text: &str) -> Option<Ticket> {
     }
     if !STATUSES.contains(&t.status.as_str()) {
         t.status = "backlog".into();
+    }
+    if !COPY_CHOICES.contains(&t.own_copy.as_str()) {
+        t.own_copy = "auto".into();
     }
     let (desc_and_done, history) = match body.split_once("\n## History\n") {
         Some((a, h)) => (a.to_string(), h.to_string()),
@@ -192,6 +210,10 @@ pub fn create(dir: &Path, n: NewTicket, who: &str) -> Result<Ticket, String> {
     check_text("title", &title, 140)?;
     check_text("description", &n.description, 20_000)?;
     check_text("done-when text", &n.acceptance, 10_000)?;
+    let own_copy = n.own_copy.unwrap_or_else(|| "auto".into());
+    if !COPY_CHOICES.contains(&own_copy.as_str()) {
+        return Err("That is not a choice for where the ticket works".into());
+    }
     let status = n.status.unwrap_or_else(|| "backlog".into());
     if !STATUSES.contains(&status.as_str()) {
         return Err("That is not a column on the board".into());
@@ -207,7 +229,7 @@ pub fn create(dir: &Path, n: NewTicket, who: &str) -> Result<Ticket, String> {
                 let t = Ticket {
                     id, title, status: status.clone(), role: n.role.filter(|r| !r.is_empty()), raised_by: who.to_string(), sessions: vec![], next: one_line(&n.next),
                     waiting: false, created: at.clone(), updated: at.clone(), description: n.description, acceptance: n.acceptance,
-                    history: vec![format!("{at} raised by {who}")],
+                    history: vec![format!("{at} raised by {who}")], own_copy: own_copy.clone(), branch: String::new(), worktree: String::new(),
                 };
                 write(dir, &t)?;
                 return Ok(t);
@@ -245,6 +267,12 @@ pub fn update(dir: &Path, id: &str, p: Patch, who: &str) -> Result<Ticket, Strin
     }
     if let Some(n) = p.next { let n = one_line(&n); if n != t.next { t.next = n; said.push(format!("next step updated by {who}")); } }
     if let Some(w) = p.waiting { if w != t.waiting { t.waiting = w; said.push(if w { format!("marked waiting on the owner by {who}") } else { format!("no longer waiting, said {who}") }); } }
+    if let Some(c) = p.own_copy {
+        if !COPY_CHOICES.contains(&c.as_str()) {
+            return Err("That is not a choice for where the ticket works".into());
+        }
+        if c != t.own_copy { said.push(format!("where it works set to {c} by {who}")); t.own_copy = c; }
+    }
     if let Some(n) = p.note {
         let n = one_line(&n);
         if !n.is_empty() { check_text("note", &n, 1_000)?; said.push(format!("note from {who}: {n}")); }
@@ -254,6 +282,21 @@ pub fn update(dir: &Path, id: &str, p: Patch, who: &str) -> Result<Ticket, Strin
     }
     t.updated = at.clone();
     for s in said { t.history.push(format!("{at} {s}")); }
+    write(dir, &t)?;
+    Ok(t)
+}
+
+/// Record the ticket's own copy of the repo (branch and folder).
+pub fn set_worktree(dir: &Path, id: &str, branch: &str, path: &str, who: &str) -> Result<Ticket, String> {
+    let mut t = get(dir, id)?;
+    if t.branch == branch && t.worktree == path {
+        return Ok(t);
+    }
+    let at = now();
+    t.branch = branch.to_string();
+    t.worktree = path.to_string();
+    t.updated = at.clone();
+    t.history.push(format!("{at} its own copy made on branch {branch} ({who})"));
     write(dir, &t)?;
     Ok(t)
 }
@@ -285,6 +328,9 @@ pub fn prompt_for(t: &Ticket) -> String {
     let mut p = format!("You are working on ticket {}: {}.", t.id, t.title);
     if !t.description.trim().is_empty() { p.push_str(&format!(" What it is: {}", one_line(&t.description))); }
     if !t.acceptance.trim().is_empty() { p.push_str(&format!(" It is done when: {}", one_line(&t.acceptance))); }
+    if !t.worktree.is_empty() {
+        p.push_str(&format!(" You are working in this ticket's own copy of the repository, on the branch {}. Commit your work there when it is ready; do not switch branches.", t.branch));
+    }
     p.push_str(" You can read and change tickets with the kona-board tools. Keep this ticket's next step up to date with update_ticket. When your part is ready for the owner to look at, move it to review. Never move a ticket to done: only the owner does that.");
     p
 }

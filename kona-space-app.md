@@ -115,6 +115,7 @@ This note holds no keys, tokens, passwords, IP addresses or e-mail addresses, on
 | 2026-10-28 | **Kona 0.8.1: repository clean-up**: pushed to GitHub (SSH, a key made for Kona); README, `.gitattributes`, wider `.gitignore`, design scripts no longer tied to one temporary folder, trial screenshots kept off the repository | this section |
 | 2026-10-28 | **Kona 0.9.0: a worktree per ticket**: own copy of the repo and branch per ticket, on by default for Frontend and Backend, overridable per ticket, state shown on the card | section 12 (step 4), F10 |
 | 2026-10-28 | **Kona 0.10.0: the worktree graph**: all worktrees of a project, owner ticket, ahead and behind, conflict preview, merge and remove with confirmations, Done guard | section 12 (step 5), F9 |
+| 2026-10-28 | **Kona 0.11.0: leftovers**: programs sessions started, left behind after the session ended, ports, stop and ignore with confirmation, scratch-file size and clean-up, badges | section 12 (step 3), F11 |
 
 **Where the work lives**
 - Design file: `docs/design/kona-design.figcraft` (open in FigCraft; it is also the clickable prototype). Previews: `docs/design/previews/`. Rules and tokens: `docs/DESIGN.md`.
@@ -1217,6 +1218,15 @@ Proposed. It moves accounts and the leftovers job object earlier than first sugg
 - **Done means merged:** moving a ticket with unmerged commits to Done (by drag or in the card) asks first and can be cancelled (seen).
 - **A new part:** the confirmation dialog (`Confirm.tsx`): Cancel has the focus when it opens, Esc cancels, Tab stays inside, and the dangerous action is the red button. The leftovers panel and the SSH registry reuse it.
 - **Not yet:** merging the other way (bringing main's new commits into a copy), a graph of individual commits, pushing to a remote, and a button that opens the copy in the Files place.
+
+**Step 3 (2026-10-28, Kona 0.11.0): the leftovers panel (F11).** Checked in the real window with a real Claude session that started a web server in the background and then ended.
+- **How it sees:** every program a session starts is inside Kona's job object, so Windows itself lists them (`QueryInformationJobObject`), including programs that lost their parent. Kona reads that list, the process list (Toolhelp), each program's start time and command line (read from its own memory, no PowerShell) and the listening TCP ports (`GetExtendedTcpTable`), and joins each program to its session by the chain of parents, or what it remembered, or the one open session. All the unsafe calls are in `winproc.rs`; the logic is in `leftovers.rs`.
+- **Seen:** the server showed as "1 running in open sessions" with `Port 8123` and its full command; when the session was stopped the server stayed alive, the sidebar showed a red 1, the session row said "1 left behind", and the panel listed it under "1 left behind". Ignore hid it (and the count) and kept it under "1 ignored". Stop showed the command, the port and "which has ended", Cancel (focused) left it running, and "Stop it" ended it and freed the port (checked by connecting to the port). A stale or malformed key was refused. Restarting Kona killed a server that was still running (the job closing), as designed.
+- **Details that mattered:** the shell Claude wraps a command in (`bash.exe`) is not listed when it only holds the real program; Kona's own tool server and the console host are skipped; a helper that lives under 10 seconds is not shown unless it holds a port or outlived its session; the process start time is a number too big for JavaScript, so the screen sends the pair back as the text `pid:start time` (a bug the first test caught).
+- **Scratch files:** Claude keeps `%TEMP%\claude\<project>\<session id>`; Kona measures it (stopping the count at 200,000 entries), shows it, and deletes it after a confirmation for a finished session only, and only that one folder under Claude's temp area (refused: a live session, a path that is not a session id, anything outside the area).
+- **What it does not see:** programs started outside Kona (a terminal, the VS Code extension); `leftovers.jsonl` records `seen`, `ended` and `stopped`, but a program started in an earlier Kona run is already gone, because closing Kona stops everything in the job. The plan's hook-based record of intent (what a command meant to start) was not built; the scan sees the result instead.
+- **Cost:** one snapshot and one table read every 4 seconds while a session is open or something is alive; nothing otherwise.
+- **Found while testing:** a session's title lost every letter s (a regular expression had lost its backslash); fixed.
 
 Why this order:
 - Steps 1 to 3 replace the owner's daily use of one terminal session and fix the leftovers problem.

@@ -105,7 +105,7 @@ export function reducer(state: State, a: Action): State {
       return { ...state, sessions: rest, order, selected: state.selected === a.id ? order[0] ?? null : state.selected };
     }
     case "user-sent":
-      return update(state, a.sessionId, (s) => ({ ...push(s, { kind: "user", id: nextId("u"), text: a.text, images: a.images }), title: s.title || a.text.replace(/s+/g, " ").slice(0, 48), run: "working", draft: "" }));
+      return update(state, a.sessionId, (s) => ({ ...push(s, { kind: "user", id: nextId("u"), text: a.text, images: a.images }), title: s.title || a.text.replace(/\s+/g, " ").trim().slice(0, 48), run: "working", draft: "" }));
     case "permission-answered":
       return update(state, a.sessionId, (s) => ({
         ...s,

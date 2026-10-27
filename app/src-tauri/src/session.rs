@@ -30,6 +30,8 @@ pub struct Sessions {
     pub ledger: Arc<Ledger>,
     /// Kona's own data folder (the board's tool server reads the role names from it)
     pub base: PathBuf,
+    /// what each session started and what is still alive after it ended
+    pub tracker: Arc<crate::leftovers::Tracker>,
 }
 
 #[derive(Deserialize)]
@@ -39,8 +41,8 @@ pub struct ImageIn {
 }
 
 impl Sessions {
-    pub fn new(ledger: Ledger, base: PathBuf) -> Self {
-        Self { map: Mutex::new(HashMap::new()), ledger: Arc::new(ledger), base }
+    pub fn new(ledger: Ledger, base: PathBuf, tracker: Arc<crate::leftovers::Tracker>) -> Self {
+        Self { map: Mutex::new(HashMap::new()), ledger: Arc::new(ledger), base, tracker }
     }
 
     fn send_line(&self, session_id: &str, value: Value) -> Result<(), String> {
@@ -147,6 +149,7 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     let mut child = cmd.spawn().map_err(|e| format!("Could not start Claude Code: {e}"))?;
     let covered = child.raw_handle().map(|h| crate::job::adopt(h as _)).unwrap_or(false);
 
+    sessions.tracker.register(&id, child.id().unwrap_or(0));
     let mut stdin = child.stdin.take().ok_or("no stdin")?;
     let stdout = child.stdout.take().ok_or("no stdout")?;
     let stderr = child.stderr.take().ok_or("no stderr")?;
@@ -199,13 +202,15 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
         });
     }
     {
-        let (app, sid) = (app.clone(), id.clone());
+        let (app, sid, tracker) = (app.clone(), id.clone(), sessions.tracker.clone());
         tauri::async_runtime::spawn(async move {
             let mut child = child;
             let code = tokio::select! {
                 status = child.wait() => status.ok().and_then(|s| s.code()),
                 _ = stop_rx => { let _ = child.kill().await; None }
             };
+            // look at once what the session leaves behind
+            { let (t, s) = (tracker.clone(), sid.clone()); let _ = tauri::async_runtime::spawn_blocking(move || t.ended(&s)).await; }
             let _ = app.emit("session-event", json!({"sessionId": sid, "record": {"type": "kona/exited", "code": code}}));
         });
     }

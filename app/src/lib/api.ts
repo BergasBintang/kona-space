@@ -26,8 +26,13 @@ export type TicketView = Ticket & { cost: number };
 export type TicketPatch = Partial<{ title: string; description: string; acceptance: string; status: string; role: string; next: string; waiting: boolean; note: string; own_copy: string }>;
 export type WorktreeInfo = {
   path: string; branch: string; head: string; is_main: boolean; missing: boolean; ahead: number; behind: number; changed: number;
-  conflicts: string[]; last_subject: string; last_when: string; ticket_id?: string | null; ticket_title?: string | null;
+  conflicts: string[]; last_subject: string; last_when: string; ticket_id?: string | null; ticket_title?: string | null; running: number;
 };
+export type LeftoverItem = {
+  pid: number; key: string; name: string; cmd: string; ports: number[]; session_id: string; first_seen: string; age_secs: number; left_behind: boolean; ignored: boolean;
+};
+export type LeftoverOverview = { items: LeftoverItem[]; sessions: { id: string; ended: boolean; running: number; left_behind: number }[] };
+export type TempInfo = { session_id: string; path: string; bytes: number; files: number; partial: boolean };
 export type Entry = { name: string; path: string; is_dir: boolean; size: number; modified: number | null };
 export type FileView =
   | { kind: "text"; text: string; size: number; truncated: boolean }
@@ -54,6 +59,11 @@ export const worktreeStatus = (projectId: string, ticketId: string) => invoke<Wo
 export const worktreeOverview = (projectId: string) => invoke<WorktreeInfo[]>("worktree_overview", { projectId });
 export const mergeWorktree = (projectId: string, path: string) => invoke<string>("worktree_merge", { projectId, path });
 export const removeWorktree = (projectId: string, path: string, discard: boolean) => invoke<string>("worktree_remove", { projectId, path, discard });
+export const leftoverOverview = () => invoke<LeftoverOverview>("leftovers");
+export const stopLeftover = (key: string) => invoke<string>("leftover_stop", { key });
+export const ignoreLeftover = (key: string) => invoke<void>("leftover_ignore", { key });
+export const sessionTemp = (sessionIds: string[]) => invoke<TempInfo[]>("session_temp", { sessionIds });
+export const sessionTempClean = (sessionId: string) => invoke<string>("session_temp_clean", { sessionId });
 export const costRows = (sinceDay: string | null) => invoke<CostRow[]>("cost_rows", { sinceDay });
 export const listRoles = () => invoke<Role[]>("list_roles");
 export const saveRole = (role: Role) => invoke<Role>("save_role", { role });

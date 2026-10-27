@@ -3,6 +3,7 @@
 mod accounts;
 mod files;
 mod job;
+mod leftovers;
 mod mcp;
 mod needs;
 mod persona;
@@ -11,6 +12,7 @@ mod projects;
 mod roles;
 mod session;
 mod tickets;
+mod winproc;
 mod worktrees;
 
 use serde::Serialize;
@@ -225,6 +227,8 @@ struct WorktreeView {
     info: worktrees::Info,
     ticket_id: Option<String>,
     ticket_title: Option<String>,
+    /// programs started by this ticket's sessions that are still alive
+    running: u32,
 }
 
 fn project_path(projects: &Projects, id: &str) -> Result<std::path::PathBuf, String> {
@@ -232,8 +236,9 @@ fn project_path(projects: &Projects, id: &str) -> Result<std::path::PathBuf, Str
 }
 
 #[tauri::command]
-async fn worktree_overview(projects: State<'_, Projects>, project_id: String) -> Result<Vec<WorktreeView>, String> {
+async fn worktree_overview(projects: State<'_, Projects>, tracker: State<'_, std::sync::Arc<leftovers::Tracker>>, project_id: String) -> Result<Vec<WorktreeView>, String> {
     let folder = project_path(&projects, &project_id)?;
+    let tracker = tracker.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         if !worktrees::is_repo(&folder) {
             return Err("This project is not a Git repository".to_string());
@@ -241,7 +246,8 @@ async fn worktree_overview(projects: State<'_, Projects>, project_id: String) ->
         let tix = tickets::list(&tickets::dir(&folder));
         Ok(worktrees::overview(&folder)?.into_iter().map(|info| {
             let t = tix.iter().find(|t| !t.worktree.is_empty() && worktrees::norm(&t.worktree) == worktrees::norm(&info.path));
-            WorktreeView { ticket_id: t.map(|t| t.id.clone()), ticket_title: t.map(|t| t.title.clone()), info }
+            let running = t.map(|t| tracker.alive_for(&t.sessions)).unwrap_or(0);
+            WorktreeView { ticket_id: t.map(|t| t.id.clone()), ticket_title: t.map(|t| t.title.clone()), running, info }
         }).collect())
     }).await.map_err(|e| e.to_string())?
 }
@@ -276,6 +282,37 @@ async fn worktree_remove(projects: State<'_, Projects>, project_id: String, path
         }
         Ok(msg)
     }).await.map_err(|e| e.to_string())?
+}
+
+/// What sessions started, what is alive, and what was left behind by sessions that ended.
+#[tauri::command]
+fn leftovers(tracker: State<'_, std::sync::Arc<leftovers::Tracker>>) -> leftovers::Overview {
+    tracker.overview()
+}
+
+/// Stop one program from the list (the screen has asked the owner first).
+#[tauri::command]
+async fn leftover_stop(tracker: State<'_, std::sync::Arc<leftovers::Tracker>>, key: String) -> Result<String, String> {
+    let t = tracker.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || t.stop(&key)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn leftover_ignore(tracker: State<'_, std::sync::Arc<leftovers::Tracker>>, key: String) -> Result<(), String> {
+    tracker.ignore(&key)
+}
+
+/// Size of Claude's scratch folder for each of these sessions.
+#[tauri::command]
+async fn session_temp(session_ids: Vec<String>) -> Result<Vec<leftovers::TempInfo>, String> {
+    tauri::async_runtime::spawn_blocking(move || leftovers::temp_for(&session_ids)).await.map_err(|e| e.to_string())
+}
+
+/// Delete a finished session's scratch folder (the screen has asked the owner first).
+#[tauri::command]
+async fn session_temp_clean(tracker: State<'_, std::sync::Arc<leftovers::Tracker>>, session_id: String) -> Result<String, String> {
+    let t = tracker.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || leftovers::clean_temp(&t, &session_id)).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -358,14 +395,27 @@ pub fn run() {
             // %APPDATA%\Kona\kona.db (the plan's place for the app's own data)
             let base = app.path().app_data_dir().ok().and_then(|p| p.parent().map(|d| d.join("Kona"))).ok_or("no app data folder")?;
             let ledger = ledger::Ledger::open(&base.join("kona.db")).map_err(|e| format!("could not open the cost ledger: {e}"))?;
-            app.manage(Sessions::new(ledger, base.clone()));
+            let tracker = std::sync::Arc::new(leftovers::Tracker::new(&base));
+            app.manage(tracker.clone());
+            app.manage(Sessions::new(ledger, base.clone(), tracker.clone()));
+            // while sessions are open (or something is alive) look every 4 seconds; otherwise do nothing
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    let busy = tracker.busy();
+                    tokio::time::sleep(std::time::Duration::from_secs(if busy { 4 } else { 10 })).await;
+                    if busy {
+                        let t = tracker.clone();
+                        let _ = tauri::async_runtime::spawn_blocking(move || t.scan()).await;
+                    }
+                }
+            });
             app.manage(Projects::load(&base));
             app.manage(Roles::load(&base));
             app.manage(Accounts::load(&base));
             app.manage(Voice::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
+        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

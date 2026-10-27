@@ -2,6 +2,18 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.11.0, 2026-10-28
+
+Leftovers.
+
+- A Leftovers place: the programs your sessions started (dev servers, watchers) and which of them are still running after the session ended.
+- Each item shows the program, the exact command, the port it listens on, which session (and role) started it and for how long. A red count on Leftovers in the sidebar, and "1 left behind" on the session row.
+- Stop a program after a confirmation that shows the command, the port and what else it started. Kona only stops the very same program it listed (the same process id and start time). Ignore hides one you want to keep running.
+- Scratch files: the size of Claude's temporary folder for each session, Show in Explorer, and Delete for a finished session after a confirmation.
+- Removing a ticket's own copy warns when programs from that ticket's sessions are still running.
+- Fixed: the first words of a session's title lost every letter s.
+- Kona looks every 4 seconds only while a session is open or something is alive, and does nothing otherwise. Everything it sees is also written to `leftovers.jsonl` in Kona's data folder.
+
 ## 0.10.0, 2026-10-28
 
 The worktree graph.

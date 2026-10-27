@@ -8,7 +8,7 @@ const RUN: Record<Session["run"], { state: GlyphState; word: string }> = {
   waiting: { state: "waiting", word: "Waiting on you" }, ended: { state: "stopped", word: "Ended" },
 };
 
-export function SessionList({ state, project, roles, onSelect, onNew, creating }: { state: State; project: Project; roles: Role[]; onSelect: (id: string) => void; onNew: () => void; creating: boolean }) {
+export function SessionList({ state, project, roles, leftBehind, onSelect, onNew, creating }: { state: State; project: Project; roles: Role[]; leftBehind: Record<string, number>; onSelect: (id: string) => void; onNew: () => void; creating: boolean }) {
   const mine = state.order.filter((id) => samePlace(state.sessions[id].folder, project.folder));
   return (
     <div className="flex h-full w-[320px] shrink-0 flex-col gap-3.5 bg-ground px-2.5 pt-6 pb-5">
@@ -30,7 +30,7 @@ export function SessionList({ state, project, roles, onSelect, onNew, creating }
               {role && <RoleMark mark={role.mark} size={26} />}
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate">{s.title || baseName(s.folder)}</span>
-                <span className="truncate text-[13px] leading-5 text-text-tertiary">{r.word} · {role ? role.name : s.model}</span>
+                <span className="truncate text-[13px] leading-5 text-text-tertiary">{r.word} · {role ? role.name : s.model}{leftBehind[id] > 0 && <span className="ml-2 font-bold text-state-left">{leftBehind[id]} left behind</span>}</span>
               </span>
               <span className="font-mono text-[13px] text-text-tertiary">{dollars(s.costTotal)}</span>
             </button>

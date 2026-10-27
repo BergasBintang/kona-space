@@ -153,6 +153,7 @@ export function Worktrees({ project, onChanged }: { project: Project; onChanged:
               <span className="text-[14px] leading-5 text-text">Also throw away {[w.changed > 0 ? `${w.changed} ${w.changed === 1 ? "changed file" : "changed files"}` : "", w.ahead > 0 ? `the branch and its ${w.ahead} unmerged ${w.ahead === 1 ? "commit" : "commits"}` : ""].filter(Boolean).join(" and ")}. This cannot be undone.</span>
             </label>
           )}
+          {w.running > 0 && <p className="m-0 font-bold text-state-waiting">{w.running} {w.running === 1 ? "program started" : "programs started"} by this ticket's sessions {w.running === 1 ? "is" : "are"} still running. See Leftovers.</p>}
           {w.changed > 0 && !discard && <p className="m-0 text-state-waiting">{w.changed} {w.changed === 1 ? "file is" : "files are"} changed and not committed, so nothing is removed unless you tick the box.</p>}
         </Confirm>
       )}

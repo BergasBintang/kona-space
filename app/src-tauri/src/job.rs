@@ -45,3 +45,18 @@ pub fn adopt(process: HANDLE) -> bool {
         None => false,
     }
 }
+
+/// The ids of every program now inside the job: the `claude` programs and everything they started that is still running.
+pub fn member_pids() -> Vec<u32> {
+    use windows_sys::Win32::System::JobObjects::{JobObjectBasicProcessIdList, QueryInformationJobObject, JOBOBJECT_BASIC_PROCESS_ID_LIST};
+    let Some(j) = job() else { return vec![] };
+    // room for 1024 ids; the list starts with two counters
+    let mut buf = vec![0usize; 2 + 1024];
+    let ok = unsafe { QueryInformationJobObject(j.0, JobObjectBasicProcessIdList, buf.as_mut_ptr() as *mut _, (buf.len() * std::mem::size_of::<usize>()) as u32, std::ptr::null_mut()) };
+    if ok == 0 {
+        return vec![];
+    }
+    let list = unsafe { &*(buf.as_ptr() as *const JOBOBJECT_BASIC_PROCESS_ID_LIST) };
+    let n = (list.NumberOfProcessIdsInList as usize).min(1024);
+    (0..n).map(|i| buf[2 + i] as u32).collect()
+}

@@ -1,11 +1,15 @@
 // Kona's core. The screen (React) asks, this program does: it starts and talks to `claude`, keeps the cost ledger,
 // and makes sure nothing it started outlives it.
+mod files;
 mod job;
 mod ledger;
+mod projects;
 mod session;
 
 use serde::Serialize;
 use serde_json::Value;
+use files::{Entry, FileView};
+use projects::{AddResult, Project, Projects};
 use session::{ImageIn, Sessions};
 use tauri::{AppHandle, Manager, State};
 
@@ -44,6 +48,32 @@ fn stop_session(sessions: State<'_, Sessions>, session_id: String) {
 }
 
 #[tauri::command]
+fn list_projects(projects: State<'_, Projects>) -> Vec<Project> {
+    projects.all()
+}
+
+#[tauri::command]
+fn add_project(projects: State<'_, Projects>, folder: String, name: Option<String>) -> Result<AddResult, String> {
+    projects.add(&folder, name)
+}
+
+/// Forget a project. Its files are never touched.
+#[tauri::command]
+fn remove_project(projects: State<'_, Projects>, id: String) -> Result<(), String> {
+    projects.remove(&id)
+}
+
+#[tauri::command]
+fn list_dir(projects: State<'_, Projects>, path: String) -> Result<Vec<Entry>, String> {
+    files::list_dir(&projects, &path)
+}
+
+#[tauri::command]
+fn read_file(projects: State<'_, Projects>, path: String) -> Result<FileView, String> {
+    files::read_file(&projects, &path)
+}
+
+#[tauri::command]
 fn running_sessions(sessions: State<'_, Sessions>) -> Vec<String> {
     sessions.running()
 }
@@ -58,9 +88,10 @@ pub fn run() {
             let base = app.path().app_data_dir().ok().and_then(|p| p.parent().map(|d| d.join("Kona"))).ok_or("no app data folder")?;
             let ledger = ledger::Ledger::open(&base.join("kona.db")).map_err(|e| format!("could not open the cost ledger: {e}"))?;
             app.manage(Sessions::new(ledger));
+            app.manage(Projects::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions])
+        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, list_dir, read_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

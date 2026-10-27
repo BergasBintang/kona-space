@@ -2,6 +2,15 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.2.0, 2026-10-27
+
+Projects and files.
+
+- Add a project (a folder with your code). Kona makes a hidden folder inside it for its notes and tells Git to ignore it. Nothing else in the project changes.
+- Switch between projects. Sessions are listed per project.
+- A Files place: a folder tree and a read-only viewer for text, JSON, pictures and PDFs. Kona never changes your files from there, and it refuses any folder that is not in a project.
+- Not yet: roles, accounts, the board, the Brain, leftovers, resuming old sessions.
+
 ## 0.1.0, 2026-10-27
 
 The first Kona that works: one session, in a real window.

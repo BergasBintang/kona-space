@@ -1,46 +1,63 @@
-// The sidebar: the Kona mark, the sessions of this run, the two plan bars. (The other places come with later steps.)
-import { Button, Glyph, PlanBar, type GlyphState } from "./ui";
-import { dollars, type Session, type State } from "../lib/sessions";
+// The sidebar: the Kona mark, the project, the places that exist so far, the two plan bars.
+import { Glyph, PlanBar } from "./ui";
+import type { Project } from "../lib/api";
+import type { PlanWindow } from "../lib/sessions";
 
-const folderName = (p: string) => p.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || p;
-const RUN: Record<Session["run"], { state: GlyphState; word: string }> = {
-  starting: { state: "idle", word: "Starting" }, ready: { state: "idle", word: "Ready" }, working: { state: "live", word: "Working" },
-  waiting: { state: "waiting", word: "Waiting on you" }, ended: { state: "stopped", word: "Ended" },
+export type Place = "sessions" | "files";
+
+const ICONS: Record<Place, React.ReactNode> = {
+  sessions: <path d="M2.5 3.5 L13.5 3.5 L13.5 10.5 L7 10.5 L4 13 L4 10.5 L2.5 10.5 Z" />,
+  files: <path d="M2 5 L2 12.5 L14 12.5 L14 6 L7.5 6 L6.5 4 L2 4 Z" />,
 };
+const PLACES: { id: Place; label: string }[] = [{ id: "sessions", label: "Sessions" }, { id: "files", label: "Files" }];
 
-export function Sidebar({ state, onSelect, onNew, version }: { state: State; onSelect: (id: string) => void; onNew: () => void; version: string }) {
+export function Sidebar({ projects, project, onProject, onAddProject, place, onPlace, attention, plan, version }: {
+  projects: Project[]; project: Project | null; onProject: (id: string) => void; onAddProject: () => void;
+  place: Place; onPlace: (p: Place) => void; attention: number; plan: { fiveHour?: PlanWindow; sevenDay?: PlanWindow }; version: string;
+}) {
   return (
     <aside className="flex w-[248px] shrink-0 flex-col gap-5 bg-surface-1 px-3.5 pt-7 pb-[22px]">
       <div className="flex items-center gap-2.5 px-1.5">
         <Glyph state="live" size={24} color="var(--color-accent)" />
         <span className="text-[22px] leading-[30px] font-bold">Kona</span>
       </div>
-      <div className="flex items-center justify-between px-1.5">
-        <span className="text-[15px] leading-6 font-bold text-text-secondary">Sessions</span>
-        <Button variant="quiet" small onClick={onNew}>New</Button>
-      </div>
-      <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto" aria-label="Sessions">
-        {state.order.length === 0 && <p className="m-0 px-1.5 text-[13px] leading-5 text-text-tertiary">None yet.</p>}
-        {state.order.map((id) => {
-          const s = state.sessions[id];
-          const r = RUN[s.run];
-          const on = state.selected === id;
-          return (
-            <button key={id} onClick={() => onSelect(id)} aria-current={on ? "true" : undefined}
-              className={`flex h-16 items-center gap-3 rounded-xl px-3.5 text-left transition-colors ${on ? "bg-surface-3" : "hover:bg-surface-2"}`}>
-              <Glyph state={r.state} size={18} />
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate">{folderName(s.folder)}</span>
-                <span className="truncate text-[13px] leading-5 text-text-tertiary">{r.word} · {s.model}</span>
-              </span>
-              <span className="font-mono text-[13px] text-text-tertiary">{dollars(s.costTotal)}</span>
-            </button>
-          );
-        })}
-      </nav>
+
+      {projects.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <label className="relative flex h-11 items-center rounded-control border border-line-strong">
+            <span className="sr-only">Project</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="pointer-events-none absolute left-3 text-text-secondary"><path d="M2 5 L2 12.5 L14 12.5 L14 6 L7.5 6 L6.5 4 L2 4 Z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /></svg>
+            <select value={project?.id ?? ""} onChange={(e) => onProject(e.target.value)} className="h-full w-full appearance-none rounded-control bg-transparent pr-9 pl-9 text-[15px] font-bold text-text">
+              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="pointer-events-none absolute right-3 text-text-secondary"><path d="M4 6 L8 10 L12 6" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </label>
+          <button onClick={onAddProject} className="self-start rounded-lg px-1.5 text-[13px] leading-5 font-bold text-text-secondary hover:text-text">Add another project</button>
+        </div>
+      )}
+
+      {project && (
+        <nav className="flex flex-col gap-0.5" aria-label="Places">
+          {PLACES.map((p) => {
+            const on = place === p.id;
+            return (
+              <button key={p.id} onClick={() => onPlace(p.id)} aria-current={on ? "page" : undefined}
+                className={`flex h-10 items-center gap-3 rounded-control px-3 text-left transition-colors ${on ? "bg-surface-3 font-bold text-text" : "text-text-secondary hover:bg-surface-2"}`}>
+                <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className={on ? "text-accent" : ""} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">{ICONS[p.id]}</svg>
+                <span className="flex-1">{p.label}</span>
+                {p.id === "sessions" && attention > 0 && (
+                  <span className="rounded-[10px] px-[7px] font-mono text-[12px]" style={{ color: "var(--color-state-waiting)", background: "color-mix(in srgb, var(--color-state-waiting) 16%, transparent)" }} aria-label={`${attention} waiting on you`}>{attention}</span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+      )}
+
+      <div className="flex-1" />
       <div className="flex flex-col gap-4 px-1.5">
-        <PlanBar label="This session (5 hours)" window={state.plan.fiveHour} />
-        <PlanBar label="This week" window={state.plan.sevenDay} />
+        <PlanBar label="This session" window={plan.fiveHour} />
+        <PlanBar label="This week" window={plan.sevenDay} />
         <span className="font-mono text-[12px] text-text-disabled">Kona {version}</span>
       </div>
     </aside>

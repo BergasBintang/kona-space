@@ -18,6 +18,7 @@ export type Session = {
   folder: string;
   model: string;
   mode: string;
+  title: string; // the first thing you asked, shortened
   run: RunState;
   items: Item[];
   draft: string; // text that is still arriving
@@ -87,7 +88,7 @@ export function reducer(state: State, a: Action): State {
       return { ...state, sessions: rest, order, selected: state.selected === a.id ? order[0] ?? null : state.selected };
     }
     case "user-sent":
-      return update(state, a.sessionId, (s) => ({ ...push(s, { kind: "user", id: nextId("u"), text: a.text, images: a.images }), run: "working", draft: "" }));
+      return update(state, a.sessionId, (s) => ({ ...push(s, { kind: "user", id: nextId("u"), text: a.text, images: a.images }), title: s.title || a.text.replace(/s+/g, " ").slice(0, 48), run: "working", draft: "" }));
     case "permission-answered":
       return update(state, a.sessionId, (s) => ({
         ...s,
@@ -102,7 +103,7 @@ function onEvent(state: State, sessionId: string, r: any): State {
   const type: string = r?.type ?? "";
 
   if (type === "kona/started") {
-    const session: Session = { id: sessionId, folder: r.folder, model: r.model, mode: r.mode, run: "ready", items: [], draft: "", costTotal: 0, costLast: 0, turns: 0 };
+    const session: Session = { id: sessionId, folder: r.folder, model: r.model, mode: r.mode, title: "", run: "ready", items: [], draft: "", costTotal: 0, costLast: 0, turns: 0 };
     return { ...state, sessions: { ...state.sessions, [sessionId]: session }, order: [...state.order, sessionId], selected: sessionId };
   }
   if (type === "rate_limit_event") {

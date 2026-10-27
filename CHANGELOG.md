@@ -2,6 +2,16 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.4.0, 2026-10-27
+
+Accounts, and better lists.
+
+- An Accounts place for two or three Claude logins. Add one, name it, sign in, rename or remove it. "Main" is the login already on this PC.
+- Choose the account when you start a session, or give a role a usual account. A warning stops you starting on an account that is not signed in.
+- Each account has its own plan bars, kept between runs with their age. The ledger saves the account of every turn.
+- New base parts for choosing from a list: single select, multi select and a smart search box (typo-tolerant, initials, any word order, matched letters marked, a clear "nothing found" message). They replace the system dropdowns, which were white on the dark window.
+- Not yet: signing in with an API key instead of a login.
+
 ## 0.3.0, 2026-10-27
 
 Roles.

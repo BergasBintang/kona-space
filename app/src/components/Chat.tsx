@@ -15,7 +15,7 @@ const RUN_BADGE: Record<Session["run"], { state: GlyphState; label: string }> = 
 
 const folderName = (p: string) => p.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || p;
 
-export function Header({ s, role, onStop }: { s: Session; role?: Role; onStop: () => void }) {
+export function Header({ s, role, account, onStop }: { s: Session; role?: Role; account?: string; onStop: () => void }) {
   const b = RUN_BADGE[s.run];
   return (
     <div className="flex items-center justify-between gap-4 px-8 pt-[22px] pb-[18px]">
@@ -24,6 +24,7 @@ export function Header({ s, role, onStop }: { s: Session; role?: Role; onStop: (
         <div className="flex flex-wrap items-center gap-3 text-[13px] leading-5 text-text-secondary">
           <Badge state={b.state} label={b.label} />
           {role && <span className="inline-flex items-center gap-2 font-bold text-text"><RoleMark mark={role.mark} size={22} />{role.name}</span>}
+          {account && <span>Account: {account}</span>}
           <span>{s.model}</span>
           <span>{modeWord(s.mode)}</span>
           <span className="truncate font-mono text-text-tertiary" title={s.folder}>{s.folder}</span>
@@ -175,7 +176,7 @@ function Composer({ s, onSend }: { s: Session; onSend: (text: string, images: At
   );
 }
 
-export function Chat({ s, role, dispatch }: { s: Session; role?: Role; dispatch: (a: any) => void }) {
+export function Chat({ s, role, account, dispatch }: { s: Session; role?: Role; account?: string; dispatch: (a: any) => void }) {
   const answer = async (it: Extract<Item, { kind: "permission" }>, allow: boolean) => {
     dispatch({ type: "permission-answered", sessionId: s.id, requestId: it.requestId, allowed: allow });
     await invoke("answer_permission", { sessionId: s.id, requestId: it.requestId, allow, input: allow ? it.input : null, message: allow ? null : "The owner said no." });
@@ -186,7 +187,7 @@ export function Chat({ s, role, dispatch }: { s: Session; role?: Role; dispatch:
   };
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col">
-      <Header s={s} role={role} onStop={() => void invoke("stop_session", { sessionId: s.id })} />
+      <Header s={s} role={role} account={account} onStop={() => void invoke("stop_session", { sessionId: s.id })} />
       <div className="mx-8 h-px bg-line-subtle" />
       <Transcript s={s} onAnswer={answer} />
       <Composer s={s} onSend={send} />

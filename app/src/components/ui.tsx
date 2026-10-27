@@ -53,7 +53,9 @@ export function Button({ variant = "primary", small = false, className = "", ...
 }
 
 /** A plan bar says what it measures in words, shows the percent in mono, and turns amber past 80 percent. */
-export function PlanBar({ label, window: w }: { label: string; window?: { utilization: number; resetsAt: number } }) {
+export function PlanBar({ label, window: w0, readAt }: { label: string; window?: { utilization: number; resetsAt: number }; readAt?: number }) {
+  // a reading from before the window reset says nothing about the new one
+  const w = w0 && w0.resetsAt * 1000 > Date.now() ? w0 : undefined;
   const pct = w ? Math.round(w.utilization * 100) : null;
   const warn = pct !== null && pct >= 80;
   const color = warn ? "var(--color-state-waiting)" : "var(--color-accent)";
@@ -67,7 +69,7 @@ export function PlanBar({ label, window: w }: { label: string; window?: { utiliz
       <div className="h-2 overflow-hidden rounded bg-surface-3" role="progressbar" aria-label={label} aria-valuenow={pct ?? undefined} aria-valuemin={0} aria-valuemax={100}>
         <div className="h-full rounded" style={{ width: `${Math.max(pct ?? 0, pct ? 4 : 0)}%`, background: color }} />
       </div>
-      {resets && <span className="text-[13px] leading-5 text-text-tertiary">Resets {resets}</span>}
+      {resets && <span className="text-[13px] leading-5 text-text-tertiary">Resets {resets}{readAt && Date.now() - readAt > 10 * 60_000 ? ` · read ${ago(readAt)} ago` : ""}</span>}
       {warn && (
         <span className="flex items-center gap-1.5 text-[13px] leading-5 font-bold" style={{ color }}>
           <Glyph state="waiting" size={14} /> Close to the limit
@@ -75,6 +77,12 @@ export function PlanBar({ label, window: w }: { label: string; window?: { utiliz
       )}
     </div>
   );
+}
+
+/** "3 h", "2 days": how long ago, in plain words. */
+export function ago(t: number): string {
+  const m = Math.max(1, Math.round((Date.now() - t) / 60_000));
+  return m < 60 ? `${m} min` : m < 60 * 24 ? `${Math.round(m / 60)} h` : `${Math.round(m / 60 / 24)} days`;
 }
 
 export const MARKS = ["ring", "halfdisc", "roundsq", "square", "triangle", "plus", "diamond", "ringdot", "lines", "dot"] as const;

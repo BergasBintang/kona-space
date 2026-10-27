@@ -20,6 +20,9 @@ pub struct Role {
     pub model: String,
     pub mode: String,
     pub brief: String,
+    /// the account this role usually uses; None means whichever was used last
+    #[serde(default)]
+    pub account: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -34,7 +37,7 @@ pub struct Roles {
 }
 
 fn starting(id: &str, name: &str, group: &str, mark: &str, mode: &str, brief: &str) -> Role {
-    Role { id: id.into(), name: name.into(), group: group.into(), mark: mark.into(), model: "sonnet".into(), mode: mode.into(), brief: brief.into() }
+    Role { id: id.into(), name: name.into(), group: group.into(), mark: mark.into(), model: "sonnet".into(), mode: mode.into(), brief: brief.into(), account: None }
 }
 
 /// The ten starting roles. The modes are the safe default (ask every time); only the two that edit files are loosened.

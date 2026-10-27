@@ -3,6 +3,7 @@
 // writes each finished turn to the cost ledger, and sends back what the screen says (a message, an answer to
 // "may I run this?", a stop).
 use crate::ledger::Ledger;
+use crate::accounts::Account;
 use crate::roles::Role;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -103,7 +104,7 @@ pub fn claude_version(exe: &PathBuf) -> Option<String> {
     Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Option<Role>, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
+pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Option<Role>, account: Option<Account>, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
     let exe = find_claude().ok_or("Claude Code was not found on this PC")?;
     let id = resume.clone().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let mut cmd = Command::new(exe);
@@ -119,6 +120,10 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
         cmd.args(["--resume", &id]);
     } else {
         cmd.args(["--session-id", &id]);
+    }
+    // each account is its own login folder, chosen here; Main keeps Claude Code's usual one
+    if let Some(dir) = account.as_ref().and_then(|a| a.config_dir.as_ref()) {
+        cmd.env("CLAUDE_CONFIG_DIR", dir);
     }
     cmd.current_dir(&folder)
         .stdin(Stdio::piped())
@@ -146,12 +151,13 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     {
         let (app, sid, folder, ledger) = (app.clone(), id.clone(), folder.clone(), sessions.ledger.clone());
         let role_id = role.as_ref().map(|r| r.id.clone());
+        let account_id = account.as_ref().map(|a| a.id.clone());
         tauri::async_runtime::spawn(async move {
             let mut lines = BufReader::new(stdout).lines();
             while let Ok(Some(line)) = lines.next_line().await {
                 let Ok(mut rec) = serde_json::from_str::<Value>(&line) else { continue };
                 if rec.get("type").and_then(Value::as_str) == Some("result") {
-                    let added = ledger.record_result(&sid, &folder, role_id.as_deref(), &rec);
+                    let added = ledger.record_result(&sid, &folder, role_id.as_deref(), account_id.as_deref(), &rec);
                     rec["kona_turn_cost_usd"] = json!(added);
                 }
                 let _ = app.emit("session-event", json!({"sessionId": sid, "record": rec}));
@@ -180,6 +186,6 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     }
 
     sessions.map.lock().unwrap().insert(id.clone(), Handle { tx, stop: Some(stop_tx) });
-    let _ = app.emit("session-event", json!({"sessionId": id, "record": {"type": "kona/started", "folder": folder, "roleId": role.as_ref().map(|r| r.id.clone()), "model": model, "mode": mode, "coveredByJob": covered}}));
+    let _ = app.emit("session-event", json!({"sessionId": id, "record": {"type": "kona/started", "folder": folder, "roleId": role.as_ref().map(|r| r.id.clone()), "accountId": account.as_ref().map(|a| a.id.clone()), "model": model, "mode": mode, "coveredByJob": covered}}));
     Ok(id)
 }

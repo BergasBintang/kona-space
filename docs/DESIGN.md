@@ -149,6 +149,20 @@ All on the page **Parts**, four frames side by side.
 
 Not drawn yet: a drag state for ticket cards, hover on tree rows and ticket cards (they have no hover in the prototype), real window chrome, keyboard focus drawn on every new part (the focus rule is the same as batch 1), a greyscale pass.
 
+## Base pickers (built in code, not yet drawn in FigCraft)
+
+Three base parts for choosing from a list, in `app/src/components/pick/`. They replace the system dropdown, which is white on a dark window. The behaviour follows the Miralis canon's SelectField and Combobox (`src/js/20-select.js`, `30-combobox.js`) and its smart-search guide (`guide/26-smart-search.md`); the look is Kona's. Never use a plain `<select>` in Kona.
+
+| Part | Use it for | Notes |
+|---|---|---|
+| **Select** (single) | one choice from a list | the trigger looks like a text field; a second line (hint) per option; a disabled option shows but cannot be chosen; a search row appears above 8 options |
+| **MultiSelect** | several choices from a list | a box per row that fills with the accent; the list stays open; footer says how many are chosen and has Clear; the trigger shows the names, or "3 chosen" |
+| **SmartSearch** | finding one thing in a long list, in the page or from a server | text field with a magnifier and a clear button; 2 letters before a fetch, 200 ms wait, the old request aborted, rows kept dimmed until the new ones arrive, 20 rows at most; an optional "typed text is the value" mode |
+
+**The matcher** is one shared function (`app/src/lib/search.ts`): lower-case and no accents; words split at spaces and `- _ . , / ( ) &`; every word must match, in any order; scores are exact 100, starts with 90, a word starts with 80, initials 60, contained 45, one typo 27, two typos 19 (words of 6+ letters), letters in order 12; hints count at 0.6; ties keep their order. A word of one or two letters is never forgiven.
+
+**Rules:** matched letters are marked by weight and underline as well as colour; "nothing found" says what was searched and where, then offers "Did you mean ...?" and "Clear the search"; the count is announced (`aria-live`); keys are Down, Up, Home, End, Enter, Space, Esc (clears the text first, then closes) and Tab; the list opens under the field or above it when there is no room, and is never clipped by a scrolling page.
+
 ## The shell
 
 A 248 px sidebar on every project screen: logo and a fold button, project switcher, eight places (Sessions, Board, Files, Worktrees, Costs, Roles, Leftovers, Brain), the two plan bars, Settings. Counts sit as chips beside a place: amber for something waiting on the owner, red for leftovers. The Sessions place adds a second column with the session list. A session has four tabs: Chat, Changes, Files, Ticket.

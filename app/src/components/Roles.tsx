@@ -1,7 +1,8 @@
 // The Roles place: the team. Each role is a saved setup for a session: its mark, model, permission mode and a short brief.
 import { useEffect, useMemo, useState } from "react";
-import { removeRole, saveRole, type Role } from "../lib/api";
+import { removeRole, saveRole, type Account, type Role } from "../lib/api";
 import { Button, Glyph, MARKS, RoleMark } from "./ui";
+import { Select } from "./pick";
 import { modeWord } from "../lib/sessions";
 
 export const GROUPS = ["Plan", "Build", "Ship", "Grow"];
@@ -12,9 +13,9 @@ export const MODE_CHOICES: { id: string; word: string; says: string }[] = [
 ];
 export const MODEL_CHOICES = [["sonnet", "Sonnet (the usual choice)"], ["opus", "Opus (the most capable, slower)"], ["haiku", "Haiku (the quickest and cheapest)"]];
 
-const blank = (): Role => ({ id: "", name: "", group: "Build", mark: "dot", model: "sonnet", mode: "default", brief: "" });
+const blank = (): Role => ({ id: "", name: "", group: "Build", mark: "dot", model: "sonnet", mode: "default", brief: "", account: null });
 
-export function Roles({ roles, onChanged }: { roles: Role[]; onChanged: (next: Role[]) => void }) {
+export function Roles({ roles, accounts, onChanged }: { roles: Role[]; accounts: Account[]; onChanged: (next: Role[]) => void }) {
   const [pickedId, setPickedId] = useState<string | null>(roles[0]?.id ?? null); // "" is a role not saved yet
   const saved = roles.find((r) => r.id === pickedId) ?? null;
   const [draft, setDraft] = useState<Role | null>(saved);
@@ -97,19 +98,14 @@ export function Roles({ roles, onChanged }: { roles: Role[]; onChanged: (next: R
             </label>
 
             <div className="grid grid-cols-2 gap-4">
-              <label className="flex flex-col gap-2">
-                <span className="text-[13px] leading-5 font-bold text-text-secondary">Group</span>
-                <select value={draft.group} onChange={(e) => set({ group: e.target.value })} className="h-11 rounded-control border border-line-strong bg-inset px-3.5 text-[15px] text-text">
-                  {[...new Set([...GROUPS, draft.group])].map((g) => <option key={g}>{g}</option>)}
-                </select>
-              </label>
-              <label className="flex flex-col gap-2">
-                <span className="text-[13px] leading-5 font-bold text-text-secondary">Model</span>
-                <select value={draft.model} onChange={(e) => set({ model: e.target.value })} className="h-11 rounded-control border border-line-strong bg-inset px-3.5 text-[15px] text-text">
-                  {MODEL_CHOICES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                </select>
-              </label>
+              <Select label="Group" value={draft.group} onChange={(v) => set({ group: v })} options={[...new Set([...GROUPS, draft.group])].map((g) => ({ value: g, label: g }))} />
+              <Select label="Model" value={draft.model} onChange={(v) => set({ model: v })} options={MODEL_CHOICES.map(([value, label]) => ({ value, label }))} />
             </div>
+
+            {accounts.length > 1 && (
+              <Select label="Usual account" value={draft.account ?? ""} onChange={(v) => set({ account: v || null })}
+                options={[{ value: "", label: "Whichever you used last" }, ...accounts.map((a) => ({ value: a.id, label: a.label }))]} />
+            )}
 
             <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
               <legend className="mb-2 p-0 text-[13px] leading-5 font-bold text-text-secondary">Mark</legend>

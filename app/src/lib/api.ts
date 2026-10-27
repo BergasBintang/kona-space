@@ -3,7 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 
 export type Project = { id: string; name: string; folder: string; github?: string | null };
 export type AddResult = { project: Project; hidden_folder: boolean; git_ignored: boolean };
-export type Role = { id: string; name: string; group: string; mark: string; model: string; mode: string; brief: string };
+export type Role = { id: string; name: string; group: string; mark: string; model: string; mode: string; brief: string; account?: string | null };
+export type Account = { id: string; label: string; config_dir?: string | null };
+export type AccountStatus = { logged_in: boolean; method?: string | null; plan?: string | null; email?: string | null };
 export type Entry = { name: string; path: string; is_dir: boolean; size: number; modified: number | null };
 export type FileView =
   | { kind: "text"; text: string; size: number; truncated: boolean }
@@ -18,6 +20,12 @@ export const removeProject = (id: string) => invoke<void>("remove_project", { id
 export const listRoles = () => invoke<Role[]>("list_roles");
 export const saveRole = (role: Role) => invoke<Role>("save_role", { role });
 export const removeRole = (id: string) => invoke<void>("remove_role", { id });
+export const listAccounts = () => invoke<Account[]>("list_accounts");
+export const addAccount = (label: string) => invoke<Account>("add_account", { label });
+export const renameAccount = (id: string, label: string) => invoke<Account>("rename_account", { id, label });
+export const removeAccount = (id: string) => invoke<void>("remove_account", { id });
+export const accountStatus = (id: string) => invoke<AccountStatus>("account_status", { id });
+export const signInAccount = (id: string) => invoke<void>("sign_in_account", { id });
 export const listDir = (path: string) => invoke<Entry[]>("list_dir", { path });
 export const readFile = (path: string) => invoke<FileView>("read_file", { path });
 

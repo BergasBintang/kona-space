@@ -1,5 +1,6 @@
 // Kona's core. The screen (React) asks, this program does: it starts and talks to `claude`, keeps the cost ledger,
 // and makes sure nothing it started outlives it.
+mod accounts;
 mod files;
 mod job;
 mod ledger;
@@ -9,6 +10,7 @@ mod session;
 
 use serde::Serialize;
 use serde_json::Value;
+use accounts::{Account, AccountStatus, Accounts};
 use files::{Entry, FileView};
 use projects::{AddResult, Project, Projects};
 use roles::{Role, Roles};
@@ -30,12 +32,16 @@ fn check_claude() -> Result<ClaudeInfo, String> {
 }
 
 #[tauri::command]
-async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: State<'_, Roles>, folder: String, role_id: Option<String>, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
+async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: State<'_, Roles>, accounts: State<'_, Accounts>, folder: String, role_id: Option<String>, account_id: Option<String>, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
     let role = match role_id {
         Some(id) => Some(roles.get(&id).ok_or("That role does not exist any more")?),
         None => None,
     };
-    session::start(app, &sessions, folder, role, model, mode, resume).await
+    let account = match account_id {
+        Some(id) => Some(accounts.get(&id).ok_or("That account does not exist any more")?),
+        None => None,
+    };
+    session::start(app, &sessions, folder, role, account, model, mode, resume).await
 }
 
 #[tauri::command]
@@ -86,6 +92,41 @@ fn remove_role(roles: State<'_, Roles>, id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn list_accounts(accounts: State<'_, Accounts>) -> Vec<Account> {
+    accounts.all()
+}
+
+#[tauri::command]
+fn add_account(accounts: State<'_, Accounts>, label: String) -> Result<Account, String> {
+    accounts.add(&label)
+}
+
+#[tauri::command]
+fn rename_account(accounts: State<'_, Accounts>, id: String, label: String) -> Result<Account, String> {
+    accounts.rename(&id, &label)
+}
+
+/// Forget an account. Its folder is left where it is.
+#[tauri::command]
+fn remove_account(accounts: State<'_, Accounts>, id: String) -> Result<(), String> {
+    accounts.remove(&id)
+}
+
+/// Is this account signed in? Asks Claude Code; saves nothing.
+#[tauri::command]
+async fn account_status(accounts: State<'_, Accounts>, id: String) -> Result<AccountStatus, String> {
+    let account = accounts.get(&id).ok_or("That account does not exist")?;
+    tauri::async_runtime::spawn_blocking(move || accounts::status(&account)).await.map_err(|e| e.to_string())
+}
+
+/// Open the sign-in page for this account's folder and wait until it is done.
+#[tauri::command]
+async fn sign_in_account(accounts: State<'_, Accounts>, id: String) -> Result<(), String> {
+    let account = accounts.get(&id).ok_or("That account does not exist")?;
+    accounts::sign_in(account).await
+}
+
+#[tauri::command]
 fn list_dir(projects: State<'_, Projects>, path: String) -> Result<Vec<Entry>, String> {
     files::list_dir(&projects, &path)
 }
@@ -112,9 +153,10 @@ pub fn run() {
             app.manage(Sessions::new(ledger));
             app.manage(Projects::load(&base));
             app.manage(Roles::load(&base));
+            app.manage(Accounts::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, list_roles, save_role, remove_role, list_dir, read_file])
+        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -54,11 +54,16 @@ impl Ledger {
         if !has_role {
             conn.execute("ALTER TABLE usage_turn ADD COLUMN role_id TEXT", [])?;
         }
+        // the account a turn was run on (added in 0.4.0)
+        let has_account = conn.prepare("SELECT 1 FROM pragma_table_info('usage_turn') WHERE name = 'account_id'")?.exists([])?;
+        if !has_account {
+            conn.execute("ALTER TABLE usage_turn ADD COLUMN account_id TEXT", [])?;
+        }
         Ok(Self { conn: Mutex::new(conn), last: Mutex::new(HashMap::new()), turns: Mutex::new(HashMap::new()) })
     }
 
     /// Record one `result` message. Returns the dollars this turn added (the difference), for the screen.
-    pub fn record_result(&self, session_id: &str, folder: &str, role_id: Option<&str>, result: &Value) -> f64 {
+    pub fn record_result(&self, session_id: &str, folder: &str, role_id: Option<&str>, account_id: Option<&str>, result: &Value) -> f64 {
         let Some(models) = result.get("modelUsage").and_then(Value::as_object) else { return 0.0 };
         let turn = {
             let mut t = self.turns.lock().unwrap();
@@ -92,9 +97,9 @@ impl Ledger {
             }
             let basis = u.get("costBasis").and_then(Value::as_str);
             let _ = conn.execute(
-                "INSERT INTO usage_turn (session_id, folder, turn, model, input_tokens, output_tokens, cache_read, cache_write, cost_usd, cost_basis, role_id)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-                params![session_id, folder, turn, model, d.input, d.output, d.cache_read, d.cache_write, d.cost, basis, role_id],
+                "INSERT INTO usage_turn (session_id, folder, turn, model, input_tokens, output_tokens, cache_read, cache_write, cost_usd, cost_basis, role_id, account_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                params![session_id, folder, turn, model, d.input, d.output, d.cache_read, d.cache_write, d.cost, basis, role_id, account_id],
             );
             added += d.cost;
         }

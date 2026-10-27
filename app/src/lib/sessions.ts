@@ -17,6 +17,7 @@ export type Session = {
   id: string;
   folder: string;
   roleId: string | null; // the role it runs as, if any
+  accountId: string; // the Claude login it runs on
   model: string;
   mode: string;
   title: string; // the first thing you asked, shortened
@@ -28,14 +29,25 @@ export type Session = {
   turns: number;
 };
 
+/** The two plan bars of one account, and when they were last read. Each account has its own limits. */
+export type Plan = { fiveHour?: PlanWindow; sevenDay?: PlanWindow; at: number };
+
 export type State = {
   sessions: Record<string, Session>;
   order: string[];
   selected: string | null;
-  plan: { fiveHour?: PlanWindow; sevenDay?: PlanWindow };
+  plans: Record<string, Plan>; // by account id
 };
 
-export const initialState: State = { sessions: {}, order: [], selected: null, plan: {} };
+// the last readings are kept, so the bars are not empty when Kona opens
+export function loadPlans(): Record<string, Plan> {
+  try { return JSON.parse(localStorage.getItem("kona.plans") ?? "{}"); } catch { return {}; }
+}
+export function savePlans(p: Record<string, Plan>) {
+  try { localStorage.setItem("kona.plans", JSON.stringify(p)); } catch { /* the readings are just not kept */ }
+}
+
+export const initialState: State = { sessions: {}, order: [], selected: null, plans: {} };
 
 export type Action =
   | { type: "event"; sessionId: string; record: any }
@@ -104,13 +116,15 @@ function onEvent(state: State, sessionId: string, r: any): State {
   const type: string = r?.type ?? "";
 
   if (type === "kona/started") {
-    const session: Session = { id: sessionId, folder: r.folder, roleId: r.roleId ?? null, model: r.model, mode: r.mode, title: "", run: "ready", items: [], draft: "", costTotal: 0, costLast: 0, turns: 0 };
+    const session: Session = { id: sessionId, folder: r.folder, roleId: r.roleId ?? null, accountId: r.accountId ?? "main", model: r.model, mode: r.mode, title: "", run: "ready", items: [], draft: "", costTotal: 0, costLast: 0, turns: 0 };
     return { ...state, sessions: { ...state.sessions, [sessionId]: session }, order: [...state.order, sessionId], selected: sessionId };
   }
   if (type === "rate_limit_event") {
     const w = r.rate_limit_info?.unifiedWindows ?? {};
     const pick = (x: any): PlanWindow | undefined => (x && typeof x.utilization === "number" ? { utilization: x.utilization, resetsAt: x.resetsAt } : undefined);
-    return { ...state, plan: { fiveHour: pick(w.five_hour) ?? state.plan.fiveHour, sevenDay: pick(w.seven_day) ?? state.plan.sevenDay } };
+    const account = state.sessions[sessionId]?.accountId ?? "main";
+    const before = state.plans[account];
+    return { ...state, plans: { ...state.plans, [account]: { fiveHour: pick(w.five_hour) ?? before?.fiveHour, sevenDay: pick(w.seven_day) ?? before?.sevenDay, at: Date.now() } } };
   }
 
   return update(state, sessionId, (s) => {

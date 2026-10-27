@@ -2,6 +2,17 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.8.0, 2026-10-27
+
+Tickets and the board.
+
+- A Board place with five columns: Backlog, Ready, In progress, Review, Done. Create a ticket, drag cards between columns, open a card to edit it, set its role, next step and a "waiting on you" flag.
+- Tickets are plain text files in the project's hidden `.kona` folder, so you can read, edit and back them up without Kona.
+- "Start session as ..." on a card opens a session as the ticket's role with the ticket told to Claude. The card moves to In progress, links the session, and shows what the session has cost.
+- Claude can raise and update tickets itself through a small tool server Kona starts with each session (list, read, create and update). It can move a card up to Review, never to Done and never remove one. The history says exactly which session and role did each change. These tools run without an approval card, even in Plan only.
+- The Costs place can group by ticket.
+- Not yet: a separate worktree per ticket (next version), a summary written into the ticket when a session ends, drag with the keyboard (use the Column choice in the card).
+
 ## 0.7.0, 2026-10-27
 
 The voice.

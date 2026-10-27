@@ -16,6 +16,12 @@ export type CostRow = {
 export type Lines = { greeting: string; started: string; ended: string; limit: string };
 export type Persona = { enabled: boolean; name: string; language: string; verbosity: string; humor: string; emoji: boolean; address: string; plain: boolean; voice: string; lines: Lines };
 export const PLAIN_LINES: Lines = { greeting: "Choose a role and start a session.", started: "Session started in {project}.", ended: "This session has ended.", limit: "Close to the limit." };
+export type Ticket = {
+  id: string; title: string; status: string; role: string | null; raised_by: string; sessions: string[]; next: string; waiting: boolean;
+  created: string; updated: string; description: string; acceptance: string; history: string[];
+};
+export type TicketView = Ticket & { cost: number };
+export type TicketPatch = Partial<{ title: string; description: string; acceptance: string; status: string; role: string; next: string; waiting: boolean; note: string }>;
 export type Entry = { name: string; path: string; is_dir: boolean; size: number; modified: number | null };
 export type FileView =
   | { kind: "text"; text: string; size: number; truncated: boolean }
@@ -30,6 +36,10 @@ export const removeProject = (id: string) => invoke<void>("remove_project", { id
 export const listTools = () => invoke<ToolInfo[]>("list_tools");
 export const checkTools = (ids: string[]) => invoke<ToolStatus[]>("check_tools", { ids });
 export const projectHints = (folder: string) => invoke<Hint[]>("project_hints", { folder });
+export const listTickets = (projectId: string) => invoke<TicketView[]>("list_tickets", { projectId });
+export const createTicket = (projectId: string, n: { title: string; description?: string; acceptance?: string; role?: string | null; status?: string; next?: string }) => invoke<Ticket>("create_ticket", { projectId, new: n });
+export const updateTicket = (projectId: string, id: string, patch: TicketPatch) => invoke<Ticket>("update_ticket", { projectId, id, patch });
+export const removeTicket = (projectId: string, id: string) => invoke<void>("remove_ticket", { projectId, id });
 export const getPersona = () => invoke<Persona>("get_persona");
 export const savePersona = (persona: Persona) => invoke<Persona>("save_persona", { persona });
 export const personaPrompt = (persona: Persona) => invoke<string>("persona_prompt", { persona });

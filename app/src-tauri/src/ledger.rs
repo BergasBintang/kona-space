@@ -126,6 +126,12 @@ pub struct CostRow {
 }
 
 impl Ledger {
+    /// What these sessions cost in all, in dollars (for the cost shown on a ticket).
+    pub fn cost_for_sessions(&self, ids: &[String]) -> f64 {
+        let conn = self.conn.lock().unwrap();
+        ids.iter().map(|id| conn.query_row("SELECT IFNULL(SUM(cost_usd), 0) FROM usage_turn WHERE session_id = ?1", params![id], |r| r.get::<_, f64>(0)).unwrap_or(0.0)).sum()
+    }
+
     /// The ledger, summed per session, model and local day, from `since_day` (YYYY-MM-DD, local) on. The screen groups it any way it likes.
     pub fn cost_rows(&self, since_day: Option<&str>) -> Vec<CostRow> {
         let conn = self.conn.lock().unwrap();

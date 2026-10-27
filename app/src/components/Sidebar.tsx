@@ -4,17 +4,18 @@ import { Select } from "./pick";
 import type { Project } from "../lib/api";
 import type { Plan } from "../lib/sessions";
 
-export type Place = "sessions" | "files" | "roles" | "accounts" | "costs" | "voice";
+export type Place = "sessions" | "files" | "roles" | "accounts" | "costs" | "voice" | "board";
 
 const ICONS: Record<Place, React.ReactNode> = {
   sessions: <path d="M2.5 3.5 L13.5 3.5 L13.5 10.5 L7 10.5 L4 13 L4 10.5 L2.5 10.5 Z" />,
   files: <path d="M2 5 L2 12.5 L14 12.5 L14 6 L7.5 6 L6.5 4 L2 4 Z" />,
+  board: <path d="M2.5 3.5 H6 V12.5 H2.5 Z M6.75 3.5 H9.25 V9 H6.75 Z M10 3.5 H13.5 V7 H10 Z" />,
   voice: <path d="M3 6.5 V9.5 M6 4 V12 M9 5.5 V10.5 M12 3.5 V12.5" />,
   costs: <path d="M3 13 V8.5 M7 13 V4 M11 13 V6.5 M14 13 H2" />,
   accounts: <><circle cx="6" cy="8" r="2.8" /><path d="M8.8 8 H14 M12 8 V10.5" /></>,
   roles: <><circle cx="8" cy="5.5" r="2.5" /><path d="M3 13 C3 10.2 5 9 8 9 C11 9 13 10.2 13 13 Z" /></>,
 };
-const PLACES: { id: Place; label: string }[] = [{ id: "sessions", label: "Sessions" }, { id: "files", label: "Files" }, { id: "costs", label: "Costs" }, { id: "roles", label: "Roles" }, { id: "voice", label: "Voice" }, { id: "accounts", label: "Accounts" }];
+const PLACES: { id: Place; label: string }[] = [{ id: "sessions", label: "Sessions" }, { id: "board", label: "Board" }, { id: "files", label: "Files" }, { id: "costs", label: "Costs" }, { id: "roles", label: "Roles" }, { id: "voice", label: "Voice" }, { id: "accounts", label: "Accounts" }];
 
 export function Sidebar({ projects, project, onProject, onAddProject, place, onPlace, attention, plan, accountLabel, limitLine, version }: {
   projects: Project[]; project: Project | null; onProject: (id: string) => void; onAddProject: () => void;

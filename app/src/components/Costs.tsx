@@ -1,13 +1,13 @@
 // The Costs place: what the sessions cost, from Kona's own ledger. Pick a period and how to group it (project, role, account,
 // model, day or session). Dollars are an estimate at list price, never a bill (decision 25).
 import { useEffect, useMemo, useState } from "react";
-import { costRows, baseName, samePlace, type Account, type CostRow, type Project, type Role } from "../lib/api";
+import { costRows, listTickets, baseName, samePlace, type Account, type CostRow, type Project, type Role } from "../lib/api";
 import { dollars } from "../lib/sessions";
 import { Glyph } from "./ui";
 
-type By = "project" | "role" | "account" | "model" | "day" | "session";
+type By = "project" | "role" | "ticket" | "account" | "model" | "day" | "session";
 const BYS: { id: By; word: string }[] = [
-  { id: "project", word: "Project" }, { id: "role", word: "Role" }, { id: "account", word: "Account" },
+  { id: "project", word: "Project" }, { id: "role", word: "Role" }, { id: "ticket", word: "Ticket" }, { id: "account", word: "Account" },
   { id: "model", word: "Model" }, { id: "day", word: "Day" }, { id: "session", word: "Session" },
 ];
 type Period = "today" | "week" | "month" | "all";
@@ -44,6 +44,13 @@ export function Costs({ projects, roles, accounts }: { projects: Project[]; role
   const [by, setBy] = useState<By>("project");
   const [rows, setRows] = useState<CostRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [ticketOf, setTicketOf] = useState<Map<string, { key: string; label: string; sub: string }>>(new Map()); // session id -> its ticket
+
+  // which ticket each session worked on, read from the ticket files of every project
+  useEffect(() => {
+    Promise.all(projects.map((p) => listTickets(p.id).then((ts) => ts.map((t) => ({ p, t }))).catch(() => [])))
+      .then((all) => { const m = new Map<string, { key: string; label: string; sub: string }>(); for (const { p, t } of all.flat()) for (const s of t.sessions) m.set(s, { key: `${p.id}|${t.id}`, label: `${t.id} ${t.title}`, sub: p.name }); setTicketOf(m); });
+  }, [projects]);
 
   useEffect(() => {
     const days = PERIODS.find((p) => p.id === period)!.days;
@@ -65,6 +72,7 @@ export function Costs({ projects, roles, accounts }: { projects: Project[]; role
       switch (by) {
         case "project": key = (r.folder ?? "").toLowerCase().replace(/\\/g, "/"); label = projectName(r.folder); sub = r.folder ?? undefined; break;
         case "role": key = r.role_id ?? ""; label = roleName(r.role_id); break;
+        case "ticket": { const k = ticketOf.get(r.session_id); key = k?.key ?? ""; label = k?.label ?? "No ticket"; sub = k?.sub; break; }
         case "account": key = r.account_id ?? "main"; label = accountName(r.account_id); break;
         case "model": key = r.model; label = modelName(r.model); sub = r.model; break;
         case "day": key = r.day; label = new Date(`${r.day}T12:00:00`).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" }); break;
@@ -76,7 +84,7 @@ export function Costs({ projects, roles, accounts }: { projects: Project[]; role
     }
     const all = [...map.values()];
     return by === "day" ? all.sort((a, b) => b.key.localeCompare(a.key)) : all.sort((a, b) => b.cost - a.cost);
-  }, [rows, by, projects, roles, accounts]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rows, by, projects, roles, accounts, ticketOf]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const total = lines.reduce((s, l) => s + l.cost, 0);
   const sessionCount = new Set((rows ?? []).map((r) => r.session_id)).size;

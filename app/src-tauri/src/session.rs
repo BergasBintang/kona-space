@@ -6,6 +6,7 @@ use crate::ledger::Ledger;
 use crate::accounts::Account;
 use crate::persona::Persona;
 use crate::roles::Role;
+use crate::tickets::{self, Ticket};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -27,6 +28,8 @@ struct Handle {
 pub struct Sessions {
     map: Mutex<HashMap<String, Handle>>,
     pub ledger: Arc<Ledger>,
+    /// Kona's own data folder (the board's tool server reads the role names from it)
+    pub base: PathBuf,
 }
 
 #[derive(Deserialize)]
@@ -36,8 +39,8 @@ pub struct ImageIn {
 }
 
 impl Sessions {
-    pub fn new(ledger: Ledger) -> Self {
-        Self { map: Mutex::new(HashMap::new()), ledger: Arc::new(ledger) }
+    pub fn new(ledger: Ledger, base: PathBuf) -> Self {
+        Self { map: Mutex::new(HashMap::new()), ledger: Arc::new(ledger), base }
     }
 
     fn send_line(&self, session_id: &str, value: Value) -> Result<(), String> {
@@ -105,7 +108,7 @@ pub fn claude_version(exe: &PathBuf) -> Option<String> {
     Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Option<Role>, account: Option<Account>, persona: Persona, project_name: String, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
+pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Option<Role>, account: Option<Account>, persona: Persona, project_name: String, ticket: Option<Ticket>, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
     let exe = find_claude().ok_or("Claude Code was not found on this PC")?;
     let id = resume.clone().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let mut cmd = Command::new(exe);
@@ -115,9 +118,16 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     ]);
     // the role's brief is added to Claude's own instructions; the mode and model come from the role unless the owner changed them
     // and the voice, when it is on for this session (it changes wording only; see persona.rs for the scope clause)
-    let extra: Vec<String> = role.as_ref().map(|r| r.brief.trim().to_string()).filter(|b| !b.is_empty()).into_iter().chain(persona.prompt()).collect();
+    let extra: Vec<String> = role.as_ref().map(|r| r.brief.trim().to_string()).filter(|b| !b.is_empty()).into_iter().chain(ticket.as_ref().map(tickets::prompt_for)).chain(persona.prompt()).collect();
     if !extra.is_empty() {
         cmd.args(["--append-system-prompt", &extra.join("\n\n")]);
+    }
+    // the board's tool server: Kona's own program, started by Claude Code for this one session (see mcp.rs)
+    if let Ok(me) = std::env::current_exe() {
+        let config = json!({"mcpServers": {"kona-board": {"command": me.to_string_lossy(), "args": [
+            "--mcp-board", "--folder", folder, "--session", id, "--role", role.as_ref().map(|r| r.id.as_str()).unwrap_or(""), "--data", sessions.base.to_string_lossy()
+        ]}}});
+        cmd.args(["--mcp-config", &config.to_string(), "--allowedTools", "mcp__kona-board"]);
     }
     if resume.is_some() {
         cmd.args(["--resume", &id]);
@@ -153,12 +163,24 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
 
     {
         let (app, sid, folder, ledger) = (app.clone(), id.clone(), folder.clone(), sessions.ledger.clone());
+        let reply_tx = tx.clone();
         let role_id = role.as_ref().map(|r| r.id.clone());
         let account_id = account.as_ref().map(|a| a.id.clone());
         tauri::async_runtime::spawn(async move {
             let mut lines = BufReader::new(stdout).lines();
             while let Ok(Some(line)) = lines.next_line().await {
                 let Ok(mut rec) = serde_json::from_str::<Value>(&line) else { continue };
+                // The board's own tools are allowed without a card: they only touch this project's ticket files and can never mark a
+                // ticket done (see mcp.rs). Plan mode would otherwise ask before every ticket the Product role raises.
+                if rec.get("type").and_then(Value::as_str) == Some("control_request")
+                    && rec["request"]["subtype"].as_str() == Some("can_use_tool")
+                    && rec["request"]["tool_name"].as_str().is_some_and(|n| n.starts_with("mcp__kona-board__"))
+                {
+                    let reply = json!({"type": "control_response", "response": {"subtype": "success", "request_id": rec["request_id"],
+                        "response": {"behavior": "allow", "updatedInput": rec["request"]["input"]}}});
+                    let _ = reply_tx.send(reply.to_string());
+                    continue;
+                }
                 if rec.get("type").and_then(Value::as_str) == Some("result") {
                     let added = ledger.record_result(&sid, &folder, role_id.as_deref(), account_id.as_deref(), &rec);
                     rec["kona_turn_cost_usd"] = json!(added);
@@ -189,6 +211,6 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     }
 
     sessions.map.lock().unwrap().insert(id.clone(), Handle { tx, stop: Some(stop_tx) });
-    let _ = app.emit("session-event", json!({"sessionId": id, "record": {"type": "kona/started", "folder": folder, "roleId": role.as_ref().map(|r| r.id.clone()), "accountId": account.as_ref().map(|a| a.id.clone()), "voice": persona.enabled, "lines": persona.lines_for(&project_name), "model": model, "mode": mode, "coveredByJob": covered}}));
+    let _ = app.emit("session-event", json!({"sessionId": id, "record": {"type": "kona/started", "folder": folder, "roleId": role.as_ref().map(|r| r.id.clone()), "accountId": account.as_ref().map(|a| a.id.clone()), "voice": persona.enabled, "ticketId": ticket.as_ref().map(|t| t.id.clone()), "lines": persona.lines_for(&project_name), "model": model, "mode": mode, "coveredByJob": covered}}));
     Ok(id)
 }

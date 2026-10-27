@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { initialState, loadPlans, reducer, savePlans } from "./lib/sessions";
-import { PLAIN_LINES, listAccounts, listProjects, getPersona, listRoles, listTools, samePlace, type Account, type AddResult, type Project, type Persona, type Role, type ToolInfo } from "./lib/api";
+import { PLAIN_LINES, listAccounts, listProjects, accountStatus, getPersona, listRoles, listTools, samePlace, type Account, type AddResult, type Project, type Persona, type Role, type TicketView, type ToolInfo } from "./lib/api";
 import { Sidebar, type Place } from "./components/Sidebar";
 import { SessionList } from "./components/SessionList";
 import { Welcome } from "./components/Welcome";
@@ -15,6 +15,7 @@ import { Accounts } from "./components/Accounts";
 import { Kit } from "./components/Kit";
 import { Costs } from "./components/Costs";
 import { Voice } from "./components/Voice";
+import { Board } from "./components/Board";
 import { Glyph } from "./components/ui";
 
 const remembered = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -71,8 +72,24 @@ export default function App() {
 
   const start = async (folder: string, roleId: string | null, accountId: string, useVoice: boolean, model: string, mode: string) => {
     setError(null);
-    try { await invoke<string>("start_session", { folder, roleId, accountId, useVoice, model, mode, resume: null }); setLastAccount(accountId); remember("kona.account", accountId); setCreating(false); }
+    try { await invoke<string>("start_session", { folder, roleId, accountId, useVoice, ticketId: null, model, mode, resume: null }); setLastAccount(accountId); remember("kona.account", accountId); setCreating(false); }
     catch (e) { setError(String(e)); }
+  };
+
+  // Start a session from a ticket card: the role's model, mode and account, the voice as set, and the ticket told to Claude.
+  const startTicket = async (t: TicketView) => {
+    if (!project || !persona) return;
+    const role = roles.find((r) => r.id === t.role);
+    if (!role) throw new Error("Choose a role for this ticket first");
+    const accountId = role.account && accounts.some((a) => a.id === role.account) ? role.account : accounts.some((a) => a.id === lastAccount) ? lastAccount : "main";
+    const status = await accountStatus(accountId);
+    if (!status.logged_in) throw new Error("That account is not signed in. Open Accounts to sign in.");
+    const id = await invoke<string>("start_session", { folder: project.folder, roleId: role.id, accountId, useVoice: persona.enabled, ticketId: t.id, model: role.model, mode: role.mode, resume: null });
+    setLastAccount(accountId); remember("kona.account", accountId);
+    const text = `Start on ticket ${t.id}: ${t.title}.`;
+    dispatch({ type: "user-sent", sessionId: id, text, images: [] });
+    await invoke("send_message", { sessionId: id, text, images: [] });
+    setCreating(false); setPlace("sessions");
   };
 
   if (import.meta.env.DEV && window.location.hash === "#kit") return <Kit />; // the base pickers on show, development only
@@ -86,6 +103,8 @@ export default function App() {
     content = <Files project={project} />;
   } else if (place === "roles") {
     content = <Roles roles={roles} accounts={accounts} tools={tools} onChanged={setRoles} />;
+  } else if (place === "board") {
+    content = <Board project={project} roles={roles} state={state} onStart={startTicket} onOpenSession={(id) => { dispatch({ type: "select", id }); setCreating(false); setPlace("sessions"); }} />;
   } else if (place === "voice") {
     content = <Voice persona={persona} onChanged={setPersona} />;
   } else if (place === "costs") {

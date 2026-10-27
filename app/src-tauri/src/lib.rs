@@ -3,12 +3,14 @@
 mod accounts;
 mod files;
 mod job;
+mod mcp;
 mod needs;
 mod persona;
 mod ledger;
 mod projects;
 mod roles;
 mod session;
+mod tickets;
 
 use serde::Serialize;
 use serde_json::Value;
@@ -18,6 +20,7 @@ use projects::{AddResult, Project, Projects};
 use persona::{Persona, Voice};
 use roles::{Role, Roles};
 use session::{ImageIn, Sessions};
+use tickets::{NewTicket, Patch, Ticket};
 use tauri::{AppHandle, Manager, State};
 
 #[derive(Serialize)]
@@ -35,7 +38,7 @@ fn check_claude() -> Result<ClaudeInfo, String> {
 }
 
 #[tauri::command]
-async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: State<'_, Roles>, accounts: State<'_, Accounts>, voice: State<'_, Voice>, projects: State<'_, Projects>, folder: String, role_id: Option<String>, account_id: Option<String>, use_voice: bool, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
+async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: State<'_, Roles>, accounts: State<'_, Accounts>, voice: State<'_, Voice>, projects: State<'_, Projects>, folder: String, role_id: Option<String>, account_id: Option<String>, use_voice: bool, ticket_id: Option<String>, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
     let role = match role_id {
         Some(id) => Some(roles.get(&id).ok_or("That role does not exist any more")?),
         None => None,
@@ -48,7 +51,16 @@ async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: Sta
     persona.enabled = use_voice;
     let project_name = projects.all().into_iter().find(|p| projects::norm(std::path::Path::new(&p.folder)) == projects::norm(std::path::Path::new(&folder))).map(|p| p.name)
         .unwrap_or_else(|| std::path::Path::new(&folder).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default());
-    session::start(app, &sessions, folder, role, account, persona, project_name, model, mode, resume).await
+    let ticket = match &ticket_id {
+        Some(id) => Some(tickets::get(&tickets::dir(std::path::Path::new(&folder)), id)?),
+        None => None,
+    };
+    let who = format!("the owner{}", role.as_ref().map(|r| format!(", as {}", r.name)).unwrap_or_default());
+    let id = session::start(app, &sessions, folder.clone(), role, account, persona, project_name, ticket, model, mode, resume).await?;
+    if let Some(t) = ticket_id {
+        let _ = tickets::link_session(&tickets::dir(std::path::Path::new(&folder)), &t, &id, &who);
+    }
+    Ok(id)
 }
 
 #[tauri::command]
@@ -132,6 +144,41 @@ fn default_persona() -> Persona {
     persona::default_persona()
 }
 
+/// A ticket with what its sessions have cost so far.
+#[derive(serde::Serialize)]
+struct TicketView {
+    #[serde(flatten)]
+    ticket: Ticket,
+    cost: f64,
+}
+
+fn project_dir(projects: &Projects, id: &str) -> Result<std::path::PathBuf, String> {
+    let p = projects.all().into_iter().find(|p| p.id == id).ok_or("That project does not exist any more")?;
+    Ok(tickets::dir(std::path::Path::new(&p.folder)))
+}
+
+#[tauri::command]
+fn list_tickets(projects: State<'_, Projects>, sessions: State<'_, Sessions>, project_id: String) -> Result<Vec<TicketView>, String> {
+    let dir = project_dir(&projects, &project_id)?;
+    Ok(tickets::list(&dir).into_iter().map(|t| { let cost = sessions.ledger.cost_for_sessions(&t.sessions); TicketView { ticket: t, cost } }).collect())
+}
+
+#[tauri::command]
+fn create_ticket(projects: State<'_, Projects>, project_id: String, new: NewTicket) -> Result<Ticket, String> {
+    tickets::create(&project_dir(&projects, &project_id)?, new, "the owner")
+}
+
+#[tauri::command]
+fn update_ticket(projects: State<'_, Projects>, project_id: String, id: String, patch: Patch) -> Result<Ticket, String> {
+    tickets::update(&project_dir(&projects, &project_id)?, &id, patch, "the owner")
+}
+
+/// Remove a ticket's file. The sessions it ran and what they cost stay in the ledger.
+#[tauri::command]
+fn remove_ticket(projects: State<'_, Projects>, project_id: String, id: String) -> Result<(), String> {
+    tickets::remove(&project_dir(&projects, &project_id)?, &id)
+}
+
 #[tauri::command]
 fn list_roles(roles: State<'_, Roles>) -> Vec<Role> {
     roles.all()
@@ -198,6 +245,11 @@ fn running_sessions(sessions: State<'_, Sessions>) -> Vec<String> {
     sessions.running()
 }
 
+/// Run as the board's tool server (see mcp.rs) instead of opening the window.
+pub fn mcp_board(args: &[String]) {
+    mcp::run(args);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -207,14 +259,14 @@ pub fn run() {
             // %APPDATA%\Kona\kona.db (the plan's place for the app's own data)
             let base = app.path().app_data_dir().ok().and_then(|p| p.parent().map(|d| d.join("Kona"))).ok_or("no app data folder")?;
             let ledger = ledger::Ledger::open(&base.join("kona.db")).map_err(|e| format!("could not open the cost ledger: {e}"))?;
-            app.manage(Sessions::new(ledger));
+            app.manage(Sessions::new(ledger, base.clone()));
             app.manage(Projects::load(&base));
             app.manage(Roles::load(&base));
             app.manage(Accounts::load(&base));
             app.manage(Voice::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
+        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -52,6 +52,10 @@ impl Sessions {
     }
 
     pub fn send_message(&self, session_id: &str, text: &str, images: &[ImageIn]) -> Result<(), String> {
+        // a private key must never travel through a prompt, a transcript or the brain
+        if text.contains("PRIVATE KEY-----") {
+            return Err("Kona did not send this message: it contains the text of a private key. Keys stay in their files; give Claude the path, never the key.".into());
+        }
         let mut content: Vec<Value> = images
             .iter()
             .map(|i| json!({"type": "image", "source": {"type": "base64", "media_type": i.media_type, "data": i.data}}))
@@ -110,7 +114,7 @@ pub fn claude_version(exe: &PathBuf) -> Option<String> {
     Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Option<Role>, account: Option<Account>, persona: Persona, project_name: String, ticket: Option<Ticket>, work_dir: String, digest: Option<String>, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
+pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Option<Role>, account: Option<Account>, persona: Persona, project_name: String, ticket: Option<Ticket>, work_dir: String, digest: Option<String>, ssh_hosts: Vec<crate::ssh::Host>, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
     let exe = find_claude().ok_or("Claude Code was not found on this PC")?;
     let id = resume.clone().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let mut cmd = Command::new(exe);
@@ -130,6 +134,14 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
             "--mcp-board", "--folder", folder, "--session", id, "--role", role.as_ref().map(|r| r.id.as_str()).unwrap_or(""), "--data", sessions.base.to_string_lossy()
         ]}}});
         cmd.args(["--mcp-config", &config.to_string(), "--allowedTools", "mcp__kona-board"]);
+    }
+    // a role that may use none of the project's servers cannot run ssh, scp or sftp at all (and a role that may is checked per command below)
+    let denied = crate::ssh::deny_rules(&ssh_hosts, role.as_ref().map(|r| r.id.as_str()));
+    if !denied.is_empty() {
+        cmd.arg("--disallowedTools").args(&denied);
+    } else if !ssh_hosts.is_empty() {
+        // a role that may use a server: each command to a server must still ask, so Kona can check it and show the card
+        cmd.args(["--settings", &json!({"permissions": {"ask": crate::ssh::ask_rules()}}).to_string()]);
     }
     if resume.is_some() {
         cmd.args(["--resume", &id]);
@@ -167,6 +179,7 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     {
         let (app, sid, folder, ledger) = (app.clone(), id.clone(), folder.clone(), sessions.ledger.clone());
         let reply_tx = tx.clone();
+        let (ssh_hosts, ssh_role) = (ssh_hosts.clone(), role.as_ref().map(|r| r.id.clone()));
         let role_id = role.as_ref().map(|r| r.id.clone());
         let account_id = account.as_ref().map(|a| a.id.clone());
         tauri::async_runtime::spawn(async move {
@@ -183,6 +196,27 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
                         "response": {"behavior": "allow", "updatedInput": rec["request"]["input"]}}});
                     let _ = reply_tx.send(reply.to_string());
                     continue;
+                }
+                // a command that reaches a server (ssh, scp, sftp): refused unless the project lists that server for this role; an allowed
+                // one still reaches the owner as a card that names the server
+                if rec.get("type").and_then(Value::as_str) == Some("control_request")
+                    && rec["request"]["subtype"].as_str() == Some("can_use_tool")
+                    && matches!(rec["request"]["tool_name"].as_str(), Some("Bash") | Some("PowerShell"))
+                {
+                    let command = rec["request"]["input"]["command"].as_str().unwrap_or("").to_string();
+                    match crate::ssh::decide(&ssh_hosts, ssh_role.as_deref(), &command) {
+                        crate::ssh::Decision::NotSsh => {}
+                        crate::ssh::Decision::Deny(why) => {
+                            let reply = json!({"type": "control_response", "response": {"subtype": "success", "request_id": rec["request_id"],
+                                "response": {"behavior": "deny", "message": why}}});
+                            let _ = reply_tx.send(reply.to_string());
+                            let _ = app.emit("session-event", json!({"sessionId": sid, "record": {"type": "kona/refused", "command": command, "why": why}}));
+                            continue;
+                        }
+                        crate::ssh::Decision::Ask(hosts) => {
+                            rec["kona_ssh"] = json!(hosts.iter().map(|h| json!({"label": h.label, "host": h.host, "user": h.user, "checked": !h.fingerprints.is_empty()})).collect::<Vec<_>>());
+                        }
+                    }
                 }
                 if rec.get("type").and_then(Value::as_str) == Some("result") {
                     let added = ledger.record_result(&sid, &folder, role_id.as_deref(), account_id.as_deref(), &rec);

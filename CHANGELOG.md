@@ -2,6 +2,17 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.14.0, 2026-10-28
+
+The SSH registry.
+
+- A Servers place: the servers each project may reach, kept as references. A server has a name, a host, a port, a user, the path of its key file, its fingerprint and the roles that may use it. Kona never opens, copies or stores a key; typing the text of a key is refused.
+- A role can run ssh, scp or sftp only to a server listed for that role. A role with no server cannot run those commands at all. A host that is not on the list, the wrong user for a listed host, and any attempt to switch off the check of the server's identity are refused with a plain message Claude can read.
+- A command to a listed server still asks you first, with a card that names the server (and says whether its fingerprint was checked), even if your own Claude settings would allow it without asking.
+- Read a server's fingerprint after a confirmation (Kona connects to the port only to read the public host keys), compare it with the server's own record, and save it. If it later differs, Kona says it changed and warns you before you trust it again.
+- Each server can give you a ready-to-paste entry for your ssh config. The key file is checked for being found, and for being inside a project folder or a cloud-synced folder.
+- A message that contains a private key header is never sent to Claude.
+
 ## 0.13.0, 2026-10-28
 
 The Brain learns from sessions.

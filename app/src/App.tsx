@@ -19,6 +19,7 @@ import { Board } from "./components/Board";
 import { Worktrees } from "./components/Worktrees";
 import { Leftovers } from "./components/Leftovers";
 import { BrainPlace } from "./components/brain/Brain";
+import { Servers } from "./components/Servers";
 import { Glyph } from "./components/ui";
 import { autoNoteOn, buildDigest, writeSessionNote } from "./lib/brain/summary.ts";
 import { localDate, redact } from "./lib/brain/text.ts";
@@ -180,6 +181,8 @@ export default function App() {
     content = <Files project={project} />;
   } else if (place === "roles") {
     content = <Roles roles={roles} accounts={accounts} tools={tools} onChanged={setRoles} />;
+  } else if (place === "servers") {
+    content = <Servers project={project} roles={roles} />;
   } else if (place === "brain") {
     content = <BrainPlace project={project} onAsk={askClaude} />;
   } else if (place === "leftovers") {

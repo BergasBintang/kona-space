@@ -36,6 +36,9 @@ export type TempInfo = { session_id: string; path: string; bytes: number; files:
 export type BrainNote = { id: string; layer: string; text: string; path: string; mtime: number; readonly: boolean };
 export type BrainData = { notes: BrainNote[]; memory_dir: string | null };
 export type Wanted = { question: string; count: number; first: string; last: string };
+export type Server = { id: string; project_id: string; label: string; host: string; port: number; user: string; key_path: string; fingerprints: string[]; roles: string[]; notes: string };
+export type Fingerprint = { kind: string; fingerprint: string };
+export type KeyState = { exists: boolean; is_file: boolean; inside_a_project: boolean; synced_folder: boolean };
 export type Entry = { name: string; path: string; is_dir: boolean; size: number; modified: number | null };
 export type FileView =
   | { kind: "text"; text: string; size: number; truncated: boolean }
@@ -76,6 +79,11 @@ export const wantedRemove = (projectId: string, question: string) => invoke<Want
 export const sessionTranscript = (sessionId: string, workDir: string, accountId: string) => invoke<string>("session_transcript", { sessionId, workDir, accountId });
 export const writeNoteWithHaiku = (a: { system: string; prompt: string; sessionId: string; folder: string; roleId: string | null; accountId: string }) =>
   invoke<string>("write_note_with_haiku", { system: a.system, prompt: a.prompt, sessionId: a.sessionId, folder: a.folder, roleId: a.roleId, accountId: a.accountId });
+export const listServers = (projectId: string) => invoke<Server[]>("ssh_list", { projectId });
+export const saveServer = (host: Server) => invoke<Server>("ssh_save", { host });
+export const removeServer = (id: string) => invoke<void>("ssh_remove", { id });
+export const readFingerprints = (host: string, port: number) => invoke<Fingerprint[]>("ssh_fingerprints", { host, port });
+export const keyState = (path: string) => invoke<KeyState>("ssh_key_state", { path });
 export const costRows = (sinceDay: string | null) => invoke<CostRow[]>("cost_rows", { sinceDay });
 export const listRoles = () => invoke<Role[]>("list_roles");
 export const saveRole = (role: Role) => invoke<Role>("save_role", { role });
@@ -93,6 +101,17 @@ export const readFile = (path: string) => invoke<FileView>("read_file", { path }
 export const samePlace = (a: string, b: string) => a.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase() === b.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
 export const baseName = (p: string) => p.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || p;
 export const humanSize = (n: number) => (n < 1024 ? `${n} bytes` : n < 1024 * 1024 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
+
+/** The file dialog (for the key file's path). In development a test can answer it in advance; a release build has no such door. */
+export async function pickFile(title: string): Promise<string | null> {
+  if (import.meta.env.DEV) {
+    const preset = (window as unknown as { __KONA_TEST_FILE__?: string }).__KONA_TEST_FILE__;
+    if (preset) return preset;
+  }
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const p = await open({ directory: false, multiple: false, title });
+  return typeof p === "string" ? p : null;
+}
 
 /** The folder dialog. In development a test can answer it in advance (a native dialog cannot be clicked by a script); a release build has no such door. */
 export async function pickFolder(title: string): Promise<string | null> {

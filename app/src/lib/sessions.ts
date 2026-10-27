@@ -8,7 +8,7 @@ export type Item =
   | { kind: "user"; id: string; text: string; images: string[] }
   | { kind: "assistant"; id: string; text: string }
   | { kind: "tool"; id: string; toolUseId: string; name: string; summary: string; status: "running" | "done" | "error" | "denied"; preview?: string }
-  | { kind: "permission"; id: string; requestId: string; toolName: string; description: string; command?: string; where?: string; input: unknown; status: "asking" | "allowed" | "denied" }
+  | { kind: "permission"; id: string; requestId: string; toolName: string; description: string; command?: string; where?: string; input: unknown; status: "asking" | "allowed" | "denied"; servers?: { label: string; host: string; user: string; checked: boolean }[] }
   | { kind: "note"; id: string; text: string; tone: "info" | "problem" };
 
 export type PlanWindow = { utilization: number; resetsAt: number };
@@ -169,7 +169,7 @@ function onEvent(state: State, sessionId: string, r: any): State {
           ...push(s, {
             kind: "permission", id: nextId("p"), requestId: r.request_id, toolName: q.tool_name, description: q.description ?? "",
             command: typeof input.command === "string" ? input.command : typeof input.file_path === "string" ? input.file_path : undefined,
-            where: s.folder, input, status: "asking",
+            where: s.folder, input, status: "asking", servers: Array.isArray(r.kona_ssh) ? r.kona_ssh : undefined,
           }),
           run: "waiting",
         };
@@ -184,6 +184,8 @@ function onEvent(state: State, sessionId: string, r: any): State {
         const text: string = r.text ?? "";
         return text.trim() ? push(s, { kind: "note", id: nextId("n"), tone: "problem", text }) : s;
       }
+      case "kona/refused":
+        return push(s, { kind: "note", id: nextId("n"), tone: "problem", text: `Kona refused a command: ${r.why ?? ""}` });
       case "kona/exited":
         return { ...push(s, { kind: "note", id: nextId("n"), tone: "info", text: s.endedLine }), run: "ended" };
       default:

@@ -13,6 +13,7 @@ mod ledger;
 mod projects;
 mod roles;
 mod session;
+mod ssh;
 mod summary;
 mod tickets;
 mod winproc;
@@ -44,7 +45,7 @@ fn check_claude() -> Result<ClaudeInfo, String> {
 }
 
 #[tauri::command]
-async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: State<'_, Roles>, accounts: State<'_, Accounts>, voice: State<'_, Voice>, projects: State<'_, Projects>, folder: String, role_id: Option<String>, account_id: Option<String>, use_voice: bool, ticket_id: Option<String>, brain_digest: Option<String>, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
+async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: State<'_, Roles>, accounts: State<'_, Accounts>, voice: State<'_, Voice>, projects: State<'_, Projects>, folder: String, role_id: Option<String>, account_id: Option<String>, use_voice: bool, ticket_id: Option<String>, brain_digest: Option<String>, servers: State<'_, ssh::Servers>, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
     let role = match role_id {
         Some(id) => Some(roles.get(&id).ok_or("That role does not exist any more")?),
         None => None,
@@ -57,6 +58,7 @@ async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: Sta
     persona.enabled = use_voice;
     let project_name = projects.all().into_iter().find(|p| projects::norm(std::path::Path::new(&p.folder)) == projects::norm(std::path::Path::new(&folder))).map(|p| p.name)
         .unwrap_or_else(|| std::path::Path::new(&folder).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default());
+    let ssh_hosts = projects.all().into_iter().find(|p| projects::norm(std::path::Path::new(&p.folder)) == projects::norm(std::path::Path::new(&folder))).map(|p| servers.for_project(&p.id)).unwrap_or_default();
     let who = format!("the owner{}", role.as_ref().map(|r| format!(", as {}", r.name)).unwrap_or_default());
     let tdir = tickets::dir(std::path::Path::new(&folder));
     let mut work_dir = folder.clone();
@@ -89,7 +91,7 @@ async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: Sta
         }
         None => None,
     };
-    let id = session::start(app, &sessions, folder.clone(), role, account, persona, project_name, ticket, work_dir, brain_digest, model, mode, resume).await?;
+    let id = session::start(app, &sessions, folder.clone(), role, account, persona, project_name, ticket, work_dir, brain_digest, ssh_hosts, model, mode, resume).await?;
     if let Some(t) = ticket_id {
         let _ = tickets::link_session(&tickets::dir(std::path::Path::new(&folder)), &t, &id, &who);
     }
@@ -369,6 +371,35 @@ async fn write_note_with_haiku(
     Ok(text)
 }
 
+/// A project's servers (references: host, user, key file path, fingerprint, roles; never a key).
+#[tauri::command]
+fn ssh_list(servers: State<'_, ssh::Servers>, project_id: String) -> Vec<ssh::Host> {
+    servers.for_project(&project_id)
+}
+
+#[tauri::command]
+fn ssh_save(servers: State<'_, ssh::Servers>, host: ssh::Host) -> Result<ssh::Host, String> {
+    servers.save_host(host)
+}
+
+#[tauri::command]
+fn ssh_remove(servers: State<'_, ssh::Servers>, id: String) -> Result<(), String> {
+    servers.remove(&id)
+}
+
+/// Read a server's public host keys and their fingerprints. It only connects to the port to read the keys; the screen has asked first.
+#[tauri::command]
+async fn ssh_fingerprints(host: String, port: u16) -> Result<Vec<ssh::Fingerprint>, String> {
+    tauri::async_runtime::spawn_blocking(move || ssh::fingerprints(&host, port)).await.map_err(|e| e.to_string())?
+}
+
+/// Does the key file exist, and is it somewhere it should not be? The file is not opened.
+#[tauri::command]
+fn ssh_key_state(projects: State<'_, Projects>, path: String) -> ssh::KeyState {
+    let folders: Vec<String> = projects.all().into_iter().map(|p| p.folder).collect();
+    ssh::key_state(&path, &folders)
+}
+
 #[tauri::command]
 fn list_roles(roles: State<'_, Roles>) -> Vec<Role> {
     roles.all()
@@ -467,9 +498,10 @@ pub fn run() {
             app.manage(Roles::load(&base));
             app.manage(Accounts::load(&base));
             app.manage(Voice::load(&base));
+            app.manage(ssh::Servers::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, session_transcript, write_note_with_haiku, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
+        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

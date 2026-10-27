@@ -62,6 +62,12 @@ function PermissionCard({ it, onAnswer }: { it: Extract<Item, { kind: "permissio
         <Glyph state={open ? "waiting" : it.status === "allowed" ? "done" : "stopped"} size={22} />
         <h2 className="m-0 text-[17px] leading-6 font-bold">{permissionTitle(it.toolName)}</h2>
       </div>
+      {it.servers && it.servers.length > 0 && (
+        <div className="flex flex-col gap-1.5 rounded-control border border-state-waiting bg-surface-1 p-3.5">
+          <span className="flex items-center gap-2 text-[14px] leading-5 font-bold text-state-waiting"><Glyph state="waiting" size={16} />This command reaches a server</span>
+          {it.servers.map((sv) => <span key={sv.host} className="text-[14px] leading-5"><span className="font-bold">{sv.label}</span> <span className="font-mono text-text-secondary">{sv.user}@{sv.host}</span> <span className="text-text-tertiary">· {sv.checked ? "fingerprint saved" : "fingerprint not checked"}</span></span>)}
+        </div>
+      )}
       {it.description && <p className="m-0 text-text-secondary">{it.description}</p>}
       {it.command && (
         <div className="flex flex-col gap-1 rounded-control border border-line-subtle bg-inset p-3.5">
@@ -185,6 +191,11 @@ export function Chat({ s, role, account, dispatch, onNote, onSaveAnswer }: { s: 
     await invoke("answer_permission", { sessionId: s.id, requestId: it.requestId, allow, input: allow ? it.input : null, message: allow ? null : "The owner said no." });
   };
   const send = async (text: string, images: Attached[]) => {
+    // a private key never goes through a prompt (the core refuses it too)
+    if (/PRIVATE KEY-----/.test(text)) {
+      dispatch({ type: "event", sessionId: s.id, record: { type: "kona/refused", why: "the message holds the text of a private key. Keys stay in their files; give Claude the path, never the key." } });
+      return;
+    }
     dispatch({ type: "user-sent", sessionId: s.id, text, images: images.map((i) => i.url) });
     await invoke("send_message", { sessionId: s.id, text, images: images.map((i) => ({ media_type: i.mediaType, data: i.data })) });
   };

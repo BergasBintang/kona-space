@@ -62,6 +62,8 @@ body {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 
-/* The live mark breathes slowly (3 s between 100 and 70 percent). Reduced motion turns it off above. */
+/* The live mark breathes slowly (3 s between 100 and 70 percent). Reduced motion turns it off above.
+   It moves in 12 small steps, not smoothly: a smooth fade of an SVG redraws it every frame and measured 15 percent of a core on this PC for the window
+   process alone; 4 steps a second looks the same at this speed and costs almost nothing. */
 @keyframes kona-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
-.kona-live-core { animation: kona-breathe 3s ease-in-out infinite; }
+.kona-live-core { animation: kona-breathe 3s steps(12, end) infinite; }

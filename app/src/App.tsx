@@ -79,6 +79,8 @@ export default function App() {
     if (!p) return;
     noting.current.add(id);
     try {
+      // the plan's rule for background work: a note is written when no other session is busy (it uses the plan too), checking every 8 seconds for up to 4 minutes
+      for (let i = 0; i < 30 && Object.values(live.current.state.sessions).some((x) => x.id !== id && x.run === "working"); i++) await new Promise((r) => setTimeout(r, 8000));
       const r = await writeSessionNote({ projectId: p.id, folder: p.folder, sessionId: id, workDir: s.workDir, accountId: s.accountId, roleId: s.roleId, roleName: rs.find((x) => x.id === s.roleId)?.name, ticketId: s.ticketId, sessionTitle: s.title });
       setNotice(r.existing ? `There is already a note about this session: “${r.title}”.` : `Wrote a note about the session: “${r.title}”. Find it in Brain.`);
     } catch (e) {

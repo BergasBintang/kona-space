@@ -11,12 +11,12 @@ const STATE_COLOR: Record<GlyphState, string> = {
 export const STATE_WORD: Record<GlyphState, string> = { live: "Live", waiting: "Waiting on you", idle: "Idle", done: "Done", stopped: "Stopped", left: "Left behind" };
 
 /** A ring plus one inner mark, on a 16 px grid. */
-export function Glyph({ state, size = 16, color }: { state: GlyphState; size?: number; color?: string }) {
+export function Glyph({ state, size = 16, color, still = false }: { state: GlyphState; size?: number; color?: string; still?: boolean }) {
   const c = color ?? STATE_COLOR[state];
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden="true" className="shrink-0">
       <circle cx="8" cy="8" r="6.9" fill="none" stroke={c} strokeWidth="1.75" strokeDasharray={state === "idle" ? "2.4 2.2" : undefined} />
-      {state === "live" && <circle cx="8" cy="8" r="3" fill={c} className="kona-live-core" />}
+      {state === "live" && <circle cx="8" cy="8" r="3" fill={c} className={still ? undefined : "kona-live-core"} />}
       {state === "waiting" && (<><rect x="5.2" y="5" width="1.9" height="6" rx="1" fill={c} /><rect x="8.9" y="5" width="1.9" height="6" rx="1" fill={c} /></>)}
       {state === "done" && <path d="M5 8.2 L7.2 10.4 L11 5.8" fill="none" stroke={c} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />}
       {state === "stopped" && <rect x="5.5" y="5.5" width="5" height="5" rx="1" fill={c} />}

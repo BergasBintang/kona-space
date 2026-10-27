@@ -10,7 +10,7 @@ use std::sync::Mutex;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Settings {
-    /// how many sessions may run at once; each `claude` program takes about 225 MB on this small PC (decision 32)
+    /// how many sessions may run at once; each `claude` program takes about 400 MB on this small PC (decision 32)
     pub max_sessions: u32,
 }
 
@@ -35,7 +35,7 @@ impl SettingsStore {
         self.cur.lock().unwrap().clone()
     }
     pub fn set(&self, s: Settings) -> Result<Settings, String> {
-        if s.max_sessions == 0 || s.max_sessions > 8 { return Err("The number of sessions must be between 1 and 8".into()); }
+        if s.max_sessions == 0 || s.max_sessions > 3 { return Err("The number of sessions must be between 1 and 3 (the plan's hard cap for this PC)".into()); }
         if let Some(d) = self.file.parent() { fs::create_dir_all(d).map_err(|e| e.to_string())?; }
         fs::write(&self.file, serde_json::to_string_pretty(&s).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
         *self.cur.lock().unwrap() = s.clone();

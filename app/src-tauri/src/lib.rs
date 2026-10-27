@@ -45,6 +45,24 @@ fn check_claude() -> Result<ClaudeInfo, String> {
     Ok(ClaudeInfo { path: exe.to_string_lossy().into_owned(), version })
 }
 
+/// What the screen may ask a session to start with. A mode that skips the permission checks, a model name that is really an option for the
+/// program, a resume id that is not a session id, or a folder that is not a project are all refused here, whatever the screen sends.
+fn check_launch(mode: &str, model: &str, resume: Option<&str>) -> Result<(), String> {
+    if !["default", "acceptEdits", "plan"].contains(&mode) {
+        return Err("That permission mode is not one Kona offers".into());
+    }
+    let model_ok = !model.is_empty() && model.len() <= 60 && model.chars().next().is_some_and(|c| c.is_ascii_alphanumeric()) && model.chars().all(|c| c.is_ascii_alphanumeric() || ".-_[]".contains(c));
+    if !model_ok {
+        return Err("That model name is not valid".into());
+    }
+    if let Some(r) = resume {
+        if r.len() != 36 || !r.chars().all(|c| c.is_ascii_hexdigit() || c == '-') {
+            return Err("That is not a session id".into());
+        }
+    }
+    Ok(())
+}
+
 #[tauri::command]
 async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: State<'_, Roles>, accounts: State<'_, Accounts>, voice: State<'_, Voice>, projects: State<'_, Projects>, folder: String, role_id: Option<String>, account_id: Option<String>, use_voice: bool, ticket_id: Option<String>, brain_digest: Option<String>, servers: State<'_, ssh::Servers>, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
     let role = match role_id {
@@ -60,6 +78,10 @@ async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: Sta
     let project_name = projects.all().into_iter().find(|p| projects::norm(std::path::Path::new(&p.folder)) == projects::norm(std::path::Path::new(&folder))).map(|p| p.name)
         .unwrap_or_else(|| std::path::Path::new(&folder).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default());
     let ssh_hosts = projects.all().into_iter().find(|p| projects::norm(std::path::Path::new(&p.folder)) == projects::norm(std::path::Path::new(&folder))).map(|p| servers.for_project(&p.id)).unwrap_or_default();
+    check_launch(&mode, &model, resume.as_deref())?;
+    if !projects.allows(std::path::Path::new(&folder)) {
+        return Err("That folder is not inside a project".into());
+    }
     let who = format!("the owner{}", role.as_ref().map(|r| format!(", as {}", r.name)).unwrap_or_default());
     let tdir = tickets::dir(std::path::Path::new(&folder));
     let mut work_dir = folder.clone();
@@ -560,4 +582,22 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, set_project_github, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::check_launch;
+
+    #[test]
+    fn a_session_cannot_start_with_options_the_screen_should_never_send() {
+        assert!(check_launch("default", "sonnet", None).is_ok());
+        assert!(check_launch("acceptEdits", "claude-opus-5-5", Some("3b1c2a4e-1111-4222-8333-444455556666")).is_ok());
+        assert!(check_launch("plan", "claude-sonnet-5-5[1m]", None).is_ok());
+        assert!(check_launch("bypassPermissions", "sonnet", None).is_err());
+        assert!(check_launch("auto", "sonnet", None).is_err());
+        assert!(check_launch("default", "--dangerously-skip-permissions", None).is_err());
+        assert!(check_launch("default", "", None).is_err());
+        assert!(check_launch("default", "sonnet", Some("../../x")).is_err());
+        assert!(check_launch("default", "sonnet", Some("--help")).is_err());
+    }
 }

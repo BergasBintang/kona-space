@@ -50,7 +50,8 @@ fn words(t: &str) -> usize {
 /// lines, bearer tokens and IP addresses (not 127.0.0.1 or 0.0.0.0).
 pub fn contains_secret(text: &str) -> bool {
     if text.contains("PRIVATE KEY-----") { return true; }
-    let lower = text.to_lowercase();
+    // ASCII lower case only, so a byte position in `lower` is the same position in `text` (full Unicode lower-casing can change a character's length)
+    let lower = text.to_ascii_lowercase();
     for key in ["password", "passwd", "pwd", "secret", "api_key", "api-key", "apikey", "token"] {
         let mut from = 0;
         while let Some(i) = lower[from..].find(key) {
@@ -330,6 +331,7 @@ mod tests {
         assert!(contains_secret("ghp_abcdefghijklmnopqrstuvwxyz0123"));
         assert!(!contains_secret("see 127.0.0.1 and talk about passwords in general"));
         assert!(!contains_secret("a token of thanks: use it wisely"));
+        assert!(!contains_secret("İİİİ password İİİİ")); // a character whose lower case is longer must not shift the search
         assert!(!contains_secret("version 1.2.3.4 is out") || contains_secret("version 1.2.3.4 is out")); // an address-shaped version is allowed to be hidden
     }
 

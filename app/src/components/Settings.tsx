@@ -45,9 +45,9 @@ export function Settings({ projects, version, onProjects }: { projects: Project[
 
         <section className="flex flex-col gap-3" aria-label="Sessions at once">
           <h2 className="m-0 text-[18px] leading-7 font-bold">Sessions at once</h2>
-          <p className="m-0 text-[14px] leading-5 text-text-secondary">Each running session uses about 225 MB of this PC's memory. Kona refuses to start more than this many at once.</p>
+          <p className="m-0 text-[14px] leading-5 text-text-secondary">Each running session uses about 400 MB of this PC's memory. Kona refuses to start more than this many at once.</p>
           {s && <div className="max-w-[240px]"><Select ariaLabel="Sessions at once" value={String(s.max_sessions)} onChange={(v) => { setError(null); void setSettings({ max_sessions: Number(v) }).then(setS).catch((e) => setError(String(e))); }}
-            options={[1, 2, 3, 4, 5, 6].map((n) => ({ value: String(n), label: `${n} ${n === 1 ? "session" : "sessions"}`, hint: n === 2 ? "The usual for a 7 GB PC" : undefined }))} /></div>}
+            options={[1, 2, 3].map((n) => ({ value: String(n), label: `${n} ${n === 1 ? "session" : "sessions"}`, hint: n === 2 ? "The usual for this 7 GB PC" : undefined }))} /></div>}
         </section>
 
         <section className="flex flex-col gap-3" aria-label="Projects">

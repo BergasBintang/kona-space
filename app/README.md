@@ -23,6 +23,22 @@ The first build takes about 4 to 6 minutes and needs a few hundred MB of free RA
 | The cost ledger (SQLite at `%APPDATA%\Kona\kona.db`) | `src-tauri/src/ledger.rs` |
 | Turning the stream into things to draw | `src/lib/sessions.ts` |
 | The screen | `src/components/` |
+| Projects, files, roles, accounts, the voice, settings | `projects.rs`, `files.rs`, `roles.rs`, `accounts.rs`, `persona.rs`, `backup.rs` (settings and backups) |
+| Tickets, and the board's tool server (Claude starts it, over standard input and output) | `tickets.rs`, `mcp.rs` |
+| Worktrees (Git's own commands only) | `worktrees.rs` |
+| Programs left running, ports, scratch files (Windows calls in `winproc.rs`) | `leftovers.rs`, `winproc.rs` |
+| The brain: files in `brain.rs`; the engine (links, groups, search, report, map) in `src/lib/brain/`; the same search for Claude in `brain_search.rs`; starter notes in `src/brain/starter/` | |
+| Notes written about sessions (one cheap Haiku call) | `summary.rs`, `src/lib/brain/summary.ts` |
+| Servers as references, and the rules for ssh, scp and sftp | `ssh.rs` |
+| Cost views, needs check | `ledger.rs`, `needs.rs` |
+
+## Tests
+
+```
+npm test                  the brain engine (12 tests, run by Node itself)
+cd src-tauri && cargo test --lib    the Rust side (brain search, the ssh rules, what a session may start with)
+npm run smoke             opens every place of a running Kona (see tests/smoke.mjs for how to start it)
+```
 
 ## Testing the real window
 

@@ -2,11 +2,24 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.16.0, 2026-10-28
+
+Audit and hardening.
+
+- The audit is written down in `docs/AUDIT.md`: what was checked, the plan against what was built, the measured budgets, what was fixed and what is still open.
+- The window now has a content-security policy. Nothing was blocked in any place (seen in the release program).
+- The graphics process is turned off (`--disable-gpu`): Kona's idle memory fell from about 235 MB to about 119 MB. The breathing mark is a stepped animation and the logo is still when idle, so idle CPU fell from 21% of a core to about 0%.
+- The session limit is a hard 3 (was 6). Each Claude session takes about 400 MB, and the Settings text says so.
+- A session's summary note waits while other sessions are working.
+- A session can only be started with a permission mode Kona offers, a plain model name, a real session id and a folder inside a project. Anything else is refused by the core, whatever the screen sends. Unit test added.
+- The brain's secret scan uses ASCII lower case so a letter with a longer lower case cannot shift a position. Test added.
+- `npm run smoke` opens every place of a running Kona and checks nothing is blocked.
+
 ## 0.15.0, 2026-10-28
 
 Polish: limits, settings, backups, resume.
 
-- A Settings place: how many sessions may run at once (default 2, because each uses about 225 MB), each project's GitHub address, removing a project (its files and hidden folder are never touched), and where Kona keeps things.
+- A Settings place: how many sessions may run at once (default 2, because each uses about 400 MB), each project's GitHub address, removing a project (its files and hidden folder are never touched), and where Kona keeps things.
 - Kona refuses to start more sessions than the limit, with a plain message. Sessions that ended no longer count.
 - Backups: one press copies Kona's own files, the cost ledger and each project's tickets and brain notes into a dated folder under `%APPDATA%\Kona\backups`. Kona never deletes a backup by itself; you can delete one after a confirmation.
 - Earlier sessions: the sessions Claude Code saved for a project are listed under Sessions, and Resume continues one. The ledger counts only what the resumed session spends from then on.

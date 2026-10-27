@@ -119,10 +119,10 @@ pub fn claude_version(exe: &PathBuf) -> Option<String> {
 
 pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Option<Role>, account: Option<Account>, persona: Persona, project_name: String, ticket: Option<Ticket>, work_dir: String, digest: Option<String>, ssh_hosts: Vec<crate::ssh::Host>, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
     let exe = find_claude().ok_or("Claude Code was not found on this PC")?;
-    // each `claude` program takes about 225 MB; on this PC two at once is the limit (a setting)
+    // each `claude` program takes about 400 MB; on this PC two at once is the limit (a setting)
     let cap = app.try_state::<crate::backup::SettingsStore>().map(|s| s.get().max_sessions).unwrap_or(2) as usize;
     if sessions.running().len() >= cap {
-        return Err(format!("{cap} sessions are already open. Stop one first: each uses about 225 MB of this PC's memory. (You can change the limit in Settings.)"));
+        return Err(format!("{cap} sessions are already open. Stop one first: each uses about 400 MB of this PC's memory. (You can change the limit in Settings.)"));
     }
     let id = resume.clone().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let mut cmd = Command::new(exe);

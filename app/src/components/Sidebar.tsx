@@ -31,7 +31,7 @@ export function Sidebar({ projects, project, onProject, onAddProject, place, onP
       {/* the logo, the project and the places scroll when the window is short; the two plan bars stay in view below */}
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-3.5 pt-7 pb-3">
       <div className="flex items-center gap-2.5 px-1.5">
-        <Glyph state="live" size={24} color="var(--color-accent)" />
+        <Glyph state="live" size={24} color="var(--color-accent)" still />
         <span className="text-[22px] leading-[30px] font-bold">Kona</span>
       </div>
 

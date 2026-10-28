@@ -23,8 +23,10 @@ Settings, Updates also has **Check now**.
 1. Make the change, bump the version in the usual way (`docs/VERSIONING.md`: `VERSION`, `app/package.json`, `Cargo.toml`, `tauri.conf.json`, `CHANGELOG.md`), commit and push, and tag `vX.Y.Z`.
 2. `cd app` then `npm run release`. It builds the installer and signs it. It writes three files into `app/src-tauri/target/release/bundle/nsis/`:
    `Kona_X.Y.Z_x64-setup.exe`, `Kona_X.Y.Z_x64-setup.exe.sig` and `latest.json`. The first lines of the version's `CHANGELOG.md` entry become the notes on the update card.
-3. On GitHub: Releases, Draft a new release, choose the tag `vX.Y.Z`, attach the **three files**, and publish. It must be a normal release (not a draft or a pre-release): `releases/latest` only finds the newest published normal release.
-4. Check: on a machine with an older Kona, Settings, Updates, **Check now**.
+3. Push the commit and the tag: `git push origin main vX.Y.Z`.
+4. `npm run publish-release`. It checks that the three files match this version, that the tag is on GitHub, that the program's code (`app/src`, `app/src-tauri`) is exactly what the tag holds, and that no release of that version exists yet. It shows what it will publish, asks, and then creates a normal, latest release `vX.Y.Z` with the three files and the changelog entry as its text. It uses GitHub's command-line tool (`gh`, signed in once with `gh auth login`; it is found on the PATH, at `KONA_GH`, or in `D:\toolchain\gh\bin`).
+   By hand instead: on GitHub, Releases, Draft a new release, choose the tag, attach the **three files**, and publish. It must be a normal release (not a draft or a pre-release): `releases/latest` only finds the newest published normal release.
+5. Check: on a machine with an older Kona, Settings, Updates, **Check now**.
 
 Notes:
 - The `.exe` file name in `latest.json` must match the attached file exactly. The script writes it for you.

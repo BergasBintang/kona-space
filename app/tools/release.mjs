@@ -4,8 +4,8 @@
 // path). The key is never copied into the project and never printed. The result is in src-tauri/target/release/bundle/nsis:
 //   Kona_<version>_x64-setup.exe   the installer (also what an update downloads)
 //   Kona_<version>_x64-setup.exe.sig   its signature
-//   latest.json                    what installed copies read; upload it to the same GitHub release
-// The steps to publish are in docs/RELEASING.md.
+//   latest.json                    what installed copies read; it goes on the same GitHub release
+// `npm run publish-release` (tools/publish.mjs) then puts the three files on GitHub. The steps are in docs/RELEASING.md.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -59,4 +59,4 @@ const latest = {
   },
 };
 fs.writeFileSync(path.join(dir, 'latest.json'), JSON.stringify(latest, null, 2) + '\n');
-console.log(`\nReady in ${dir}\n  ${exe}\n  ${exe}.sig\n  latest.json\nUpload these three to the GitHub release v${version} (see docs/RELEASING.md).`);
+console.log(`\nReady in ${dir}\n  ${exe}\n  ${exe}.sig\n  latest.json\nNext: push the commit and the tag v${version}, then run npm run publish-release (see docs/RELEASING.md).`);

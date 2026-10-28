@@ -123,7 +123,7 @@ This note holds no keys, tokens, passwords, IP addresses or e-mail addresses, on
 | 2026-10-28 | **Kona 0.16.0** (audit and hardening) | `docs/AUDIT.md` written; content-security policy, graphics process off, session cap 3, launch checks. Installer still waiting for a download yes. |
 | 2026-10-28 | **Kona 0.16.1** (size, folding sidebar) | Window no longer scrolls as a whole; 100/90/80% size; sidebar folds with Ctrl+B. |
 | 2026-10-28 | **Kona 0.17.0** (logo) | Cat and sunflower mark in the sidebar, new app icon files, sample pictures removed. |
-| 2026-10-28 | **Kona 0.18.0** (installer, clippy) | `Kona_0.17.0_x64-setup.exe` built (2.66 MB, not yet run; it was built just before the 0.18.0 lint fixes, which change no behaviour); clippy pass, 22 style fixes, tests green. |
+| 2026-10-28 | **Kona 0.18.0** (installer, clippy) | `Kona_0.18.0_x64-setup.exe` built (2.66 MB) and tested: silent install, every place opens, uninstall, reinstall; clippy pass, 22 style fixes, tests green. |
 
 **Where the work lives**
 - Design file: `docs/design/kona-design.figcraft` (open in FigCraft; it is also the clickable prototype). Previews: `docs/design/previews/`. Rules and tokens: `docs/DESIGN.md`.
@@ -1276,7 +1276,7 @@ Proposed. It moves accounts and the leftovers job object earlier than first sugg
 
 **The logo (2026-10-28, Kona 0.17.0).** Chosen by the owner from three ideas, then four variants of the one they liked (the cat head with a sunflower cut out of the face); the variant with two eyes in the flower won. Drawn headless in FigCraft (`build-logo.mjs`), which also writes the SVG files, the page icon and `KonaMark.tsx`. The icon files in `app/src-tauri/icons` were remade from the icon SVG with `tauri icon`; the corners are see-through (checked). Seen in the real window: the mark in the open and the folded sidebar, and the page icon. Not checked: the taskbar and title-bar icon at their real small sizes, and the installer icon (no installer yet).
 
-**Installer and lint (2026-10-28, Kona 0.18.0).** The installer was built with Tauri's NSIS bundler (first run downloaded NSIS 3.13 and a small helper library, a few MB; WiX was not needed and not downloaded). It is 2.66 MB and installs for the current user. Seen: the release program built for it opens every place and shows no content-policy violation (`npm run smoke`). Not checked: running the installer itself (it installs onto this PC, so it waits for the owner's yes), uninstalling, and the installer's icon on screen.
+**Installer and lint (2026-10-28, Kona 0.18.0).** The installer was built with Tauri's NSIS bundler (first run downloaded NSIS 3.13 and a small helper library, a few MB; WiX was not needed and not downloaded). It is 2.66 MB and installs for the current user. Seen: the release program built for it opens every place and shows no content-policy violation (`npm run smoke`). Then rebuilt as `Kona_0.18.0_x64-setup.exe` and tested with the owner's yes (seen): the silent install put Kona in `%LOCALAPPDATA%\Kona` with a Start menu shortcut and an uninstall entry; the installed program opened every place with no content-policy violation; the uninstall removed the folder, the shortcut and the entry and left the 28 data files in `%APPDATA%\Kona` alone; Kona was then installed again and is left installed. Not checked: the installer's own window and icon on screen (the silent mode shows none), and upgrading over an older version.
 
 Why this order:
 - Steps 1 to 3 replace the owner's daily use of one terminal session and fix the leftovers problem.

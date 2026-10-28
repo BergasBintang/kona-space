@@ -47,7 +47,7 @@ export function Button({ variant = "primary", small = false, className = "", ...
   return (
     <button
       {...rest}
-      className={`inline-flex items-center justify-center gap-2 rounded-control font-bold transition-colors disabled:cursor-not-allowed disabled:border-line-subtle disabled:bg-surface-3 disabled:text-text-disabled ${size} ${look[variant]} ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-control font-bold transition-colors disabled:cursor-not-allowed disabled:border-line-subtle disabled:bg-surface-3 disabled:text-text-disabled ${size} ${look[variant]} ${className}`}
     />
   );
 }

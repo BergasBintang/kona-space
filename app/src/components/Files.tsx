@@ -152,7 +152,7 @@ function Viewer({ project, entry }: { project: Project; entry: Entry | null }) {
     body = md && rendered ? (
       <div className="flex min-h-0 flex-1 flex-col">
         {view.truncated && <div className="px-8 pb-2 text-[13px] leading-5 text-text-tertiary">Only the first 2 MB are shown.</div>}
-        <div className="min-h-0 flex-1 overflow-auto px-8 py-5"><div className="max-w-[760px]"><Markdown text={view.text} resolve={() => null} open={() => {}} wiki={false} /></div></div>
+        <div className="min-h-0 flex-1 overflow-auto px-8 py-5"><div className="max-w-[calc(1180px*var(--k))]"><Markdown text={view.text} resolve={() => null} open={() => {}} wiki={false} /></div></div>
       </div>
     ) : (
       <div className="flex min-h-0 flex-1 flex-col">

@@ -10,6 +10,8 @@ Updates.
 - Settings has a new Updates part: a switch for the start-up check, and Check now.
 - Updates are signed with a key that lives outside the project, and Kona only installs what that key signed. `npm run release` builds the signed installer and the `latest.json` file; the steps to publish are in `docs/RELEASING.md`.
 - Copies older than this one have no update check and need one manual install.
+- Pages are wider, and they grow with the zoom: at 80% they keep the width they have at 100% instead of leaving wide empty margins. Buttons and badges ("Back up now", "Signed in") no longer wrap their words onto two lines.
+- The repository is public and now has an MIT license (`LICENSE`) and a `SECURITY.md`.
 
 ## 0.18.0, 2026-10-28
 

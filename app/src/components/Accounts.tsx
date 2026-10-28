@@ -35,12 +35,12 @@ function Card({ account, status, onChanged, onRemoved, onRefresh }: {
             ? <h2 className="m-0 truncate text-[19px] leading-7 font-bold">{account.label}</h2>
             : <input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void rename(); if (e.key === "Escape") setName(null); }}
                 aria-label="Account name" className="h-10 w-[260px] rounded-control border border-line-strong bg-inset px-3 text-[15px] text-text" />}
-          <div className="flex items-center gap-2.5 text-[14px] leading-5">
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[14px] leading-5">
             {status === undefined
               ? <span className="text-text-tertiary">Checking…</span>
               : status.logged_in
-                ? (<><Glyph state="done" size={16} /><span className="font-bold">Signed in</span><span className="text-text-secondary">{[status.plan && `${status.plan[0].toUpperCase()}${status.plan.slice(1)} plan`, status.email].filter(Boolean).join(" · ")}</span></>)
-                : (<><Glyph state="left" size={16} /><span className="font-bold text-state-left">Not signed in</span></>)}
+                ? (<><Glyph state="done" size={16} /><span className="font-bold whitespace-nowrap">Signed in</span><span className="min-w-0 break-all text-text-secondary">{[status.plan && `${status.plan[0].toUpperCase()}${status.plan.slice(1)} plan`, status.email].filter(Boolean).join(" · ")}</span></>)
+                : (<><Glyph state="left" size={16} /><span className="font-bold whitespace-nowrap text-state-left">Not signed in</span></>)}
           </div>
         </div>
         <div className="flex shrink-0 gap-2">
@@ -85,7 +85,7 @@ export function Accounts({ accounts, onChanged }: { accounts: Account[]; onChang
 
   return (
     <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-[680px] flex-col gap-6 px-8 pt-8 pb-10">
+      <div className="mx-auto flex w-full max-w-[calc(880px*var(--k))] flex-col gap-6 px-8 pt-8 pb-10">
         <div className="flex flex-col gap-3">
           <h1 className="m-0 text-[30px] leading-[38px] font-bold">Accounts</h1>
           <p className="m-0 text-text-secondary">The Claude logins Kona can use. Pick one when you start a session, or give a role a usual one. Each account has its own limits. Use a second account for a real separate purpose, such as work and personal, not to get around a limit.</p>

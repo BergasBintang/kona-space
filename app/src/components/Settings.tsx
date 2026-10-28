@@ -43,7 +43,7 @@ export function Settings({ projects, version, onProjects }: { projects: Project[
 
   return (
     <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-[760px] flex-col gap-8 px-8 pt-8 pb-10">
+      <div className="mx-auto flex w-full max-w-[calc(960px*var(--k))] flex-col gap-8 px-8 pt-8 pb-10">
         <h1 className="m-0 text-[30px] leading-[38px] font-bold">Settings</h1>
         {notice && <div role="status" className="flex items-start gap-2.5 rounded-control border border-line-subtle bg-surface-2 px-4 py-3 text-[14px] leading-5"><Glyph state="done" size={16} /> <span className="break-all">{notice}</span></div>}
         {error && <div className="flex items-start gap-2.5 text-[14px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}

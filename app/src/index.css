@@ -41,6 +41,7 @@
   --radius-dialog: 18px;
 }
 
+:root { --k: 1; } /* 100 / the zoom percent: wide pages use it to stay as wide as they were at 100% */
 html, body, #root { height: 100%; }
 /* The window never scrolls as a whole: each part scrolls inside itself. `clip` (not `hidden`) also stops a script or a focus jump from
    scrolling it, which pushed the whole app up and left an empty strip below. */

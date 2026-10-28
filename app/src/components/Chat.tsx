@@ -46,7 +46,7 @@ function ToolLine({ it }: { it: Extract<Item, { kind: "tool" }> }) {
   const state: GlyphState = it.status === "running" ? "live" : it.status === "done" ? "done" : it.status === "denied" ? "stopped" : "left";
   const word = it.status === "running" ? "Running" : it.status === "done" ? "Done" : it.status === "denied" ? "You said no" : "Failed";
   return (
-    <div className="flex max-w-[760px] items-center gap-2.5 rounded-control border border-line-subtle bg-surface-1 px-3.5 py-2.5">
+    <div className="flex max-w-[calc(980px*var(--k))] items-center gap-2.5 rounded-control border border-line-subtle bg-surface-1 px-3.5 py-2.5">
       <Glyph state={state} size={16} />
       <span className="text-[13px] leading-5 text-text-secondary">{it.name}: {word}</span>
       {it.summary && <span className="truncate font-mono text-[13px] leading-5 text-text-tertiary">{it.summary}</span>}
@@ -108,16 +108,16 @@ function Transcript({ s, onAnswer }: { s: Session; onAnswer: (it: Extract<Item, 
               </div>
             </div>
           );
-        if (it.kind === "assistant") return <p key={it.id} className="m-0 max-w-[760px] whitespace-pre-wrap">{it.text}</p>;
+        if (it.kind === "assistant") return <p key={it.id} className="m-0 max-w-[calc(980px*var(--k))] whitespace-pre-wrap">{it.text}</p>;
         if (it.kind === "tool") return <ToolLine key={it.id} it={it} />;
         if (it.kind === "permission") return <PermissionCard key={it.id} it={it} onAnswer={(a, r) => onAnswer(it, a, r)} />;
         return (
-          <div key={it.id} className={`flex max-w-[760px] items-start gap-2.5 text-[13px] leading-5 ${it.tone === "problem" ? "text-state-left" : "text-text-tertiary"}`}>
+          <div key={it.id} className={`flex max-w-[calc(980px*var(--k))] items-start gap-2.5 text-[13px] leading-5 ${it.tone === "problem" ? "text-state-left" : "text-text-tertiary"}`}>
             <Glyph state={it.tone === "problem" ? "left" : "stopped"} size={16} /> <span className="whitespace-pre-wrap">{it.text}</span>
           </div>
         );
       })}
-      {s.draft && <p className="m-0 max-w-[760px] whitespace-pre-wrap">{s.draft}</p>}
+      {s.draft && <p className="m-0 max-w-[calc(980px*var(--k))] whitespace-pre-wrap">{s.draft}</p>}
       <div ref={end} />
     </div>
   );

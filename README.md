@@ -51,6 +51,7 @@ To make an installer instead: `npm run tauri build` in `app`. It writes `app/src
 | The look: rules, colours, parts, screens | [docs/DESIGN.md](docs/DESIGN.md) and the previews in `docs/design/previews/` |
 | The design file and the scripts that draw it in FigCraft | `docs/design/` ([docs/FIGCRAFT.md](docs/FIGCRAFT.md)) |
 | What was checked, measured and left open | [docs/AUDIT.md](docs/AUDIT.md) |
+| Security reports | [SECURITY.md](SECURITY.md) |
 | How a version is published and how installed copies update | [docs/RELEASING.md](docs/RELEASING.md) |
 | How versions are numbered | [docs/VERSIONING.md](docs/VERSIONING.md), [CHANGELOG.md](CHANGELOG.md) |
 | Small throwaway tests of how Claude Code behaves | `spikes/` |
@@ -62,4 +63,4 @@ Kona keeps its own data on your PC: `%APPDATA%\Kona` (projects, roles, accounts,
 
 ## License
 
-No license has been chosen yet, so all rights are reserved until one is added.
+[MIT](LICENSE). Use it, change it, share it; there is no warranty. Security reports: see [SECURITY.md](SECURITY.md).

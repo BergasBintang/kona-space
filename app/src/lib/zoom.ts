@@ -20,6 +20,7 @@ export function loadZoom() {
 export function setZoom(z: Zoom) {
   current = z;
   try { localStorage.setItem("kona.zoom", String(z)); } catch { /* the choice is just not kept */ }
+  document.documentElement.style.setProperty("--k", String(100 / z)); // pages keep their physical width when the view is smaller
   void getCurrentWebview().setZoom(z / 100).catch(() => {});
   listeners.forEach((f) => f(z));
 }

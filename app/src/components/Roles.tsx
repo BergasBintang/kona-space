@@ -86,7 +86,7 @@ export function Roles({ roles, accounts, tools, onChanged }: { roles: Role[]; ac
         {!draft ? (
           <div className="flex flex-1 items-center justify-center p-8 text-text-tertiary">Pick a role on the left, or press New role.</div>
         ) : (
-          <div className="mx-auto flex w-full max-w-[640px] flex-col gap-6 px-8 pt-8 pb-10">
+          <div className="mx-auto flex w-full max-w-[calc(880px*var(--k))] flex-col gap-6 px-8 pt-8 pb-10">
             <div className="flex items-center gap-3.5">
               <RoleMark mark={draft.mark} size={44} />
               <h1 className="m-0 text-[26px] leading-[34px] font-bold">{draft.name.trim() || "New role"}</h1>

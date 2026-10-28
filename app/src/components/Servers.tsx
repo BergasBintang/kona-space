@@ -65,7 +65,7 @@ export function Servers({ project, roles }: { project: Project; roles: Role[] })
 
   return (
     <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-[860px] flex-col gap-6 px-8 pt-8 pb-10">
+      <div className="mx-auto flex w-full max-w-[calc(1160px*var(--k))] flex-col gap-6 px-8 pt-8 pb-10">
         <div className="flex items-start justify-between gap-4">
           <div className="flex flex-col gap-3">
             <h1 className="m-0 text-[30px] leading-[38px] font-bold">Servers</h1>

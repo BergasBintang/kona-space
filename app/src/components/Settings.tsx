@@ -7,6 +7,7 @@ import { Button, Glyph } from "./ui";
 import { Confirm } from "./Confirm";
 import { Select } from "./pick";
 import { getZoom, onZoom, setZoom, ZOOMS, type Zoom } from "../lib/zoom";
+import { checkForUpdate, installUpdate, useUpdate } from "../lib/update";
 
 const size = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
 const when = (name: string) => name.replace(/^(\d{4}-\d{2}-\d{2})-(\d{2})-(\d{2})$/, "$1 $2:$3");
@@ -23,6 +24,7 @@ export function Settings({ projects, version, onProjects }: { projects: Project[
   const [github, setGithub] = useState<Record<string, string>>({});
   const [zoom, setZoomState] = useState<Zoom>(getZoom());
   useEffect(() => onZoom(setZoomState), []);
+  const update = useUpdate();
 
   const load = useCallback(() => { getSettings().then(setS).catch(() => {}); listBackups().then(setBackups).catch(() => setBackups([])); }, []);
   useEffect(() => { load(); }, [load]);
@@ -52,10 +54,27 @@ export function Settings({ projects, version, onProjects }: { projects: Project[
           <div className="max-w-[240px]"><Select ariaLabel="Size" value={String(zoom)} onChange={(v) => setZoom(Number(v) as Zoom)} options={ZOOMS.map((z) => ({ value: String(z), label: `${z}%`, hint: z === 100 ? "Normal" : undefined }))} /></div>
         </section>
 
+        <section className="flex flex-col gap-3" aria-label="Updates">
+          <h2 className="m-0 text-[18px] leading-7 font-bold">Updates</h2>
+          <p className="m-0 text-[14px] leading-5 text-text-secondary">When Kona starts, it can ask GitHub whether a newer version has been published. It sends nothing about you. If there is one, it asks you first; it never updates by itself without your yes.</p>
+          {s && (
+            <label className="flex items-center gap-3 text-[15px]">
+              <input type="checkbox" className="h-4 w-4 accent-[var(--color-accent)]" checked={s.check_updates} onChange={(e) => { setError(null); void setSettings({ ...s, check_updates: e.target.checked }).then(setS).catch((er) => setError(String(er))); }} />
+              Look for a new version when Kona starts
+            </label>
+          )}
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="quiet" onClick={() => void checkForUpdate(true)} disabled={update.phase === "checking" || update.phase === "downloading" || update.phase === "installing"}>{update.phase === "checking" ? "Checking…" : "Check now"}</Button>
+            {update.phase === "current" && <span className="flex items-center gap-2 text-[14px] text-text-secondary"><Glyph state="done" size={16} /> Kona {version} is the newest version.</span>}
+            {update.phase === "available" && <><span className="flex items-center gap-2 text-[14px] text-text-secondary"><Glyph state="waiting" size={16} /> Kona {update.version} is ready.</span><Button onClick={() => void installUpdate()}>Update and restart</Button></>}
+            {update.phase === "error" && <span className="flex items-center gap-2 text-[14px] text-state-left"><Glyph state="left" size={16} /> {update.message}</span>}
+          </div>
+        </section>
+
         <section className="flex flex-col gap-3" aria-label="Sessions at once">
           <h2 className="m-0 text-[18px] leading-7 font-bold">Sessions at once</h2>
           <p className="m-0 text-[14px] leading-5 text-text-secondary">Each running session uses about 400 MB of this PC's memory. Kona refuses to start more than this many at once.</p>
-          {s && <div className="max-w-[240px]"><Select ariaLabel="Sessions at once" value={String(s.max_sessions)} onChange={(v) => { setError(null); void setSettings({ max_sessions: Number(v) }).then(setS).catch((e) => setError(String(e))); }}
+          {s && <div className="max-w-[240px]"><Select ariaLabel="Sessions at once" value={String(s.max_sessions)} onChange={(v) => { setError(null); void setSettings({ ...s, max_sessions: Number(v) }).then(setS).catch((e) => setError(String(e))); }}
             options={[1, 2, 3].map((n) => ({ value: String(n), label: `${n} ${n === 1 ? "session" : "sessions"}`, hint: n === 2 ? "The usual for this 7 GB PC" : undefined }))} /></div>}
         </section>
 

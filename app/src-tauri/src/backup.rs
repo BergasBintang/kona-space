@@ -12,11 +12,18 @@ use std::sync::Mutex;
 pub struct Settings {
     /// how many sessions may run at once; each `claude` program takes about 400 MB on this small PC (decision 32)
     pub max_sessions: u32,
+    /// look for a newer Kona on GitHub when the app starts (one small web request; nothing is sent about you)
+    #[serde(default = "yes")]
+    pub check_updates: bool,
+}
+
+fn yes() -> bool {
+    true
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { max_sessions: 2 }
+        Self { max_sessions: 2, check_updates: true }
     }
 }
 

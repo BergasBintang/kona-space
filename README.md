@@ -18,6 +18,7 @@ Kona is a personal project, made by one person for their own PC. It is early (se
 - **Leftovers:** the programs a session started (dev servers) and which are still running after it ended, with their ports; stop one after a confirmation. Claude's scratch files per session.
 - **Brain:** a graph of linked notes: your own notes, Claude's memory for the project (read-only) and starter notes about working with agents. Ask it a question and it says plainly whether the answer is found, partly there, or not in the brain. A session that ends writes a short note, and Claude can search the brain itself.
 - **Servers:** the servers a project may reach, kept as references (never a key). A role can run ssh, scp or sftp only to a server listed for it, and every such command still asks you.
+- **Updates:** a few seconds after start Kona can ask GitHub if a newer version exists (one small request, nothing about you is sent). If so it asks you; on yes it downloads the signed installer, installs it and starts again. Turn it off in Settings. How a version is published: [docs/RELEASING.md](docs/RELEASING.md).
 - **Settings and backups:** the window size (100, 90 or 80%), the session limit, each project's GitHub address, and one-press backups of Kona's data, tickets and notes.
 
 Not built yet: syntax colours in the file viewer, a voice per role.
@@ -50,13 +51,14 @@ To make an installer instead: `npm run tauri build` in `app`. It writes `app/src
 | The look: rules, colours, parts, screens | [docs/DESIGN.md](docs/DESIGN.md) and the previews in `docs/design/previews/` |
 | The design file and the scripts that draw it in FigCraft | `docs/design/` ([docs/FIGCRAFT.md](docs/FIGCRAFT.md)) |
 | What was checked, measured and left open | [docs/AUDIT.md](docs/AUDIT.md) |
+| How a version is published and how installed copies update | [docs/RELEASING.md](docs/RELEASING.md) |
 | How versions are numbered | [docs/VERSIONING.md](docs/VERSIONING.md), [CHANGELOG.md](CHANGELOG.md) |
 | Small throwaway tests of how Claude Code behaves | `spikes/` |
 | Rules for an AI agent working in this folder | [CLAUDE.md](CLAUDE.md), [AGENTS.md](AGENTS.md) |
 
 ## Your data
 
-Kona keeps its own data on your PC: `%APPDATA%\Kona` (projects, roles, accounts, the voice, the cost ledger) and a hidden `.kona` folder inside each project you add (tickets), which Kona tells Git to ignore. Nothing leaves your PC except what Claude Code itself sends to Anthropic. Kona never stores a login or a key; each account is a folder that Claude Code owns.
+Kona keeps its own data on your PC: `%APPDATA%\Kona` (projects, roles, accounts, the voice, the cost ledger) and a hidden `.kona` folder inside each project you add (tickets), which Kona tells Git to ignore. Nothing leaves your PC except what Claude Code itself sends to Anthropic, and the update check (one request to GitHub for a small file, which you can turn off). Kona never stores a login or a key; each account is a folder that Claude Code owns.
 
 ## License
 

@@ -25,7 +25,9 @@ import { Glyph } from "./components/ui";
 import { autoNoteOn, buildDigest, writeSessionNote } from "./lib/brain/summary.ts";
 import { localDate, redact } from "./lib/brain/text.ts";
 import { loadZoom, stepZoom } from "./lib/zoom";
-import { earlierSessions, saveNote, wantedRemove, type Earlier } from "./lib/api";
+import { checkForUpdate } from "./lib/update";
+import { UpdateCard } from "./components/UpdateCard";
+import { getSettings, earlierSessions, saveNote, wantedRemove, type Earlier } from "./lib/api";
 
 const remembered = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const remember = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* the choice is just not kept */ } };
@@ -69,6 +71,13 @@ export default function App() {
     window.addEventListener("scroll", stay);
     return () => { window.removeEventListener("keydown", keys); window.removeEventListener("scroll", stay); };
   }, [toggleSidebar]);
+
+  // a few seconds after start, look for a newer version (if the owner has not turned that off); offline or a failure stays quiet
+  useEffect(() => {
+    let live = true;
+    const t = setTimeout(() => { getSettings().then((s) => { if (live && s.check_updates) void checkForUpdate(false); }).catch(() => {}); }, 6000);
+    return () => { live = false; clearTimeout(t); };
+  }, []);
 
   // a notice goes away by itself after a few seconds
   useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(null), 9000); return () => clearTimeout(t); }, [notice]);
@@ -261,6 +270,7 @@ export default function App() {
         onPlace={(p) => { setAdding(false); setPlace(p); }} attention={attention} leftBehind={leftTotal} plan={state.plans[current?.accountId ?? lastAccount]} limitLine={persona.enabled ? persona.lines.limit : PLAIN_LINES.limit} accountLabel={accounts.length > 1 ? accounts.find((a) => a.id === (current?.accountId ?? lastAccount))?.label ?? null : null} version={version} collapsed={folded} onToggle={toggleSidebar} />
       <div className="relative flex min-w-0 flex-1">
         {content}
+        <UpdateCard running={state.order.filter((id) => state.sessions[id].run !== "ended").length} />
         {notice && (
           <div role="status" className="absolute right-6 bottom-6 flex max-w-[440px] items-start gap-3 rounded-card border border-line-subtle bg-surface-2 px-[18px] py-4 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.4)]">
             <Glyph state="done" size={20} />

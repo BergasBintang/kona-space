@@ -2,6 +2,15 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.19.0, 2026-10-28
+
+Updates.
+
+- Kona can update itself. A few seconds after it starts it asks GitHub (one small request, nothing about you is sent) whether a newer version is published. If there is, a card says so: Update and restart, or Later. On yes it downloads the installer, checks its signature, installs and starts again. If sessions are running the card says they will be closed. Offline or a failed check says nothing.
+- Settings has a new Updates part: a switch for the start-up check, and Check now.
+- Updates are signed with a key that lives outside the project, and Kona only installs what that key signed. `npm run release` builds the signed installer and the `latest.json` file; the steps to publish are in `docs/RELEASING.md`.
+- Copies older than this one have no update check and need one manual install.
+
 ## 0.18.0, 2026-10-28
 
 An installer, and a Rust lint pass.

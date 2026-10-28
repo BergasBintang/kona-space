@@ -2,7 +2,7 @@
 
 A black cat with soft pointed ears and two tilted white oval eyes, with a sunflower between its ears. The cat is the name's owner; the sunflower is for the owner's girlfriend. The app icon is the cat on an ice-blue rounded square (the cool blue-grey of Kona's dusk theme, lighter). The mark inside the app is the same cat in one colour, the logo gold (`--color-brand`, #e8b25a), with the eyes and a ring around the flower cut out.
 
-Version 2, chosen on 2026-10-28 (the first logo was a cat with a sunflower in its face; it is in the Git history, and `../kona-logo.figcraft` is its old FigCraft board).
+Version 2, chosen on 2026-10-28 (the first logo was a cat with a sunflower in its face; it and its FigCraft board are in the Git history, before the commit that removed them).
 
 | File | What |
 |---|---|
@@ -10,7 +10,7 @@ Version 2, chosen on 2026-10-28 (the first logo was a cat with a sunflower in it
 | `kona-mark.svg` | The flat gold mark, with the eyes and a ring around the flower cut out (masks, so it sits on any background) |
 | `../previews/logo.png` | The board: the icon at several sizes and the mark |
 
-Everything is made by `docs/design/build/build-logo.mjs` (plain Node, no FigCraft). It also writes `app/src/components/KonaMark.tsx`, which the sidebar, the update card and the start screens use. Change the script, not the outputs. (`logo-lib.mjs` belonged to the first logo and is not used any more.)
+Everything is made by `docs/design/build/build-logo.mjs` (plain Node, no FigCraft). It also writes `app/src/components/KonaMark.tsx`, which the sidebar, the update card and the start screens use. Change the script, not the outputs.
 
 ## Remaking the app icon files
 

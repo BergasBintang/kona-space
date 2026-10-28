@@ -266,7 +266,7 @@ pub fn update(dir: &Path, id: &str, p: Patch, who: &str) -> Result<Ticket, Strin
         if r != t.role { said.push(format!("role set to {} by {who}", r.as_deref().unwrap_or("none"))); t.role = r; }
     }
     if let Some(n) = p.next { let n = one_line(&n); if n != t.next { t.next = n; said.push(format!("next step updated by {who}")); } }
-    if let Some(w) = p.waiting { if w != t.waiting { t.waiting = w; said.push(if w { format!("marked waiting on the owner by {who}") } else { format!("no longer waiting, said {who}") }); } }
+    if let Some(w) = p.waiting && w != t.waiting { t.waiting = w; said.push(if w { format!("marked waiting on the owner by {who}") } else { format!("no longer waiting, said {who}") }); }
     if let Some(c) = p.own_copy {
         if !COPY_CHOICES.contains(&c.as_str()) {
             return Err("That is not a choice for where the ticket works".into());

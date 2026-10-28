@@ -82,11 +82,10 @@ pub fn ensure(project: &Path, ticket_id: &str, title: &str) -> Result<Created, S
     git(project, &["rev-parse", "--verify", "HEAD"]).map_err(|_| "This repository has no commits yet, so it cannot have its own copies".to_string())?;
     let path = dir_for(project, ticket_id);
     let want = norm(&path.to_string_lossy());
-    if let Some(e) = list(project)?.into_iter().find(|e| norm(&e.path) == want) {
-        if path.exists() {
+    if let Some(e) = list(project)?.into_iter().find(|e| norm(&e.path) == want)
+        && path.exists() {
             return Ok(Created { branch: e.branch, path });
         }
-    }
     let slug = slug(title);
     let branch = if slug.is_empty() { format!("feat/{ticket_id}") } else { format!("feat/{ticket_id}-{slug}") };
     let p = path.to_string_lossy().to_string();
@@ -120,13 +119,12 @@ pub fn status(project: &Path, worktree: &Path, branch: &str) -> Status {
     if let Ok(t) = git(worktree, &["status", "--porcelain"]) {
         s.changed = t.lines().filter(|l| !l.trim().is_empty()).count() as u32;
     }
-    if !branch.is_empty() && !s.base.is_empty() {
-        if let Ok(t) = git(project, &["rev-list", "--left-right", "--count", &format!("{}...{}", s.base, branch)]) {
+    if !branch.is_empty() && !s.base.is_empty()
+        && let Ok(t) = git(project, &["rev-list", "--left-right", "--count", &format!("{}...{}", s.base, branch)]) {
             let mut it = t.split_whitespace();
             s.behind = it.next().and_then(|x| x.parse().ok()).unwrap_or(0);
             s.ahead = it.next().and_then(|x| x.parse().ok()).unwrap_or(0);
         }
-    }
     s
 }
 

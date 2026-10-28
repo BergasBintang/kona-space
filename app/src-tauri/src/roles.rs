@@ -67,7 +67,7 @@ impl Roles {
         let file = base.join("roles.json");
         let found = fs::read_to_string(&file).ok().and_then(|t| serde_json::from_str::<FileData>(&t).ok());
         // a file from before the needs check (version 1): the starting roles get their starting needs
-        let old = found.as_ref().map_or(false, |d| d.version < 3);
+        let old = found.as_ref().is_some_and(|d| d.version < 3);
         let fresh = found.is_none() || old;
         let mut list = found.map(|d| d.roles).unwrap_or_else(starting_roles);
         if old {

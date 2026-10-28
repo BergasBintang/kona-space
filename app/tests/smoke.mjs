@@ -5,7 +5,7 @@
 // for the folder dialog is absent in a release build. It changes nothing and starts no session.
 import { attach } from './cdp.mjs';
 
-const c = await attach();
+const c = await attach(Number(process.env.PORT ?? 9223));
 let failed = 0;
 const ok = (name, v) => { console.log((v ? 'PASS ' : 'FAIL ') + name); if (!v) failed++; };
 const click = (label) => c.ev(`(() => { const b = [...document.querySelectorAll('button')].find((x) => x.textContent.trim().startsWith(${JSON.stringify(label)}) && !x.disabled); if (!b) return false; b.click(); return true; })()`);

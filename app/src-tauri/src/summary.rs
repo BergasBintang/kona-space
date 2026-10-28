@@ -191,11 +191,10 @@ pub fn earlier(folder: &str, roots: &[(String, Option<String>)]) -> Vec<Earlier>
     out.truncate(30);
     // read the first words of only the ones that are shown
     for e in out.iter_mut() {
-        if let Some(root) = roots.iter().find(|r| r.0 == e.account_id).and_then(|r| config_root(r.1.as_deref())) {
-            if let Some(dir) = std::fs::read_dir(root.join("projects")).ok().and_then(|rd| rd.filter_map(Result::ok).find(|d| d.file_name().to_string_lossy().to_lowercase() == want)) {
+        if let Some(root) = roots.iter().find(|r| r.0 == e.account_id).and_then(|r| config_root(r.1.as_deref()))
+            && let Some(dir) = std::fs::read_dir(root.join("projects")).ok().and_then(|rd| rd.filter_map(Result::ok).find(|d| d.file_name().to_string_lossy().to_lowercase() == want)) {
                 e.title = first_words(&dir.path().join(format!("{}.jsonl", e.id)));
             }
-        }
     }
     out.retain(|e| e.bytes > 600); // an empty session (opened and closed) is not worth listing
     out

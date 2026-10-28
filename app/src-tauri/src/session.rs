@@ -81,11 +81,10 @@ impl Sessions {
     }
 
     pub fn stop(&self, session_id: &str) {
-        if let Some(mut h) = self.map.lock().unwrap().remove(session_id) {
-            if let Some(s) = h.stop.take() {
+        if let Some(mut h) = self.map.lock().unwrap().remove(session_id)
+            && let Some(s) = h.stop.take() {
                 let _ = s.send(());
             }
-        }
     }
 
     pub fn running(&self) -> Vec<String> {

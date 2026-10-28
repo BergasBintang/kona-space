@@ -82,13 +82,13 @@ fn call(ctx: &Ctx, name: &str, a: &Value) -> Result<String, String> {
     match name {
         "list_tickets" => {
             let only = text_of(a, "status");
-            let list: Vec<String> = tickets::list(&ctx.dir).iter().filter(|t| only.as_ref().map_or(true, |s| &t.status == s)).map(|t| line(ctx, t)).collect();
+            let list: Vec<String> = tickets::list(&ctx.dir).iter().filter(|t| only.as_ref().is_none_or(|s| &t.status == s)).map(|t| line(ctx, t)).collect();
             Ok(if list.is_empty() { "No tickets.".into() } else { list.join("\n") })
         }
         "get_ticket" => Ok(full(ctx, &tickets::get(&ctx.dir, &text_of(a, "id").unwrap_or_default())?)),
         "create_ticket" => {
             let status = text_of(a, "status");
-            if status.as_deref().map_or(false, |s| s != "backlog" && s != "ready") {
+            if status.as_deref().is_some_and(|s| s != "backlog" && s != "ready") {
                 return Err("A new ticket can only start in backlog or ready".into());
             }
             let role = role_id(ctx, &text_of(a, "role").unwrap_or_default())?;

@@ -56,9 +56,9 @@ pub fn contains_secret(text: &str) -> bool {
         let mut from = 0;
         while let Some(i) = lower[from..].find(key) {
             let after = &text[from + i + key.len()..];
-            let t = after.trim_start_matches(|c: char| c == ' ');
+            let t = after.trim_start_matches(' ');
             if let Some(rest) = t.strip_prefix(':').or_else(|| t.strip_prefix('=')) {
-                let v: String = rest.trim_start().trim_start_matches(|c| c == '"' || c == '\'').chars().take_while(|c| !c.is_whitespace() && *c != '"' && *c != '\'').collect();
+                let v: String = rest.trim_start().trim_start_matches(['"', '\'']).chars().take_while(|c| !c.is_whitespace() && *c != '"' && *c != '\'').collect();
                 if v.chars().count() >= 8 { return true; }
             }
             from += i + key.len();
@@ -74,11 +74,11 @@ pub fn contains_secret(text: &str) -> bool {
         if t.starts_with("github_pat_") && t.len() >= 31 { return true; }
         if t.starts_with("AKIA") && t.len() >= 16 && t[4..].chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()) { return true; }
         if t.starts_with("xox") && t.len() >= 14 && "abprs".contains(t.chars().nth(3).unwrap_or(' ')) && t.chars().nth(4) == Some('-') { return true; }
-        if t.eq_ignore_ascii_case("bearer") && toks.get(i + 1).map_or(false, |n| n.len() >= 20) { return true; }
+        if t.eq_ignore_ascii_case("bearer") && toks.get(i + 1).is_some_and(|n| n.len() >= 20) { return true; }
         // an IPv4 address
-        let ip = t.trim_end_matches(|c: char| c == '.' || c == ':');
+        let ip = t.trim_end_matches(['.', ':']);
         let parts: Vec<&str> = ip.split('.').collect();
-        if parts.len() == 4 && parts.iter().all(|p| !p.is_empty() && p.len() <= 3 && p.chars().all(|c| c.is_ascii_digit()) && p.parse::<u32>().map_or(false, |n| n <= 255)) && ip != "127.0.0.1" && ip != "0.0.0.0" { return true; }
+        if parts.len() == 4 && parts.iter().all(|p| !p.is_empty() && p.len() <= 3 && p.chars().all(|c| c.is_ascii_digit()) && p.parse::<u32>().is_ok_and(|n| n <= 255)) && ip != "127.0.0.1" && ip != "0.0.0.0" { return true; }
     }
     false
 }
@@ -127,7 +127,7 @@ fn sections_of(note_id: &str, text: &str, body_start: usize, fallback: &str) -> 
         if l.trim_start().starts_with("```") { fence = !fence; continue; }
         if fence { continue; }
         let hashes = l.chars().take_while(|c| *c == '#').count();
-        if (1..=3).contains(&hashes) && l.chars().nth(hashes).map_or(false, |c| c.is_whitespace()) {
+        if (1..=3).contains(&hashes) && l.chars().nth(hashes).is_some_and(|c| c.is_whitespace()) {
             cuts.push(Cut { heading: l[hashes..].trim().trim_end_matches('#').trim().replace(['*', '`'], ""), start: i + 1 });
         }
     }
@@ -137,7 +137,7 @@ fn sections_of(note_id: &str, text: &str, body_start: usize, fallback: &str) -> 
     for k in 0..cuts.len() {
         let c = &cuts[k];
         let mut e = if k + 1 < cuts.len() { cuts[k + 1].start - 1 } else { lines.len() };
-        while e > c.start && lines.get(e - 1).map_or(false, |l| l.trim().is_empty()) { e -= 1; }
+        while e > c.start && lines.get(e - 1).is_some_and(|l| l.trim().is_empty()) { e -= 1; }
         let body = lines.get(c.start - 1..e.min(lines.len())).map(|s| s.join("\n")).unwrap_or_default();
         if !body.trim().is_empty() { raw.push(Raw { heading: c.heading.clone(), start: c.start, end: e, body }); }
     }

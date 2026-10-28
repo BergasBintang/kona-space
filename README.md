@@ -20,7 +20,7 @@ Kona is a personal project, made by one person for their own PC. It is early (se
 - **Servers:** the servers a project may reach, kept as references (never a key). A role can run ssh, scp or sftp only to a server listed for it, and every such command still asks you.
 - **Settings and backups:** the window size (100, 90 or 80%), the session limit, each project's GitHub address, and one-press backups of Kona's data, tickets and notes.
 
-Not built yet: an installer, syntax colours in the file viewer, a voice per role.
+Not built yet: syntax colours in the file viewer, a voice per role.
 
 ## What you need
 
@@ -38,6 +38,8 @@ npm run tauri dev
 ```
 
 The first build takes several minutes. More in [app/README.md](app/README.md).
+
+To make an installer instead: `npm run tauri build` in `app`. It writes `app/src-tauri/target/release/bundle/nsis/Kona_<version>_x64-setup.exe` (about 3 MB), which installs for the current user only, with no administrator rights. The first time, Tauri downloads the NSIS packer.
 
 ## Where things are
 

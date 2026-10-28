@@ -130,7 +130,7 @@ fn unquote(t: &str) -> &str {
 fn split_user_host(s: &str) -> Target {
     let s = s.trim_start_matches("ssh://").trim_start_matches("scp://").trim_start_matches("sftp://");
     let (user, rest) = match s.rsplit_once('@') { Some((u, r)) => (Some(u.to_string()), r), None => (None, s) };
-    let host = rest.split(|c| c == ':' || c == '/').next().unwrap_or("").trim_matches(|c| c == '[' || c == ']');
+    let host = rest.split([':', '/']).next().unwrap_or("").trim_matches(|c| c == '[' || c == ']');
     Target { host: host.to_string(), user }
 }
 
@@ -148,7 +148,7 @@ pub fn read_command(cmd: &str) -> (Vec<Target>, bool) {
     let toks: Vec<&str> = cmd.split_whitespace().collect();
     let mut i = 0;
     while i < toks.len() {
-        let name = unquote(toks[i]).rsplit(|c| c == '/' || c == '\\').next().unwrap_or("").to_lowercase();
+        let name = unquote(toks[i]).rsplit(['/', '\\']).next().unwrap_or("").to_lowercase();
         let name = name.trim_end_matches(".exe");
         let kind = match name { "ssh" => 1, "scp" => 2, "sftp" => 3, _ => 0 };
         if kind == 0 { i += 1; continue; }
@@ -178,9 +178,8 @@ pub fn read_command(cmd: &str) -> (Vec<Target>, bool) {
                 3 if first_operand => { let t = split_user_host(a); if !t.host.is_empty() { targets.push(t); } }
                 _ => {
                     // scp (and sftp's later operands): `[user@]host:path`; a one-letter "host" is a drive letter; a leading slash or dot is a local path
-                    if let Some((left, _)) = a.split_once(':') {
-                        if left.len() > 1 && !left.starts_with('/') && !left.starts_with('.') && !left.starts_with('\\') { let t = split_user_host(a); if !t.host.is_empty() { targets.push(t); } }
-                    }
+                    if let Some((left, _)) = a.split_once(':')
+                        && left.len() > 1 && !left.starts_with('/') && !left.starts_with('.') && !left.starts_with('\\') { let t = split_user_host(a); if !t.host.is_empty() { targets.push(t); } }
                 }
             }
             first_operand = false;
@@ -209,10 +208,10 @@ pub fn decide(hosts: &[Host], role_id: Option<&str>, cmd: &str) -> Decision {
         let Some(h) = hosts.iter().find(|h| h.host.eq_ignore_ascii_case(&t.host)) else {
             return Decision::Deny(format!("Refused: {} is not in this project's server list. Ask the owner to add it in Kona under Servers; do not try another way to reach it.", t.host));
         };
-        if !role_id.map_or(false, |r| h.roles.iter().any(|x| x == r)) {
+        if !role_id.is_some_and(|r| h.roles.iter().any(|x| x == r)) {
             return Decision::Deny(format!("Refused: this role may not use the server \"{}\". Ask the owner to allow it in Kona under Servers.", h.label));
         }
-        if let Some(u) = &t.user { if !u.eq_ignore_ascii_case(&h.user) { return Decision::Deny(format!("Refused: the server \"{}\" is registered for the user {}, not {}.", h.label, h.user, u)); } }
+        if let Some(u) = &t.user && !u.eq_ignore_ascii_case(&h.user) { return Decision::Deny(format!("Refused: the server \"{}\" is registered for the user {}, not {}.", h.label, h.user, u)); }
         if !found.iter().any(|f| f.id == h.id) { found.push(h.clone()); }
     }
     Decision::Ask(found)
@@ -220,7 +219,7 @@ pub fn decide(hosts: &[Host], role_id: Option<&str>, cmd: &str) -> Decision {
 
 /// Rules handed to Claude Code at the start of a session for a role that may use no server of the project: ssh, scp and sftp are denied outright.
 pub fn deny_rules(hosts: &[Host], role_id: Option<&str>) -> Vec<String> {
-    if role_id.map_or(false, |r| hosts.iter().any(|h| h.roles.iter().any(|x| x == r))) { return vec![]; }
+    if role_id.is_some_and(|r| hosts.iter().any(|h| h.roles.iter().any(|x| x == r))) { return vec![]; }
     ["ssh", "scp", "sftp", "ssh.exe", "scp.exe", "sftp.exe"].iter().flat_map(|c| [format!("Bash({c} *)"), format!("Bash({c})"), format!("PowerShell({c} *)"), format!("PowerShell({c})")]).collect()
 }
 

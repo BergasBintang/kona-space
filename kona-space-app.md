@@ -123,6 +123,7 @@ This note holds no keys, tokens, passwords, IP addresses or e-mail addresses, on
 | 2026-10-28 | **Kona 0.16.0** (audit and hardening) | `docs/AUDIT.md` written; content-security policy, graphics process off, session cap 3, launch checks. Installer still waiting for a download yes. |
 | 2026-10-28 | **Kona 0.16.1** (size, folding sidebar) | Window no longer scrolls as a whole; 100/90/80% size; sidebar folds with Ctrl+B. |
 | 2026-10-28 | **Kona 0.17.0** (logo) | Cat and sunflower mark in the sidebar, new app icon files, sample pictures removed. |
+| 2026-10-28 | **Kona 0.18.0** (installer, clippy) | `Kona_0.17.0_x64-setup.exe` built (2.66 MB, not yet run; it was built just before the 0.18.0 lint fixes, which change no behaviour); clippy pass, 22 style fixes, tests green. |
 
 **Where the work lives**
 - Design file: `docs/design/kona-design.figcraft` (open in FigCraft; it is also the clickable prototype). Previews: `docs/design/previews/`. Rules and tokens: `docs/DESIGN.md`.
@@ -1274,6 +1275,8 @@ Proposed. It moves accounts and the leftovers job object earlier than first sugg
 **Size and the folding sidebar (2026-10-28, Kona 0.16.1).** Checked in the real window (seen): the page cannot be scrolled (forcing a scroll snaps back to 0), the sidebar goes 248 to 68 px and back with its button and Ctrl+B, and Ctrl+minus twice reaches 80% (window width 1283 to 1604 css px) and Ctrl+0 returns to 100%. The zoom needs the permission `core:webview:allow-set-webview-zoom`.
 
 **The logo (2026-10-28, Kona 0.17.0).** Chosen by the owner from three ideas, then four variants of the one they liked (the cat head with a sunflower cut out of the face); the variant with two eyes in the flower won. Drawn headless in FigCraft (`build-logo.mjs`), which also writes the SVG files, the page icon and `KonaMark.tsx`. The icon files in `app/src-tauri/icons` were remade from the icon SVG with `tauri icon`; the corners are see-through (checked). Seen in the real window: the mark in the open and the folded sidebar, and the page icon. Not checked: the taskbar and title-bar icon at their real small sizes, and the installer icon (no installer yet).
+
+**Installer and lint (2026-10-28, Kona 0.18.0).** The installer was built with Tauri's NSIS bundler (first run downloaded NSIS 3.13 and a small helper library, a few MB; WiX was not needed and not downloaded). It is 2.66 MB and installs for the current user. Seen: the release program built for it opens every place and shows no content-policy violation (`npm run smoke`). Not checked: running the installer itself (it installs onto this PC, so it waits for the owner's yes), uninstalling, and the installer's icon on screen.
 
 Why this order:
 - Steps 1 to 3 replace the owner's daily use of one terminal session and fix the leftovers problem.

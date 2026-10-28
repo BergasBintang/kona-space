@@ -2,6 +2,14 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.18.0, 2026-10-28
+
+An installer, and a Rust lint pass.
+
+- An installer: `npm run tauri build` makes `Kona_<version>_x64-setup.exe` (2.66 MB, NSIS). It installs for the current user only, so it needs no administrator rights. The build is set to make this one kind of package only.
+- Clippy (Rust's lint tool) was run over the whole core. 27 warnings, all about style, none about a bug; 22 were fixed automatically and the 10 tests still pass. The 5 left are three commands that take many arguments (Tauri passes them that way), one `sort_by_key` suggestion, and one false alarm on a line in the ssh check where two `if` statements sit side by side on purpose.
+- `npm run smoke` can be pointed at another test port with `PORT=`.
+
 ## 0.17.0, 2026-10-28
 
 Kona's logo.

@@ -55,11 +55,10 @@ fn check_launch(mode: &str, model: &str, resume: Option<&str>) -> Result<(), Str
     if !model_ok {
         return Err("That model name is not valid".into());
     }
-    if let Some(r) = resume {
-        if r.len() != 36 || !r.chars().all(|c| c.is_ascii_hexdigit() || c == '-') {
+    if let Some(r) = resume
+        && (r.len() != 36 || !r.chars().all(|c| c.is_ascii_hexdigit() || c == '-')) {
             return Err("That is not a session id".into());
         }
-    }
     Ok(())
 }
 

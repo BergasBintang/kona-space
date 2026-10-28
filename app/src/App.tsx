@@ -249,7 +249,7 @@ export default function App() {
   } else if (place === "voice") {
     content = <Voice persona={persona} onChanged={setPersona} />;
   } else if (place === "costs") {
-    content = <Costs projects={projects} roles={roles} accounts={accounts} />;
+    content = <Costs project={project} projects={projects} roles={roles} accounts={accounts} />;
   } else if (place === "accounts") {
     content = <Accounts accounts={accounts} onChanged={setAccounts} />;
   } else {

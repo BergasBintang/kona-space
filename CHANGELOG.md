@@ -2,6 +2,13 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.19.3, 2026-10-28
+
+Costs shows the open project.
+
+- Costs now opens on the open project only. A new switch next to the period, This project or All projects, shows the whole ledger again when you want it. Before, every project in the ledger was listed, including ones you had removed from Kona, which looked like another project's costs leaking into a new one.
+- With one project shown, Group by Project is hidden (it would be a single line) and the grouping starts on Role. The ? next to Costs explains the switch.
+
 ## 0.19.2, 2026-10-28
 
 A softer, lighter look.

@@ -1,5 +1,5 @@
-// The Costs place: what the sessions cost, from Kona's own ledger. Pick a period and how to group it (project, role, account,
-// model, day or session). Dollars are an estimate at list price, never a bill (decision 25).
+// The Costs place: what the sessions cost, from Kona's own ledger. It opens on the open project only; "All projects" shows the whole ledger.
+// Pick a period and how to group it (project, role, account, model, day or session). Dollars are an estimate at list price, never a bill (decision 25).
 import { useEffect, useMemo, useState } from "react";
 import { costRows, listTickets, baseName, samePlace, type Account, type CostRow, type Project, type Role } from "../lib/api";
 import { dollars } from "../lib/sessions";
@@ -40,9 +40,13 @@ function Chips<T extends string>({ label, value, onChange, items }: { label: str
   );
 }
 
-export function Costs({ projects, roles, accounts }: { projects: Project[]; roles: Role[]; accounts: Account[] }) {
+type Scope = "this" | "all";
+const SCOPES: { id: Scope; word: string }[] = [{ id: "this", word: "This project" }, { id: "all", word: "All projects" }];
+
+export function Costs({ project, projects, roles, accounts }: { project: Project | null; projects: Project[]; roles: Role[]; accounts: Account[] }) {
   const [period, setPeriod] = useState<Period>("week");
-  const [by, setBy] = useState<By>("project");
+  const [scope, setScope] = useState<Scope>("this");
+  const [pickedBy, setBy] = useState<By>("role");
   const [rows, setRows] = useState<CostRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ticketOf, setTicketOf] = useState<Map<string, { key: string; label: string; sub: string }>>(new Map()); // session id -> its ticket
@@ -59,6 +63,12 @@ export function Costs({ projects, roles, accounts }: { projects: Project[]; role
     costRows(days === null ? null : localDay(days)).then(setRows).catch((e) => setError(String(e)));
   }, [period]);
 
+  // one project has no use for "group by project", so it falls back to role
+  const only = scope === "this" && project !== null;
+  const by: By = only && pickedBy === "project" ? "role" : pickedBy;
+  const bys = only ? BYS.filter((b) => b.id !== "project") : BYS;
+  const shown = useMemo(() => (only ? (rows ?? []).filter((r) => r.folder && samePlace(project.folder, r.folder)) : rows), [rows, only, project]);
+
   const projectName = (folder: string | null | undefined) => {
     if (!folder) return "Unknown folder";
     return projects.find((p) => samePlace(p.folder, folder))?.name ?? baseName(folder);
@@ -68,7 +78,7 @@ export function Costs({ projects, roles, accounts }: { projects: Project[]; role
 
   const lines = useMemo<Line[]>(() => {
     const map = new Map<string, Line>();
-    for (const r of rows ?? []) {
+    for (const r of shown ?? []) {
       let key: string, label: string, sub: string | undefined;
       switch (by) {
         case "project": key = (r.folder ?? "").toLowerCase().replace(/\\/g, "/"); label = projectName(r.folder); sub = r.folder ?? undefined; break;
@@ -85,22 +95,25 @@ export function Costs({ projects, roles, accounts }: { projects: Project[]; role
     }
     const all = [...map.values()];
     return by === "day" ? all.sort((a, b) => b.key.localeCompare(a.key)) : all.sort((a, b) => b.cost - a.cost);
-  }, [rows, by, projects, roles, accounts, ticketOf]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [shown, by, projects, roles, accounts, ticketOf]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const total = lines.reduce((s, l) => s + l.cost, 0);
-  const sessionCount = new Set((rows ?? []).map((r) => r.session_id)).size;
-  const turnCount = (rows ?? []).reduce((s, r) => s + r.turns, 0);
+  const sessionCount = new Set((shown ?? []).map((r) => r.session_id)).size;
+  const turnCount = (shown ?? []).reduce((s, r) => s + r.turns, 0);
   const top = Math.max(...lines.map((l) => l.cost), 0);
   const period_ = PERIODS.find((p) => p.id === period)!;
 
   return (
     <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
       <div className="mx-auto flex w-full max-w-[calc(1160px*var(--k))] flex-col gap-6 px-8 pt-8 pb-10">
-        <div className="flex items-center gap-3"><h1 className="m-0 text-[30px] leading-[38px] font-bold">Costs</h1><Help title="Costs"><p className="m-0">What your sessions cost, from the ledger Kona keeps on this PC. Only sessions Kona ran are in it.</p><p className="m-0">The figures are an estimate at list price, not your bill. On a Pro or Max plan you pay a flat fee; use these figures to compare, not to count money.</p></Help></div>
+        <div className="flex items-center gap-3"><h1 className="m-0 text-[30px] leading-[38px] font-bold">Costs</h1><Help title="Costs"><p className="m-0">What your sessions cost, from the ledger Kona keeps on this PC. Only sessions Kona ran are in it.</p><p className="m-0">It shows the open project. Choose All projects to see every project in the ledger, including ones you have since removed from Kona.</p><p className="m-0">The figures are an estimate at list price, not your bill. On a Pro or Max plan you pay a flat fee; use these figures to compare, not to count money.</p></Help></div>
 
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <Chips label="Period" value={period} onChange={setPeriod} items={PERIODS} />
-          <Chips label="Group by" value={by} onChange={setBy} items={BYS} />
+          <div className="flex flex-wrap items-center gap-4">
+            {project && <Chips label="Which projects" value={scope} onChange={setScope} items={SCOPES} />}
+            <Chips label="Period" value={period} onChange={setPeriod} items={PERIODS} />
+          </div>
+          <Chips label="Group by" value={by} onChange={setBy} items={bys} />
         </div>
 
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
@@ -110,9 +123,9 @@ export function Costs({ projects, roles, accounts }: { projects: Project[]; role
 
         {error && <div className="flex items-start gap-2.5 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
         {rows === null && !error && <p className="m-0 text-text-tertiary">Reading the ledger…</p>}
-        {rows !== null && lines.length === 0 && (
+        {shown !== null && lines.length === 0 && (
           <div className="flex flex-col gap-2 rounded-card border border-dashed border-line-strong p-6">
-            <span className="font-bold">Nothing spent {period === "all" ? "yet" : "in this period"}.</span>
+            <span className="font-bold">Nothing spent {only ? `in ${project.name} ` : ""}{period === "all" ? "yet" : "in this period"}.</span>
             <span className="text-[14px] leading-5 text-text-secondary">{period === "all" ? "Start a session and each finished turn is saved here." : "Try a longer period."}</span>
           </div>
         )}

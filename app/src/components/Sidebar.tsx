@@ -1,5 +1,6 @@
 // The sidebar: the Kona mark, the project, the places that exist so far, the two plan bars. It folds down to a narrow strip of icons.
-import { Glyph, PlanBar } from "./ui";
+import { PlanBar } from "./ui";
+import { KonaMark } from "./KonaMark";
 import { Select } from "./pick";
 import type { Project } from "../lib/api";
 import type { Plan } from "../lib/sessions";
@@ -33,7 +34,7 @@ export function Sidebar({ projects, project, onProject, onAddProject, place, onP
       <div className={`flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pt-7 pb-3 ${collapsed ? "items-center px-2" : "px-3.5"}`}>
       <div className={`flex items-center ${collapsed ? "flex-col gap-3" : "justify-between gap-2.5 px-1.5"}`}>
         <div className="flex items-center gap-2.5">
-          <Glyph state="live" size={24} color="var(--color-accent)" still />
+          <KonaMark size={32} />
           {!collapsed && <span className="text-[22px] leading-[30px] font-bold">Kona</span>}
         </div>
         <button onClick={onToggle} aria-label={toggleLabel} aria-expanded={!collapsed} title={toggleLabel} className="flex h-8 w-8 items-center justify-center rounded-control text-text-secondary hover:bg-surface-2 hover:text-text">

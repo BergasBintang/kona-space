@@ -171,7 +171,7 @@ A 248 px sidebar on every project screen: logo and a fold button, project switch
 
 Asked for by the owner on 2026-10-27, with a picture of VS Code's icon strip as the reference: "make the sidebar able to minimize while maintaining the logo".
 
-- **A 72 px rail** holds, top to bottom: the Kona mark (the live glyph, 28 px, in the accent), the unfold button, the project (a folder icon in an outlined square), the eight places as 48 by 44 icon tiles, the two plan meters, and Settings.
+- **A 72 px rail** holds, top to bottom: the Kona mark (the logo: a cat head with a sunflower in its face, 28 px, in the logo gold; see `docs/design/logo/README.md`), the unfold button, the project (a folder icon in an outlined square), the eight places as 48 by 44 icon tiles, the two plan meters, and Settings.
 - **The mark stays.** The word "Kona" goes, the mark does not.
 - **Plan meters** become a percent in mono over a 40 px bar. Their words ("This session", "This week") live in the node names and in the tooltip to add; they are not drawn on the rail (to decide: a tooltip on hover is the plan).
 - **Counts** stay as small chips on the corner of the icon (amber for waiting, red for leftovers), the way the VS Code strip shows its number.

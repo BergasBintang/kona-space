@@ -122,6 +122,7 @@ This note holds no keys, tokens, passwords, IP addresses or e-mail addresses, on
 | 2026-10-28 | **Kona 0.15.0: polish**: session limit and Settings, backups, resume of earlier sessions, always allow here, GitHub address and remove project, tree keys, markdown page | section 12 (step 8), F1, F4 |
 | 2026-10-28 | **Kona 0.16.0** (audit and hardening) | `docs/AUDIT.md` written; content-security policy, graphics process off, session cap 3, launch checks. Installer still waiting for a download yes. |
 | 2026-10-28 | **Kona 0.16.1** (size, folding sidebar) | Window no longer scrolls as a whole; 100/90/80% size; sidebar folds with Ctrl+B. |
+| 2026-10-28 | **Kona 0.17.0** (logo) | Cat and sunflower mark in the sidebar, new app icon files, sample pictures removed. |
 
 **Where the work lives**
 - Design file: `docs/design/kona-design.figcraft` (open in FigCraft; it is also the clickable prototype). Previews: `docs/design/previews/`. Rules and tokens: `docs/DESIGN.md`.
@@ -1271,6 +1272,8 @@ Proposed. It moves accounts and the leftovers job object earlier than first sugg
 **Audit (2026-10-28, Kona 0.16.0).** Written in `docs/AUDIT.md`. Tests: 12 TypeScript and 10 Rust pass, `tsc` and `cargo check` clean, `npm audit` 0 vulnerabilities, release program smoke-tested (seen). Budgets met: idle memory about 119 MB (target 200), Kona's share with two sessions about 118 MB (target 300), idle CPU about 0%, start about 1.2 s. Each Claude session takes about 400 MB. Not built or not checked: the installer (needs a download), clippy, syntax colours, monthly CSV export, voice per role, a second-account browser sign-in, keyboard-only pass, FigCraft update for the newer places.
 
 **Size and the folding sidebar (2026-10-28, Kona 0.16.1).** Checked in the real window (seen): the page cannot be scrolled (forcing a scroll snaps back to 0), the sidebar goes 248 to 68 px and back with its button and Ctrl+B, and Ctrl+minus twice reaches 80% (window width 1283 to 1604 css px) and Ctrl+0 returns to 100%. The zoom needs the permission `core:webview:allow-set-webview-zoom`.
+
+**The logo (2026-10-28, Kona 0.17.0).** Chosen by the owner from three ideas, then four variants of the one they liked (the cat head with a sunflower cut out of the face); the variant with two eyes in the flower won. Drawn headless in FigCraft (`build-logo.mjs`), which also writes the SVG files, the page icon and `KonaMark.tsx`. The icon files in `app/src-tauri/icons` were remade from the icon SVG with `tauri icon`; the corners are see-through (checked). Seen in the real window: the mark in the open and the folded sidebar, and the page icon. Not checked: the taskbar and title-bar icon at their real small sizes, and the installer icon (no installer yet).
 
 Why this order:
 - Steps 1 to 3 replace the owner's daily use of one terminal session and fix the leftovers problem.

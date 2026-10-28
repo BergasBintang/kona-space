@@ -2,6 +2,15 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.17.0, 2026-10-28
+
+Kona's logo.
+
+- A logo: a cat head with pointed ears, a sunflower in its face, and two eyes in the middle of the flower (the cat is the name's owner, the sunflower is for the owner's girlfriend). It is gold on Kona's dark surface, and it replaces the ring mark in the sidebar, folded or open.
+- The app icon (window, taskbar, installer) and the page icon are the same drawing, dark on a gold rounded square.
+- The logo is drawn by `docs/design/build/build-logo.mjs` with no FigCraft window; its files and notes are in `docs/design/logo/`.
+- Removed the unused Vite and Tauri sample pictures from `app/public`.
+
 ## 0.16.1, 2026-10-28
 
 Size, a folding sidebar, and no window scroll.

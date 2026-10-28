@@ -56,6 +56,8 @@ FigCraft is the design tool Kona's design is drawn in (version 0.7.0, early alph
 - A build script that writes screenshots needs its output folder to exist. `kona-lib.mjs` `shot` now creates it; several older scripts still point at a scratch folder from an older session, so edit the `OUT` line before a full run. (seen)
 - No `git init` yet, so a rebuild in place can lose the previous look. Copy `kona-design.figcraft` and `registry.json` somewhere before a big change. (seen)
 
+- A small drawing (the logo options) can be built with no window at all: write a list of `node.create` steps and run `figcraft-cli run steps.json --out file.figcraft`, then `figcraft-cli render file -o out.png`. It costs no extra memory. `stroke: 'none'` is rejected there, so leave the stroke out. See `docs/design/build/build-logo.mjs`. (seen)
+
 ## Where the pieces are
 
 | What | File |

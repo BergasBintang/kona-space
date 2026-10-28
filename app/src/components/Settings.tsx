@@ -9,6 +9,7 @@ import { Help } from "./Help";
 import { Select } from "./pick";
 import { getZoom, onZoom, setZoom, ZOOMS, type Zoom } from "../lib/zoom";
 import { checkForUpdate, installUpdate, useUpdate } from "../lib/update";
+import { KonaMark } from "./KonaMark";
 
 const size = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
 const when = (name: string) => name.replace(/^(\d{4}-\d{2}-\d{2})-(\d{2})-(\d{2})$/, "$1 $2:$3");
@@ -108,7 +109,7 @@ export function Settings({ projects, version, onProjects }: { projects: Project[
 
         <section className="flex flex-col gap-2" aria-label="About">
           <div className="flex items-center gap-2.5"><h2 className="m-0 text-[18px] leading-7 font-bold">About</h2><Help title="Where Kona keeps things"><p className="m-0">Kona keeps its own data in %APPDATA%\Kona and each project's tickets and brain in a hidden .kona folder inside it.</p><p className="m-0">Nothing leaves this PC except what Claude Code itself sends to Anthropic.</p></Help></div>
-          <p className="m-0 font-mono text-[13px] leading-5 text-text-secondary">Kona {version}</p>
+          <p className="m-0 flex items-center gap-2.5 font-mono text-[13px] leading-5 text-text-secondary"><KonaMark size={20} />Kona {version}</p>
         </section>
       </div>
 

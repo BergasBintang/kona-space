@@ -28,7 +28,7 @@ export function Glyph({ state, size = 16, color, still = false }: { state: Glyph
 export function Badge({ state, label }: { state: GlyphState; label?: string }) {
   const c = STATE_COLOR[state];
   return (
-    <span className="inline-flex items-center gap-2 rounded-full py-[5px] pr-3 pl-[9px] text-[13px] leading-5 font-bold" style={{ color: c, background: `color-mix(in srgb, ${c} 14%, transparent)` }}>
+    <span className="inline-flex items-center gap-2 rounded-full py-[5px] pr-3 pl-[9px] text-[13px] leading-5 font-bold" style={{ color: c, background: `color-mix(in srgb, ${c} 10%, transparent)` }}>
       <Glyph state={state} size={16} />
       {label ?? STATE_WORD[state]}
     </span>

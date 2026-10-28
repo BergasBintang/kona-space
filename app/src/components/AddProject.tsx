@@ -3,6 +3,7 @@ import { useState } from "react";
 import { addProject, baseName, pickFolder, type AddResult } from "../lib/api";
 import { Button, Glyph } from "./ui";
 import { Help } from "./Help";
+import { KonaMark } from "./KonaMark";
 
 export function AddProject({ first, onDone, onCancel }: { first: boolean; onDone: (r: AddResult) => void; onCancel: () => void }) {
   const [folder, setFolder] = useState("");
@@ -25,7 +26,7 @@ export function AddProject({ first, onDone, onCancel }: { first: boolean; onDone
   return (
     <div className="flex h-full flex-1 overflow-y-auto p-8">
       <div className="m-auto flex w-full max-w-[560px] flex-col gap-6">
-        <div className="flex items-center gap-3"><h1 className="m-0 text-[30px] leading-[38px] font-bold">{first ? "Add your first project" : "Add a project"}</h1><Help title="What a project is"><p className="m-0">A project is one folder with your code in it.</p><p className="m-0">Kona adds a hidden folder inside it for notes and tickets, and tells Git to ignore that folder. Nothing else in your project is changed.</p></Help></div>
+        <div className="flex items-center gap-3"><KonaMark size={36} /><h1 className="m-0 text-[30px] leading-[38px] font-bold">{first ? "Add your first project" : "Add a project"}</h1><Help title="What a project is"><p className="m-0">A project is one folder with your code in it.</p><p className="m-0">Kona adds a hidden folder inside it for notes and tickets, and tells Git to ignore that folder. Nothing else in your project is changed.</p></Help></div>
         <div className="flex flex-col gap-2">
           <span className="text-[13px] leading-5 font-bold text-text-secondary">Folder</span>
           <div className="flex gap-3">

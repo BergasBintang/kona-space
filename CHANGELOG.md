@@ -2,6 +2,14 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.19.2, 2026-10-28
+
+A softer, lighter look.
+
+- The dark theme is lifted one step: the page background goes from near-black to a soft slate, the cards and panels follow, and the text is a little warmer. Text and state colours keep their contrast (body text about 13 to 1; the state words stay readable on their tints).
+- The logo's gold shows up in a few places that are not state colours: a thin marker on the active place in the sidebar, the Kona mark beside the title on Start a session and Add a project, the mark on the update card and beside the version in Settings, and the highlight of selected text. Gold is still never a button colour, because it is also the colour of waiting.
+- The state colours for idle, done, stopped and left behind are a little lighter, and their tinted backgrounds a little fainter, so they stay clear on the lighter surfaces.
+
 ## 0.19.1, 2026-10-28
 
 Help buttons, a map you can move, and a crop fix.

@@ -1,6 +1,7 @@
 // The card that offers a new version, shows the download and says when Kona is about to restart. Nothing starts without the owner's yes.
 import { Button, Glyph } from "./ui";
 import { dismissUpdateError, installUpdate, postponeUpdate, useUpdate } from "../lib/update";
+import { KonaMark } from "./KonaMark";
 
 export function UpdateCard({ running }: { running: number }) {
   const u = useUpdate();
@@ -11,7 +12,7 @@ export function UpdateCard({ running }: { running: number }) {
     <div role="status" aria-label="Update" className="absolute top-6 right-6 z-10 flex w-[380px] flex-col gap-3 rounded-card border border-line-subtle bg-surface-2 px-[18px] py-4 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.4)]">
       {u.phase === "available" && (
         <>
-          <div className="flex items-center gap-2.5"><Glyph state="waiting" size={18} /><span className="font-bold">Kona {u.version} is ready</span></div>
+          <div className="flex items-center gap-2.5"><KonaMark size={22} /><span className="font-bold">Kona {u.version} is ready</span></div>
           {u.notes && <p className="m-0 line-clamp-3 text-[13px] leading-5 text-text-secondary">{u.notes}</p>}
           <p className="m-0 text-[14px] leading-5 text-text-secondary">
             {running > 0

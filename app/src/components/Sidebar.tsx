@@ -57,13 +57,14 @@ export function Sidebar({ projects, project, onProject, onAddProject, place, onP
             return (
               <button key={p.id} onClick={() => onPlace(p.id)} aria-current={on ? "page" : undefined} title={collapsed ? p.label : undefined} aria-label={collapsed ? p.label : undefined}
                 className={`relative flex h-10 items-center rounded-control text-left transition-colors ${collapsed ? "justify-center" : "gap-3 px-3"} ${on ? "bg-surface-3 font-bold text-text" : "text-text-secondary hover:bg-surface-2"}`}>
+                {on && <span aria-hidden="true" className="absolute top-2.5 bottom-2.5 left-0 w-[3px] rounded-full bg-brand" />}
                 <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className={on ? "text-accent" : ""} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">{ICONS[p.id]}</svg>
                 {!collapsed && <span className="flex-1">{p.label}</span>}
                 {p.id === "leftovers" && leftBehind > 0 && (
-                  <span className={`rounded-[10px] px-[7px] font-mono text-[12px] ${collapsed ? "absolute top-0 right-0 px-[5px] text-[11px] leading-4" : ""}`} style={{ color: "var(--color-state-left)", background: "color-mix(in srgb, var(--color-state-left) 16%, transparent)" }} aria-label={`${leftBehind} left behind`}>{leftBehind}</span>
+                  <span className={`rounded-[10px] px-[7px] font-mono text-[12px] ${collapsed ? "absolute top-0 right-0 px-[5px] text-[11px] leading-4" : ""}`} style={{ color: "var(--color-state-left)", background: "color-mix(in srgb, var(--color-state-left) 11%, transparent)" }} aria-label={`${leftBehind} left behind`}>{leftBehind}</span>
                 )}
                 {p.id === "sessions" && attention > 0 && (
-                  <span className={`rounded-[10px] px-[7px] font-mono text-[12px] ${collapsed ? "absolute top-0 right-0 px-[5px] text-[11px] leading-4" : ""}`} style={{ color: "var(--color-state-waiting)", background: "color-mix(in srgb, var(--color-state-waiting) 16%, transparent)" }} aria-label={`${attention} waiting on you`}>{attention}</span>
+                  <span className={`rounded-[10px] px-[7px] font-mono text-[12px] ${collapsed ? "absolute top-0 right-0 px-[5px] text-[11px] leading-4" : ""}`} style={{ color: "var(--color-state-waiting)", background: "color-mix(in srgb, var(--color-state-waiting) 11%, transparent)" }} aria-label={`${attention} waiting on you`}>{attention}</span>
                 )}
               </button>
             );

@@ -35,40 +35,45 @@ Names are meaning-based. Raw ramps come later, when light mode is designed.
 
 ```css
 @theme {
-  /* surfaces, darkest to lightest */
-  --color-canvas: #0B0E10;      /* behind the app, design pages */
-  --color-ground: #101417;      /* app background */
-  --color-surface-1: #151A1E;   /* sidebar, quiet panels */
-  --color-surface-2: #1B2126;   /* cards, dialogs, menus */
-  --color-surface-3: #242B31;   /* hover, selected row, chips */
-  --color-inset: #0E1215;       /* fields, code blocks */
+  /* surfaces, darkest to lightest (the softer "dusk" set of 0.19.2; the first near-black set is in the version history) */
+  --color-canvas: #171D22;      /* behind the app, design pages */
+  --color-ground: #1F262D;      /* app background */
+  --color-surface-1: #252D35;   /* sidebar, quiet panels */
+  --color-surface-2: #2D3640;   /* cards, dialogs, menus */
+  --color-surface-3: #38434E;   /* hover, selected row, chips */
+  --color-inset: #171D22;       /* fields, code blocks */
   /* lines */
-  --color-line-subtle: #2A3238; /* decoration: card edges, dividers */
-  --color-line-strong: #5C666D; /* control edges (3.1 to 3.2 : 1 against ground and inset) */
+  --color-line-subtle: #404B56; /* decoration: card edges, dividers */
+  --color-line-strong: #838F98; /* control edges (4.6 : 1 against ground, 5.1 against inset) */
   /* text */
-  --color-text: #ECE6DA;
-  --color-text-secondary: #B9B4AA;
-  --color-text-tertiary: #8E9396;
-  --color-text-disabled: #5F666B;
+  --color-text: #F4EFE5;
+  --color-text-secondary: #D0CBC1;
+  --color-text-tertiary: #AEB3B5;
+  --color-text-disabled: #78828A;
+  /* the logo's gold: the mark, the selection colour, a marker on the active place. Never a button colour: it is also "waiting" */
+  --color-brand: #E8B25A;
   /* the one accent */
-  --color-accent: #6CC6B4;
-  --color-accent-hover: #86D4C4;
-  --color-accent-pressed: #58AE9D;
+  --color-accent: #74CBB9;
+  --color-accent-hover: #8ED8C9;
+  --color-accent-pressed: #5FB4A2;
   --color-on-accent: #0D1517;
   /* states */
-  --color-state-live: #6CC6B4;
+  --color-state-live: #74CBB9;
   --color-state-waiting: #E8B25A;
-  --color-state-idle: #8FA3AD;
-  --color-state-done: #8FBF7F;
-  --color-state-stopped: #8A9297;
-  --color-state-left-behind: #E5776B;  /* also used for danger */
+  --color-state-idle: #A2B4BE;
+  --color-state-done: #9AC98A;
+  --color-state-stopped: #A9B0B5;
+  --color-state-left-behind: #F2958A;  /* also used for danger */
   --color-on-danger: #1A0E0C;
 }
 ```
 
-State backgrounds are the state colour at 14 percent on the surface. Focus is a 2 px accent ring with a 2 px gap. A focused field also gets a 3 px halo at 22 percent accent.
+State backgrounds are the state colour at 10 percent on the surface (it was 14 on the darker set). Focus is a 2 px accent ring with a 2 px gap. A focused field also gets a 3 px halo at 22 percent accent.
 
-### Contrast, computed on 2026-10-25 (WCAG ratios)
+### Contrast, computed on 2026-10-25 (WCAG ratios), first near-black set
+
+Recomputed on 2026-10-28 for the softer set above: text on ground, surface 2, surface 3 is 13.3, 10.7, 8.8; secondary 9.5, 7.6, 6.2; tertiary 7.2, 5.8, 4.8; accent on ground and surface 2 is 8.0 and 6.4; on-accent on accent 9.7; line strong against ground and inset 4.6 and 5.1; every state colour on its own 10 percent tint over ground, surface 1 and surface 2 is 4.6 or better (stopped 4.6, left behind 4.8, idle 4.7). On surface 3 a state tint can fall to about 4.3, so state chips are not placed on surface 3.
+
 
 | Pair | Ratio |
 |---|---|

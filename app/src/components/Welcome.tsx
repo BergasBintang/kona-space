@@ -5,6 +5,7 @@ import { Button, Glyph, RoleMark } from "./ui";
 import { Select } from "./pick";
 import { Needs } from "./Needs";
 import { accountStatus, PLAIN_LINES, type Account, type Persona, type AccountStatus, type Project, type Role } from "../lib/api";
+import { Help } from "./Help";
 
 type ClaudeInfo = { path: string; version: string | null };
 const MODELS = [["sonnet", "Sonnet (the usual choice)"], ["opus", "Opus (the most capable, slower)"], ["haiku", "Haiku (the quickest and cheapest)"]];
@@ -32,12 +33,11 @@ export function Welcome({ project, roles, accounts, persona, lastAccount, onStar
   const start = async () => { setBusy(true); try { await onStart(project.folder, roleId, accountId, voice, model, mode); } finally { setBusy(false); } };
 
   return (
-    <div className="flex h-full flex-1 items-center justify-center overflow-y-auto p-8">
-      <div className="flex w-full max-w-[560px] flex-col gap-6">
+    <div className="flex h-full flex-1 overflow-y-auto p-8">
+      <div className="m-auto flex w-full max-w-[560px] flex-col gap-6">
         <div className="flex flex-col gap-3">
-          <h1 className="m-0 text-[30px] leading-[38px] font-bold">Start a session</h1>
+          <div className="flex items-center gap-3"><h1 className="m-0 text-[30px] leading-[38px] font-bold">Start a session</h1><Help title="Start a session"><p className="m-0">Claude will work inside this project. Nothing leaves this PC except what Claude itself sends to Anthropic.</p></Help></div>
           <p className="m-0 text-[15px] leading-6 text-text-tertiary">{(voice ? persona.lines.greeting : PLAIN_LINES.greeting)}</p>
-          <p className="m-0 text-text-secondary">Claude will work inside this project. Nothing leaves this PC except what Claude itself sends to Anthropic.</p>
         </div>
 
         <div className="flex items-center gap-2.5 text-[13px] leading-5">

@@ -6,6 +6,7 @@ import { ignoreLeftover, sessionTemp, sessionTempClean, stopLeftover, type Lefto
 import type { State } from "../lib/sessions";
 import { Button, Glyph } from "./ui";
 import { Confirm } from "./Confirm";
+import { Help } from "./Help";
 
 const age = (s: number) => (s < 90 ? `${s} s` : s < 5400 ? `${Math.round(s / 60)} min` : `${Math.round(s / 3600)} h`);
 const size = (b: number) => (b < 1024 ? `${b} bytes` : b < 1024 * 1024 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
@@ -72,10 +73,7 @@ export function Leftovers({ state, roles, overview, onRefresh }: { state: State;
   return (
     <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
       <div className="mx-auto flex w-full max-w-[calc(1160px*var(--k))] flex-col gap-7 px-8 pt-8 pb-10">
-        <div className="flex flex-col gap-3">
-          <h1 className="m-0 text-[30px] leading-[38px] font-bold">Leftovers</h1>
-          <p className="m-0 text-text-secondary">Programs your sessions started (dev servers, watchers) and what is still running after a session ended. Kona only sees sessions it started itself, and when Kona closes it stops all of them.</p>
-        </div>
+        <div className="flex items-center gap-3"><h1 className="m-0 text-[30px] leading-[38px] font-bold">Leftovers</h1><Help title="Leftovers"><p className="m-0">Programs your sessions started (dev servers, watchers) and what is still running after a session ended.</p><p className="m-0">Kona only sees sessions it started itself, and when Kona closes it stops all of them.</p></Help></div>
         {notice && <div role="status" className="flex items-start gap-2.5 rounded-control border border-line-subtle bg-surface-2 px-4 py-3 text-[14px] leading-5"><Glyph state="done" size={16} /> {notice}</div>}
 
         <section className="flex flex-col gap-3" aria-label="Left behind">
@@ -97,8 +95,7 @@ export function Leftovers({ state, roles, overview, onRefresh }: { state: State;
         )}
 
         <section className="flex flex-col gap-3" aria-label="Scratch files">
-          <h2 className="m-0 text-[17px] leading-6 font-bold">Scratch files</h2>
-          <p className="m-0 text-[14px] leading-5 text-text-tertiary">Claude keeps a folder of temporary files (and pasted pictures) for each session. Only finished sessions can be cleaned.</p>
+          <div className="flex items-center gap-2.5"><h2 className="m-0 text-[17px] leading-6 font-bold">Scratch files</h2><Help title="Scratch files"><p className="m-0">Claude keeps a folder of temporary files (and pasted pictures) for each session. Only finished sessions can be cleaned.</p></Help></div>
           {bigTemps.length === 0 && <p className="m-0 text-[14px] leading-5 text-text-tertiary">No scratch files for the sessions open in this window.</p>}
           {bigTemps.map((t) => {
             const live = state.sessions[t.session_id]?.run !== "ended";

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { costRows, listTickets, baseName, samePlace, type Account, type CostRow, type Project, type Role } from "../lib/api";
 import { dollars } from "../lib/sessions";
 import { Glyph } from "./ui";
+import { Help } from "./Help";
 
 type By = "project" | "role" | "ticket" | "account" | "model" | "day" | "session";
 const BYS: { id: By; word: string }[] = [
@@ -95,10 +96,7 @@ export function Costs({ projects, roles, accounts }: { projects: Project[]; role
   return (
     <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
       <div className="mx-auto flex w-full max-w-[calc(1160px*var(--k))] flex-col gap-6 px-8 pt-8 pb-10">
-        <div className="flex flex-col gap-3">
-          <h1 className="m-0 text-[30px] leading-[38px] font-bold">Costs</h1>
-          <p className="m-0 text-text-secondary">What your sessions cost, from the ledger Kona keeps on this PC. Only sessions Kona ran are in it.</p>
-        </div>
+        <div className="flex items-center gap-3"><h1 className="m-0 text-[30px] leading-[38px] font-bold">Costs</h1><Help title="Costs"><p className="m-0">What your sessions cost, from the ledger Kona keeps on this PC. Only sessions Kona ran are in it.</p><p className="m-0">The figures are an estimate at list price, not your bill. On a Pro or Max plan you pay a flat fee; use these figures to compare, not to count money.</p></Help></div>
 
         <div className="flex flex-wrap items-center justify-between gap-4">
           <Chips label="Period" value={period} onChange={setPeriod} items={PERIODS} />
@@ -109,7 +107,6 @@ export function Costs({ projects, roles, accounts }: { projects: Project[]; role
           <span className="font-mono text-[34px] leading-[44px] font-bold">{dollars(total)}</span>
           <span className="text-[14px] leading-5 text-text-secondary">{period_.word === "All time" ? "in all" : period_.word === "Today" ? "today" : `in the last ${period_.word}`} · {sessionCount} {sessionCount === 1 ? "session" : "sessions"} · {turnCount} {turnCount === 1 ? "turn" : "turns"}</span>
         </div>
-        <p className="m-0 -mt-3 text-[13px] leading-5 text-text-tertiary">An estimate at list price, not your bill. On a Pro or Max plan you pay a flat fee; use these figures to compare, not to count money.</p>
 
         {error && <div className="flex items-start gap-2.5 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
         {rows === null && !error && <p className="m-0 text-text-tertiary">Reading the ledger…</p>}

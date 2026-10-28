@@ -7,6 +7,7 @@ import { saveServer, listServers, removeServer, readFingerprints, keyState, pick
 import { Button, Glyph, RoleMark } from "./ui";
 import { Confirm } from "./Confirm";
 import { MultiSelect } from "./pick";
+import { Help } from "./Help";
 
 const blank = (project_id: string): Server => ({ id: "", project_id, label: "", host: "", port: 22, user: "", key_path: "", fingerprints: [], roles: [], notes: "" });
 const field = "h-11 rounded-control border border-line-strong bg-inset px-3.5 text-[15px] text-text placeholder:text-text-tertiary";
@@ -67,10 +68,7 @@ export function Servers({ project, roles }: { project: Project; roles: Role[] })
     <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
       <div className="mx-auto flex w-full max-w-[calc(1160px*var(--k))] flex-col gap-6 px-8 pt-8 pb-10">
         <div className="flex items-start justify-between gap-4">
-          <div className="flex flex-col gap-3">
-            <h1 className="m-0 text-[30px] leading-[38px] font-bold">Servers</h1>
-            <p className="m-0 text-text-secondary">The servers {project.name} may reach. Kona keeps where the key file is, never the key. A role can use a server only if it is listed here for that role, and every command still asks you first.</p>
-          </div>
+          <div className="flex items-center gap-3"><h1 className="m-0 text-[30px] leading-[38px] font-bold">Servers</h1><Help title="Servers"><p className="m-0">The servers {project.name} may reach. Kona keeps where the key file is, never the key.</p><p className="m-0">A role can use a server only if it is listed here for that role, and every command still asks you first.</p></Help></div>
           <Button onClick={() => { setDraft(blank(project.id)); setError(null); }}>Add a server</Button>
         </div>
 

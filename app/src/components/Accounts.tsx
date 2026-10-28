@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { accountStatus, addAccount, removeAccount, renameAccount, signInAccount, type Account, type AccountStatus } from "../lib/api";
 import { Button, Glyph } from "./ui";
+import { Help } from "./Help";
 
 function Card({ account, status, onChanged, onRemoved, onRefresh }: {
   account: Account; status: AccountStatus | undefined; onChanged: (a: Account) => void; onRemoved: (id: string) => void; onRefresh: () => void;
@@ -32,7 +33,8 @@ function Card({ account, status, onChanged, onRemoved, onRefresh }: {
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1.5">
           {name === null
-            ? <h2 className="m-0 truncate text-[19px] leading-7 font-bold">{account.label}</h2>
+            ? <div className="flex items-center gap-2.5"><h2 className="m-0 min-w-0 truncate text-[19px] leading-7 font-bold">{account.label}</h2>
+                <Help title="About this account"><p className="m-0">{isMain ? "The login already on this PC, the one the terminal uses." : "Its own login folder, kept apart from the main account. It starts clean: sessions on this account do not see your personal Claude settings, skills or servers from the main account."}</p></Help></div>
             : <input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void rename(); if (e.key === "Escape") setName(null); }}
                 aria-label="Account name" className="h-10 w-[260px] rounded-control border border-line-strong bg-inset px-3 text-[15px] text-text" />}
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[14px] leading-5">
@@ -51,11 +53,6 @@ function Card({ account, status, onChanged, onRemoved, onRefresh }: {
         </div>
       </div>
 
-      <p className="m-0 text-[13px] leading-5 text-text-tertiary">
-        {isMain
-          ? "The login already on this PC, the one the terminal uses."
-          : "Its own login folder, kept apart from the main account. It starts clean: sessions on this account do not see your personal Claude settings, skills or servers from the main account."}
-      </p>
       {account.config_dir && <span className="truncate font-mono text-[12px] leading-5 text-text-tertiary" title={account.config_dir}>{account.config_dir}</span>}
       {signing && <p className="m-0 text-[13px] leading-5 text-text-secondary">A sign-in page opened in your browser. Finish it there, then come back. Kona never sees your password.</p>}
       {error && <div className="flex items-start gap-2.5 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
@@ -86,22 +83,18 @@ export function Accounts({ accounts, onChanged }: { accounts: Account[]; onChang
   return (
     <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
       <div className="mx-auto flex w-full max-w-[calc(880px*var(--k))] flex-col gap-6 px-8 pt-8 pb-10">
-        <div className="flex flex-col gap-3">
-          <h1 className="m-0 text-[30px] leading-[38px] font-bold">Accounts</h1>
-          <p className="m-0 text-text-secondary">The Claude logins Kona can use. Pick one when you start a session, or give a role a usual one. Each account has its own limits. Use a second account for a real separate purpose, such as work and personal, not to get around a limit.</p>
-        </div>
+        <div className="flex items-center gap-3"><h1 className="m-0 text-[30px] leading-[38px] font-bold">Accounts</h1><Help title="Accounts"><p className="m-0">The Claude logins Kona can use. Pick one when you start a session, or give a role a usual one.</p><p className="m-0">Each account has its own limits. Use a second account for a real separate purpose, such as work and personal, not to get around a limit.</p></Help></div>
         {accounts.map((a) => (
           <Card key={a.id} account={a} status={status[a.id]} onRefresh={refresh}
             onChanged={(x) => onChanged(accounts.map((y) => (y.id === x.id ? x : y)))} onRemoved={(id) => onChanged(accounts.filter((y) => y.id !== id))} />
         ))}
         <div className="flex flex-col gap-3 rounded-card border border-dashed border-line-strong p-5">
-          <h2 className="m-0 text-[17px] leading-6 font-bold">Add an account</h2>
+          <div className="flex items-center gap-2.5"><h2 className="m-0 text-[17px] leading-6 font-bold">Add an account</h2><Help title="Add an account"><p className="m-0">Kona makes an empty login folder for it. Press Sign in on the new card to log in once.</p></Help></div>
           <div className="flex gap-3">
             <input value={label} onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && label.trim()) void add(); }} placeholder="Work"
               aria-label="Name of the new account" className="h-11 min-w-0 flex-1 rounded-control border border-line-strong bg-inset px-3.5 text-[15px] text-text placeholder:text-text-tertiary" />
             <Button onClick={add} disabled={!label.trim()}>Add account</Button>
           </div>
-          <p className="m-0 text-[13px] leading-5 text-text-tertiary">Kona makes an empty login folder for it. Press Sign in on the new card to log in once.</p>
           {error && <div className="flex items-start gap-2.5 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
         </div>
       </div>

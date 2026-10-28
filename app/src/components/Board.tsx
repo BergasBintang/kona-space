@@ -7,6 +7,7 @@ import { dollars, type State } from "../lib/sessions";
 import { Button, Glyph, RoleMark } from "./ui";
 import { Select } from "./pick";
 import { Confirm } from "./Confirm";
+import { Help } from "./Help";
 
 export const COLUMNS = [
   { id: "backlog", name: "Backlog", says: "Ideas and things to do someday" },
@@ -237,8 +238,8 @@ export function Board({ project, roles, state, onStart, onOpenSession }: {
     <main className="relative flex min-w-0 flex-1 flex-col">
       <div className="flex items-center justify-between gap-4 px-8 pt-7 pb-4">
         <div className="flex flex-col gap-1">
-          <h1 className="m-0 text-[26px] leading-[34px] font-bold">Board</h1>
-          <span className="text-[13px] leading-5 text-text-tertiary">{project.name} · tickets are plain files in the project's hidden .kona folder</span>
+          <div className="flex items-center gap-3"><h1 className="m-0 text-[26px] leading-[34px] font-bold">Board</h1><Help title="Board"><p className="m-0">Tickets are plain files in the project's hidden .kona folder.</p></Help></div>
+          <span className="text-[13px] leading-5 text-text-tertiary">{project.name}</span>
         </div>
         <Button onClick={() => setOpenId("")}>New ticket</Button>
       </div>

@@ -4,6 +4,7 @@
 import type { SearchResult } from "../../lib/brain/engine.ts";
 import { Button, Glyph, type GlyphState } from "../ui";
 import { Chip, LAYER_WORD } from "./NoteView";
+import { Help } from "../Help";
 
 const STATE: Record<SearchResult["state"], { glyph: GlyphState; word: string; says: string }> = {
   found: { glyph: "done", word: "Found in the brain", says: "A section holds nearly every word of your question." },
@@ -44,7 +45,7 @@ export function Ask({ question, result, onOpen, onAskClaude, onWeb, onWrite, onC
 
       {result.state !== "found" && (
         <section className="flex flex-col gap-3 rounded-card border border-dashed border-line-strong p-5" aria-label="What to do next">
-          <h3 className="m-0 text-[16px] leading-6 font-bold">{result.state === "partly" ? "None of these fit?" : "What would you like to do?"}</h3>
+          <div className="flex items-center gap-2.5"><h3 className="m-0 text-[16px] leading-6 font-bold">{result.state === "partly" ? "None of these fit?" : "What would you like to do?"}</h3><Help title="What these buttons do"><p className="m-0">Asking Claude starts a session in plan-only mode and uses your plan.</p><p className="m-0">Searching the web opens your browser with these words, after you confirm.</p></Help></div>
           <p className="m-0 text-[13px] leading-5 text-text-tertiary">Kona does nothing on its own. {result.state === "none" ? "This question is on the wanted list in the Report, so the gap is not forgotten." : ""}</p>
           <div className="flex flex-wrap gap-2.5">
             <Button variant="quiet" onClick={onAskClaude}>Ask Claude in a session</Button>
@@ -52,7 +53,6 @@ export function Ask({ question, result, onOpen, onAskClaude, onWeb, onWrite, onC
             {result.nearest && <Button variant="quiet" onClick={() => onOpen(result.nearest!.id)}>Open “{result.nearest.title}”</Button>}
             <Button variant="quiet" onClick={onWrite}>Write a note about this</Button>
           </div>
-          <p className="m-0 text-[12px] leading-5 text-text-tertiary">Asking Claude starts a session in plan-only mode and uses your plan. Searching the web opens your browser with these words, after you confirm.</p>
         </section>
       )}
 

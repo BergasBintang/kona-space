@@ -5,6 +5,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { backupNow, deleteBackup, getSettings, listBackups, removeProject, setProjectGithub, setSettings, type BackupInfo, type Project, type Settings as SettingsT } from "../lib/api";
 import { Button, Glyph } from "./ui";
 import { Confirm } from "./Confirm";
+import { Help } from "./Help";
 import { Select } from "./pick";
 import { getZoom, onZoom, setZoom, ZOOMS, type Zoom } from "../lib/zoom";
 import { checkForUpdate, installUpdate, useUpdate } from "../lib/update";
@@ -49,14 +50,12 @@ export function Settings({ projects, version, onProjects }: { projects: Project[
         {error && <div className="flex items-start gap-2.5 text-[14px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
 
         <section className="flex flex-col gap-3" aria-label="Size">
-          <h2 className="m-0 text-[18px] leading-7 font-bold">Size</h2>
-          <p className="m-0 text-[14px] leading-5 text-text-secondary">How big everything is drawn. Smaller fits more on a small screen. Ctrl and minus or plus change it from anywhere; Ctrl and 0 goes back to 100%.</p>
+          <div className="flex items-center gap-2.5"><h2 className="m-0 text-[18px] leading-7 font-bold">Size</h2><Help title="Size"><p className="m-0">How big everything is drawn. Smaller fits more on a small screen.</p><p className="m-0">Ctrl and minus or plus change it from anywhere; Ctrl and 0 goes back to 100%.</p></Help></div>
           <div className="max-w-[240px]"><Select ariaLabel="Size" value={String(zoom)} onChange={(v) => setZoom(Number(v) as Zoom)} options={ZOOMS.map((z) => ({ value: String(z), label: `${z}%`, hint: z === 100 ? "Normal" : undefined }))} /></div>
         </section>
 
         <section className="flex flex-col gap-3" aria-label="Updates">
-          <h2 className="m-0 text-[18px] leading-7 font-bold">Updates</h2>
-          <p className="m-0 text-[14px] leading-5 text-text-secondary">When Kona starts, it can ask GitHub whether a newer version has been published. It sends nothing about you. If there is one, it asks you first; it never updates by itself without your yes.</p>
+          <div className="flex items-center gap-2.5"><h2 className="m-0 text-[18px] leading-7 font-bold">Updates</h2><Help title="Updates"><p className="m-0">When Kona starts, it can ask GitHub whether a newer version has been published. It sends nothing about you.</p><p className="m-0">If there is one, it asks you first; it never updates by itself without your yes.</p></Help></div>
           {s && (
             <label className="flex items-center gap-3 text-[15px]">
               <input type="checkbox" className="h-4 w-4 accent-[var(--color-accent)]" checked={s.check_updates} onChange={(e) => { setError(null); void setSettings({ ...s, check_updates: e.target.checked }).then(setS).catch((er) => setError(String(er))); }} />
@@ -72,8 +71,7 @@ export function Settings({ projects, version, onProjects }: { projects: Project[
         </section>
 
         <section className="flex flex-col gap-3" aria-label="Sessions at once">
-          <h2 className="m-0 text-[18px] leading-7 font-bold">Sessions at once</h2>
-          <p className="m-0 text-[14px] leading-5 text-text-secondary">Each running session uses about 400 MB of this PC's memory. Kona refuses to start more than this many at once.</p>
+          <div className="flex items-center gap-2.5"><h2 className="m-0 text-[18px] leading-7 font-bold">Sessions at once</h2><Help title="Sessions at once"><p className="m-0">Each running session uses about 400 MB of this PC's memory. Kona refuses to start more than this many at once.</p></Help></div>
           {s && <div className="max-w-[240px]"><Select ariaLabel="Sessions at once" value={String(s.max_sessions)} onChange={(v) => { setError(null); void setSettings({ ...s, max_sessions: Number(v) }).then(setS).catch((e) => setError(String(e))); }}
             options={[1, 2, 3].map((n) => ({ value: String(n), label: `${n} ${n === 1 ? "session" : "sessions"}`, hint: n === 2 ? "The usual for this 7 GB PC" : undefined }))} /></div>}
         </section>
@@ -96,8 +94,7 @@ export function Settings({ projects, version, onProjects }: { projects: Project[
 
         <section className="flex flex-col gap-3" aria-label="Backups">
           <div className="flex items-start justify-between gap-4">
-            <div className="flex flex-col gap-1"><h2 className="m-0 text-[18px] leading-7 font-bold">Backups</h2>
-              <p className="m-0 text-[14px] leading-5 text-text-secondary">A copy of Kona's own files, the cost ledger, and each project's tickets and brain notes. Not your project's code (that is Git's job) and not the ticket working copies.</p></div>
+            <div className="flex items-center gap-2.5"><h2 className="m-0 text-[18px] leading-7 font-bold">Backups</h2><Help title="Backups"><p className="m-0">A copy of Kona's own files, the cost ledger, and each project's tickets and brain notes.</p><p className="m-0">Not your project's code (that is Git's job) and not the ticket working copies.</p></Help></div>
             <Button onClick={doBackup} disabled={busy}>{busy ? "Backing up…" : "Back up now"}</Button>
           </div>
           {backups.length === 0 && <p className="m-0 text-[14px] leading-5 text-text-tertiary">No backups yet. Kona never deletes one by itself.</p>}
@@ -110,9 +107,8 @@ export function Settings({ projects, version, onProjects }: { projects: Project[
         </section>
 
         <section className="flex flex-col gap-2" aria-label="About">
-          <h2 className="m-0 text-[18px] leading-7 font-bold">About</h2>
+          <div className="flex items-center gap-2.5"><h2 className="m-0 text-[18px] leading-7 font-bold">About</h2><Help title="Where Kona keeps things"><p className="m-0">Kona keeps its own data in %APPDATA%\Kona and each project's tickets and brain in a hidden .kona folder inside it.</p><p className="m-0">Nothing leaves this PC except what Claude Code itself sends to Anthropic.</p></Help></div>
           <p className="m-0 font-mono text-[13px] leading-5 text-text-secondary">Kona {version}</p>
-          <p className="m-0 text-[13px] leading-5 text-text-tertiary">Kona keeps its own data in %APPDATA%\Kona and each project's tickets and brain in a hidden .kona folder inside it. Nothing leaves this PC except what Claude Code itself sends to Anthropic.</p>
         </section>
       </div>
 

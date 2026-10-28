@@ -3,6 +3,7 @@
 import type { Brain } from "../../lib/brain/engine.ts";
 import type { Wanted } from "../../lib/api";
 import { Button, Glyph } from "../ui";
+import { Help } from "../Help";
 
 export function Report({ brain, wanted, onOpen, onWrite, onDrop }: {
   brain: Brain; wanted: Wanted[]; onOpen: (id: string) => void; onWrite: (question: string) => void; onDrop: (question: string) => void;
@@ -10,16 +11,19 @@ export function Report({ brain, wanted, onOpen, onWrite, onDrop }: {
   const rep = brain.report(Date.now(), wanted.length);
   const warns = rep.warnings.filter((w) => w.severity === "warn");
   const infos = rep.warnings.filter((w) => w.severity === "info" && w.code !== "wanted");
-  const Card = ({ title, children, count }: { title: string; children: React.ReactNode; count?: number }) => (
+  const Card = ({ title, children, count, help }: { title: string; children: React.ReactNode; count?: number; help?: React.ReactNode }) => (
     <section className="flex flex-col gap-3 rounded-card border border-line-subtle bg-surface-1 p-5" aria-label={title}>
-      <h2 className="m-0 flex items-baseline gap-3 text-[17px] leading-6 font-bold">{title}{count !== undefined && <span className="font-mono text-[13px] font-normal text-text-tertiary">{count}</span>}</h2>
+      <div className="flex items-center gap-2.5">
+        <h2 className="m-0 flex items-baseline gap-3 text-[17px] leading-6 font-bold">{title}{count !== undefined && <span className="font-mono text-[13px] font-normal text-text-tertiary">{count}</span>}</h2>
+        {help && <Help title={title}>{help}</Help>}
+      </div>
       {children}
     </section>
   );
   return (
     <div className="flex flex-col gap-4">
-      <Card title="Wanted notes" count={wanted.length}>
-        {wanted.length === 0 && <p className="m-0 text-[14px] leading-5 text-text-tertiary">Questions the brain could not answer show up here, so a gap becomes a to-do. The text of a question stays on this PC.</p>}
+      <Card title="Wanted notes" count={wanted.length} help={<p className="m-0">Questions the brain could not answer show up here, so a gap becomes a to-do. The text of a question stays on this PC.</p>}>
+        {wanted.length === 0 && <p className="m-0 text-[14px] leading-5 text-text-tertiary">No questions are waiting for a note.</p>}
         {wanted.map((w) => (
           <div key={w.question} className="flex items-center justify-between gap-4">
             <div className="flex min-w-0 flex-col"><span className="truncate font-bold">{w.question}</span><span className="text-[13px] leading-5 text-text-tertiary">Asked {w.count} {w.count === 1 ? "time" : "times"} · last {w.last}</span></div>
@@ -48,8 +52,7 @@ export function Report({ brain, wanted, onOpen, onWrite, onDrop }: {
         {rep.hubs.length === 0 && <p className="m-0 text-[14px] leading-5 text-text-tertiary">No links yet.</p>}
       </Card>
 
-      <Card title="How your notes group" count={rep.clusters.length}>
-        <p className="m-0 text-[13px] leading-5 text-text-tertiary">Notes that link to each other end up in a group, with no model involved. “Filed as” is how you or the notes themselves call them (role, kind or layer).</p>
+      <Card title="How your notes group" count={rep.clusters.length} help={<><p className="m-0">Notes that link to each other end up in a group, with no model involved.</p><p className="m-0">“Filed as” is how you or the notes themselves call them (role, kind or layer).</p></>}>
         {rep.clusters.map((c) => (
           <div key={c.id} className="flex items-baseline justify-between gap-4 text-[14px] leading-5">
             <span className="truncate font-bold">{c.label}</span>

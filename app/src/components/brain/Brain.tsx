@@ -14,6 +14,7 @@ import { Ask } from "./Ask";
 import { MapView } from "./MapView";
 import { Chip, LAYER_WORD, NoteView } from "./NoteView";
 import { Report } from "./Report";
+import { Help } from "../Help";
 
 type Tab = "map" | "notes" | "report";
 
@@ -110,10 +111,13 @@ export function BrainPlace({ project, onAsk }: { project: Project; onAsk: (quest
           <Button variant="quiet" small onClick={() => writeNote("")}>New note</Button>
         </div>
 
-        <label className="flex cursor-pointer items-start gap-3">
-          <input type="checkbox" checked={auto} onChange={(e) => { setAuto(e.target.checked); setAutoNote(e.target.checked); }} className="mt-1.5 h-4 w-4 accent-[var(--color-accent)]" />
-          <span className="flex flex-col"><span className="font-bold">Write a note when a session ends</span><span className="text-[13px] leading-5 text-text-secondary">One cheap Haiku call per session, using your plan. The conversation is cleaned of secrets first. You can also press Write a note in any session.</span></span>
-        </label>
+        <div className="flex items-center gap-3">
+          <label className="flex cursor-pointer items-center gap-3">
+            <input type="checkbox" checked={auto} onChange={(e) => { setAuto(e.target.checked); setAutoNote(e.target.checked); }} className="h-4 w-4 accent-[var(--color-accent)]" />
+            <span className="font-bold">Write a note when a session ends</span>
+          </label>
+          <Help title="Write a note when a session ends"><p className="m-0">One cheap Haiku call per session, using your plan. The conversation is cleaned of secrets first.</p><p className="m-0">You can also press Write a note in any session.</p></Help>
+        </div>
 
         <form className="flex gap-3" onSubmit={(e) => { e.preventDefault(); void ask(); }} role="search">
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ask the brain, for example: what is a worktree?" aria-label="Ask the brain" className="h-12 min-w-0 flex-1 rounded-control border border-line-strong bg-inset px-4 text-[15px] text-text placeholder:text-text-tertiary" />

@@ -2,6 +2,14 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.19.1, 2026-10-28
+
+Help buttons, a map you can move, and a crop fix.
+
+- Explanations are no longer shown under headings. Each one is behind a circled "?" next to the heading; pressing it opens the explanation in a small window (Esc, Close or a click outside closes it). This covers Settings, the page titles, Accounts, Scratch files, the Brain note switch and the Brain report. Messages about what is happening now (counts, errors, empty lists) stay on the page.
+- The Brain map can be moved and zoomed: drag it, scroll the wheel, or use Zoom in, Zoom out and Fit all. It opens zoomed out so every group is fully inside the frame.
+- Fixed Start a session and Add a project being cut off at the top when the window is short: the content is centred only when there is room, and can always be scrolled to the top.
+
 ## 0.19.0, 2026-10-28
 
 Updates.

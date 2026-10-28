@@ -41,6 +41,10 @@
 }
 
 html, body, #root { height: 100%; }
+/* The window never scrolls as a whole: each part scrolls inside itself. `clip` (not `hidden`) also stops a script or a focus jump from
+   scrolling it, which pushed the whole app up and left an empty strip below. */
+html, body { overflow: hidden; }
+#root { overflow: clip; }
 body {
   margin: 0;
   background: var(--color-ground);

@@ -24,6 +24,7 @@ import { Settings } from "./components/Settings";
 import { Glyph } from "./components/ui";
 import { autoNoteOn, buildDigest, writeSessionNote } from "./lib/brain/summary.ts";
 import { localDate, redact } from "./lib/brain/text.ts";
+import { loadZoom, stepZoom } from "./lib/zoom";
 import { earlierSessions, saveNote, wantedRemove, type Earlier } from "./lib/api";
 
 const remembered = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
@@ -40,6 +41,8 @@ export default function App() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [lastAccount, setLastAccount] = useState(remembered("kona.account") ?? "main"); // the account used last
   const [place, setPlace] = useState<Place>("sessions");
+  const [folded, setFolded] = useState(remembered("kona.sidebar") === "folded"); // the sidebar as a narrow strip of icons
+  const toggleSidebar = useCallback(() => setFolded((f) => { remember("kona.sidebar", f ? "open" : "folded"); return !f; }), []);
   const [adding, setAdding] = useState(false); // the Add a project screen
   const [creating, setCreating] = useState(false); // the Start a session screen
   const [notice, setNotice] = useState<string | null>(null);
@@ -50,6 +53,22 @@ export default function App() {
   live.current = { state, projects, roles };
   const noting = useRef(new Set<string>());
   const [earlier, setEarlier] = useState<Earlier[]>([]); // sessions Claude Code saved earlier, for Resume
+
+  // the window size (100, 90, 80 percent) and the keys for it and for the sidebar; the window itself never scrolls
+  useEffect(() => {
+    loadZoom();
+    const keys = (e: KeyboardEvent) => {
+      if (!e.ctrlKey || e.altKey) return;
+      if (e.key === "-" || e.key === "_") { e.preventDefault(); stepZoom(-1); }
+      else if (e.key === "=" || e.key === "+") { e.preventDefault(); stepZoom(1); }
+      else if (e.key === "0") { e.preventDefault(); stepZoom(0); }
+      else if (e.key.toLowerCase() === "b") { e.preventDefault(); toggleSidebar(); }
+    };
+    const stay = () => { if (window.scrollX || window.scrollY) window.scrollTo(0, 0); };
+    window.addEventListener("keydown", keys);
+    window.addEventListener("scroll", stay);
+    return () => { window.removeEventListener("keydown", keys); window.removeEventListener("scroll", stay); };
+  }, [toggleSidebar]);
 
   // a notice goes away by itself after a few seconds
   useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(null), 9000); return () => clearTimeout(t); }, [notice]);
@@ -239,7 +258,7 @@ export default function App() {
   return (
     <div className="flex h-full overflow-hidden">
       <Sidebar projects={projects} project={project} onProject={pickProject} onAddProject={() => setAdding(true)} place={place}
-        onPlace={(p) => { setAdding(false); setPlace(p); }} attention={attention} leftBehind={leftTotal} plan={state.plans[current?.accountId ?? lastAccount]} limitLine={persona.enabled ? persona.lines.limit : PLAIN_LINES.limit} accountLabel={accounts.length > 1 ? accounts.find((a) => a.id === (current?.accountId ?? lastAccount))?.label ?? null : null} version={version} />
+        onPlace={(p) => { setAdding(false); setPlace(p); }} attention={attention} leftBehind={leftTotal} plan={state.plans[current?.accountId ?? lastAccount]} limitLine={persona.enabled ? persona.lines.limit : PLAIN_LINES.limit} accountLabel={accounts.length > 1 ? accounts.find((a) => a.id === (current?.accountId ?? lastAccount))?.label ?? null : null} version={version} collapsed={folded} onToggle={toggleSidebar} />
       <div className="relative flex min-w-0 flex-1">
         {content}
         {notice && (

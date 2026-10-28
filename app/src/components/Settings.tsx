@@ -6,6 +6,7 @@ import { backupNow, deleteBackup, getSettings, listBackups, removeProject, setPr
 import { Button, Glyph } from "./ui";
 import { Confirm } from "./Confirm";
 import { Select } from "./pick";
+import { getZoom, onZoom, setZoom, ZOOMS, type Zoom } from "../lib/zoom";
 
 const size = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
 const when = (name: string) => name.replace(/^(\d{4}-\d{2}-\d{2})-(\d{2})-(\d{2})$/, "$1 $2:$3");
@@ -20,6 +21,8 @@ export function Settings({ projects, version, onProjects }: { projects: Project[
   const [dropBackup, setDropBackup] = useState<BackupInfo | null>(null);
   const [dropProject, setDropProject] = useState<Project | null>(null);
   const [github, setGithub] = useState<Record<string, string>>({});
+  const [zoom, setZoomState] = useState<Zoom>(getZoom());
+  useEffect(() => onZoom(setZoomState), []);
 
   const load = useCallback(() => { getSettings().then(setS).catch(() => {}); listBackups().then(setBackups).catch(() => setBackups([])); }, []);
   useEffect(() => { load(); }, [load]);
@@ -42,6 +45,12 @@ export function Settings({ projects, version, onProjects }: { projects: Project[
         <h1 className="m-0 text-[30px] leading-[38px] font-bold">Settings</h1>
         {notice && <div role="status" className="flex items-start gap-2.5 rounded-control border border-line-subtle bg-surface-2 px-4 py-3 text-[14px] leading-5"><Glyph state="done" size={16} /> <span className="break-all">{notice}</span></div>}
         {error && <div className="flex items-start gap-2.5 text-[14px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
+
+        <section className="flex flex-col gap-3" aria-label="Size">
+          <h2 className="m-0 text-[18px] leading-7 font-bold">Size</h2>
+          <p className="m-0 text-[14px] leading-5 text-text-secondary">How big everything is drawn. Smaller fits more on a small screen. Ctrl and minus or plus change it from anywhere; Ctrl and 0 goes back to 100%.</p>
+          <div className="max-w-[240px]"><Select ariaLabel="Size" value={String(zoom)} onChange={(v) => setZoom(Number(v) as Zoom)} options={ZOOMS.map((z) => ({ value: String(z), label: `${z}%`, hint: z === 100 ? "Normal" : undefined }))} /></div>
+        </section>
 
         <section className="flex flex-col gap-3" aria-label="Sessions at once">
           <h2 className="m-0 text-[18px] leading-7 font-bold">Sessions at once</h2>

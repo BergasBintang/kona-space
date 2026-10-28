@@ -121,6 +121,7 @@ This note holds no keys, tokens, passwords, IP addresses or e-mail addresses, on
 | 2026-10-28 | **Kona 0.14.0: the SSH registry**: servers as references per project, roles allowed per server, ssh, scp and sftp refused unless listed (even when the owner's settings allow them), server named on the approval card, fingerprint read and saved with a change warning, private keys never sent | section 12 (step 7), F8 |
 | 2026-10-28 | **Kona 0.15.0: polish**: session limit and Settings, backups, resume of earlier sessions, always allow here, GitHub address and remove project, tree keys, markdown page | section 12 (step 8), F1, F4 |
 | 2026-10-28 | **Kona 0.16.0** (audit and hardening) | `docs/AUDIT.md` written; content-security policy, graphics process off, session cap 3, launch checks. Installer still waiting for a download yes. |
+| 2026-10-28 | **Kona 0.16.1** (size, folding sidebar) | Window no longer scrolls as a whole; 100/90/80% size; sidebar folds with Ctrl+B. |
 
 **Where the work lives**
 - Design file: `docs/design/kona-design.figcraft` (open in FigCraft; it is also the clickable prototype). Previews: `docs/design/previews/`. Rules and tokens: `docs/DESIGN.md`.
@@ -1268,6 +1269,8 @@ Proposed. It moves accounts and the leftovers job object earlier than first sugg
 - **Still open from step 1 and 2:** the Kona UI kit swap test and the no-colour-alone test were not run as such (state is glyph plus word everywhere it was drawn), keyboard-only use of the whole app was not tried (the tree, dialogs and pickers have keys), and syntax colours in the file viewer.
 
 **Audit (2026-10-28, Kona 0.16.0).** Written in `docs/AUDIT.md`. Tests: 12 TypeScript and 10 Rust pass, `tsc` and `cargo check` clean, `npm audit` 0 vulnerabilities, release program smoke-tested (seen). Budgets met: idle memory about 119 MB (target 200), Kona's share with two sessions about 118 MB (target 300), idle CPU about 0%, start about 1.2 s. Each Claude session takes about 400 MB. Not built or not checked: the installer (needs a download), clippy, syntax colours, monthly CSV export, voice per role, a second-account browser sign-in, keyboard-only pass, FigCraft update for the newer places.
+
+**Size and the folding sidebar (2026-10-28, Kona 0.16.1).** Checked in the real window (seen): the page cannot be scrolled (forcing a scroll snaps back to 0), the sidebar goes 248 to 68 px and back with its button and Ctrl+B, and Ctrl+minus twice reaches 80% (window width 1283 to 1604 css px) and Ctrl+0 returns to 100%. The zoom needs the permission `core:webview:allow-set-webview-zoom`.
 
 Why this order:
 - Steps 1 to 3 replace the owner's daily use of one terminal session and fix the leftovers problem.

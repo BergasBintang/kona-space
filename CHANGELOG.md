@@ -2,6 +2,14 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.16.1, 2026-10-28
+
+Size, a folding sidebar, and no window scroll.
+
+- The whole window can no longer scroll: a focus jump had pushed the app up and left an empty strip at the bottom. Each part scrolls inside itself, and a stray scroll snaps back.
+- Size: 100%, 90% or 80%, set in Settings or with Ctrl and minus or plus (Ctrl and 0 goes back to 100%). It is the web view's own zoom, so text, layout and pictures scale together, and it is remembered.
+- The sidebar folds to a narrow strip of icons with its button or Ctrl+B, and remembers it. Waiting and left-behind counts stay visible on the icons.
+
 ## 0.16.0, 2026-10-28
 
 Audit and hardening.

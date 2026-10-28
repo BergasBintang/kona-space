@@ -18,7 +18,7 @@ Kona is a personal project, made by one person for their own PC. It is early (se
 - **Leftovers:** the programs a session started (dev servers) and which are still running after it ended, with their ports; stop one after a confirmation. Claude's scratch files per session.
 - **Brain:** a graph of linked notes: your own notes, Claude's memory for the project (read-only) and starter notes about working with agents. Ask it a question and it says plainly whether the answer is found, partly there, or not in the brain. A session that ends writes a short note, and Claude can search the brain itself.
 - **Servers:** the servers a project may reach, kept as references (never a key). A role can run ssh, scp or sftp only to a server listed for it, and every such command still asks you.
-- **Settings and backups:** the session limit, each project's GitHub address, and one-press backups of Kona's data, tickets and notes.
+- **Settings and backups:** the window size (100, 90 or 80%), the session limit, each project's GitHub address, and one-press backups of Kona's data, tickets and notes.
 
 Not built yet: an installer, syntax colours in the file viewer, a voice per role.
 

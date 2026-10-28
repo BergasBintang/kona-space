@@ -1,4 +1,4 @@
-// The sidebar: the Kona mark, the project, the places that exist so far, the two plan bars.
+// The sidebar: the Kona mark, the project, the places that exist so far, the two plan bars. It folds down to a narrow strip of icons.
 import { Glyph, PlanBar } from "./ui";
 import { Select } from "./pick";
 import type { Project } from "../lib/api";
@@ -22,20 +22,26 @@ const ICONS: Record<Place, React.ReactNode> = {
 };
 const PLACES: { id: Place; label: string }[] = [{ id: "sessions", label: "Sessions" }, { id: "board", label: "Board" }, { id: "worktrees", label: "Worktrees" }, { id: "brain", label: "Brain" }, { id: "files", label: "Files" }, { id: "leftovers", label: "Leftovers" }, { id: "servers", label: "Servers" }, { id: "costs", label: "Costs" }, { id: "roles", label: "Roles" }, { id: "voice", label: "Voice" }, { id: "accounts", label: "Accounts" }, { id: "settings", label: "Settings" }];
 
-export function Sidebar({ projects, project, onProject, onAddProject, place, onPlace, attention, leftBehind, plan, accountLabel, limitLine, version }: {
+export function Sidebar({ projects, project, onProject, onAddProject, place, onPlace, attention, leftBehind, plan, accountLabel, limitLine, version, collapsed, onToggle }: {
   projects: Project[]; project: Project | null; onProject: (id: string) => void; onAddProject: () => void;
-  place: Place; onPlace: (p: Place) => void; attention: number; leftBehind: number; plan: Plan | undefined; accountLabel: string | null; limitLine: string; version: string;
+  place: Place; onPlace: (p: Place) => void; attention: number; leftBehind: number; plan: Plan | undefined; accountLabel: string | null; limitLine: string; version: string; collapsed: boolean; onToggle: () => void;
 }) {
+  const toggleLabel = collapsed ? "Show the sidebar (Ctrl+B)" : "Hide the sidebar (Ctrl+B)";
   return (
-    <aside className="flex h-full min-h-0 w-[248px] shrink-0 flex-col bg-surface-1">
+    <aside className={`flex h-full min-h-0 shrink-0 flex-col bg-surface-1 transition-[width] duration-150 ${collapsed ? "w-[68px]" : "w-[248px]"}`}>
       {/* the logo, the project and the places scroll when the window is short; the two plan bars stay in view below */}
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-3.5 pt-7 pb-3">
-      <div className="flex items-center gap-2.5 px-1.5">
-        <Glyph state="live" size={24} color="var(--color-accent)" still />
-        <span className="text-[22px] leading-[30px] font-bold">Kona</span>
+      <div className={`flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pt-7 pb-3 ${collapsed ? "items-center px-2" : "px-3.5"}`}>
+      <div className={`flex items-center ${collapsed ? "flex-col gap-3" : "justify-between gap-2.5 px-1.5"}`}>
+        <div className="flex items-center gap-2.5">
+          <Glyph state="live" size={24} color="var(--color-accent)" still />
+          {!collapsed && <span className="text-[22px] leading-[30px] font-bold">Kona</span>}
+        </div>
+        <button onClick={onToggle} aria-label={toggleLabel} aria-expanded={!collapsed} title={toggleLabel} className="flex h-8 w-8 items-center justify-center rounded-control text-text-secondary hover:bg-surface-2 hover:text-text">
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"><path d="M2.5 3 H13.5 V13 H2.5 Z M6 3 V13" />{collapsed ? <path d="M9 6.5 L11 8 L9 9.5" /> : <path d="M11 6.5 L9 8 L11 9.5" />}</svg>
+        </button>
       </div>
 
-      {projects.length > 0 && (
+      {projects.length > 0 && !collapsed && (
         <div className="flex flex-col gap-2">
           <Select ariaLabel="Project" bold value={project?.id ?? ""} onChange={onProject} options={projects.map((p) => ({ value: p.id, label: p.name, hint: p.folder }))}
             icon={<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="shrink-0 text-text-secondary"><path d="M2 5 L2 12.5 L14 12.5 L14 6 L7.5 6 L6.5 4 L2 4 Z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" /></svg>} />
@@ -44,19 +50,19 @@ export function Sidebar({ projects, project, onProject, onAddProject, place, onP
       )}
 
       {project && (
-        <nav className="flex flex-col gap-0.5" aria-label="Places">
+        <nav className={`flex flex-col gap-0.5 ${collapsed ? "w-full" : ""}`} aria-label="Places">
           {PLACES.map((p) => {
             const on = place === p.id;
             return (
-              <button key={p.id} onClick={() => onPlace(p.id)} aria-current={on ? "page" : undefined}
-                className={`flex h-10 items-center gap-3 rounded-control px-3 text-left transition-colors ${on ? "bg-surface-3 font-bold text-text" : "text-text-secondary hover:bg-surface-2"}`}>
+              <button key={p.id} onClick={() => onPlace(p.id)} aria-current={on ? "page" : undefined} title={collapsed ? p.label : undefined} aria-label={collapsed ? p.label : undefined}
+                className={`relative flex h-10 items-center rounded-control text-left transition-colors ${collapsed ? "justify-center" : "gap-3 px-3"} ${on ? "bg-surface-3 font-bold text-text" : "text-text-secondary hover:bg-surface-2"}`}>
                 <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className={on ? "text-accent" : ""} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">{ICONS[p.id]}</svg>
-                <span className="flex-1">{p.label}</span>
+                {!collapsed && <span className="flex-1">{p.label}</span>}
                 {p.id === "leftovers" && leftBehind > 0 && (
-                  <span className="rounded-[10px] px-[7px] font-mono text-[12px]" style={{ color: "var(--color-state-left)", background: "color-mix(in srgb, var(--color-state-left) 16%, transparent)" }} aria-label={`${leftBehind} left behind`}>{leftBehind}</span>
+                  <span className={`rounded-[10px] px-[7px] font-mono text-[12px] ${collapsed ? "absolute top-0 right-0 px-[5px] text-[11px] leading-4" : ""}`} style={{ color: "var(--color-state-left)", background: "color-mix(in srgb, var(--color-state-left) 16%, transparent)" }} aria-label={`${leftBehind} left behind`}>{leftBehind}</span>
                 )}
                 {p.id === "sessions" && attention > 0 && (
-                  <span className="rounded-[10px] px-[7px] font-mono text-[12px]" style={{ color: "var(--color-state-waiting)", background: "color-mix(in srgb, var(--color-state-waiting) 16%, transparent)" }} aria-label={`${attention} waiting on you`}>{attention}</span>
+                  <span className={`rounded-[10px] px-[7px] font-mono text-[12px] ${collapsed ? "absolute top-0 right-0 px-[5px] text-[11px] leading-4" : ""}`} style={{ color: "var(--color-state-waiting)", background: "color-mix(in srgb, var(--color-state-waiting) 16%, transparent)" }} aria-label={`${attention} waiting on you`}>{attention}</span>
                 )}
               </button>
             );
@@ -65,12 +71,12 @@ export function Sidebar({ projects, project, onProject, onAddProject, place, onP
       )}
       </div>
 
-      <div className="flex shrink-0 flex-col gap-4 border-t border-line-subtle px-5 pt-4 pb-[18px]">
+      {!collapsed && <div className="flex shrink-0 flex-col gap-4 border-t border-line-subtle px-5 pt-4 pb-[18px]">
         {accountLabel && <span className="text-[13px] leading-5 font-bold text-text-secondary">Account: {accountLabel}</span>}
         <PlanBar label="This session" window={plan?.fiveHour} readAt={plan?.at} warnLine={limitLine} />
         <PlanBar label="This week" window={plan?.sevenDay} readAt={plan?.at} warnLine={limitLine} />
         <span className="font-mono text-[12px] text-text-disabled">Kona {version}</span>
-      </div>
+      </div>}
     </aside>
   );
 }

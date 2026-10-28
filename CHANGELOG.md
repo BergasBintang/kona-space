@@ -2,6 +2,13 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.19.4, 2026-10-28
+
+A new logo, and Costs is always one project.
+
+- A new logo: a black cat with soft pointed ears and two tilted white oval eyes, with a gold sunflower between its ears. The app icon is the cat on an ice-blue rounded square; inside the app the mark is the same cat in flat gold. It is drawn by `docs/design/build/build-logo.mjs`, which now writes plain SVG (no FigCraft needed).
+- Costs is always for the open project. The This project or All projects switch from 0.19.3 is gone, and so is Group by Project (it would be one line). Open another project to see its costs. Costs of projects that are no longer in Kona stay in the ledger file but are not shown.
+
 ## 0.19.3, 2026-10-28
 
 Costs shows the open project.

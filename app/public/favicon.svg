@@ -1,20 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
-<title>Kona</title>
-<path d="M46 0 L154 0 C179.41 0 200 20.59 200 46 L200 154 C200 179.41 179.41 200 154 200 L46 200 C20.59 200 0 179.41 0 154 L0 46 C0 20.59 20.59 0 46 0 Z" fill="#E8B25A"/>
-<path d="M48 110.83 L68.33 50.19 Q69.6 46.4 72.47 49.18 L91.74 67.85 Q100 73.6 108.26 67.85 L127.53 49.18 Q130.4 46.4 131.67 50.19 L152 110.83 C154.71 126.2 150.48 141.98 140.45 153.94 C130.41 165.9 115.61 172.8 100 172.8 C84.39 172.8 69.59 165.9 59.55 153.94 C49.52 141.98 45.29 126.2 48 110.83 Z" fill="#101417"/>
-<path d="M100 100 Q91.79 89.6 100 79.2 Q108.21 89.6 100 100 Z" fill="#E8B25A"/>
-<path d="M110 102.68 Q108.09 89.57 120.4 84.67 Q122.31 97.78 110 102.68 Z" fill="#E8B25A"/>
-<path d="M117.32 110 Q122.22 97.69 135.33 99.6 Q130.43 111.91 117.32 110 Z" fill="#E8B25A"/>
-<path d="M120 120 Q130.4 111.79 140.8 120 Q130.4 128.21 120 120 Z" fill="#E8B25A"/>
-<path d="M117.32 130 Q130.43 128.09 135.33 140.4 Q122.22 142.31 117.32 130 Z" fill="#E8B25A"/>
-<path d="M110 137.32 Q122.31 142.22 120.4 155.33 Q108.09 150.43 110 137.32 Z" fill="#E8B25A"/>
-<path d="M100 140 Q108.21 150.4 100 160.8 Q91.79 150.4 100 140 Z" fill="#E8B25A"/>
-<path d="M90 137.32 Q91.91 150.43 79.6 155.33 Q77.69 142.22 90 137.32 Z" fill="#E8B25A"/>
-<path d="M82.68 130 Q77.78 142.31 64.67 140.4 Q69.57 128.09 82.68 130 Z" fill="#E8B25A"/>
-<path d="M80 120 Q69.6 128.21 59.2 120 Q69.6 111.79 80 120 Z" fill="#E8B25A"/>
-<path d="M82.68 110 Q69.57 111.91 64.67 99.6 Q77.78 97.69 82.68 110 Z" fill="#E8B25A"/>
-<path d="M90 102.68 Q77.69 97.78 79.6 84.67 Q91.91 89.57 90 102.68 Z" fill="#E8B25A"/>
-<path d="M100 104 C108.84 104 116 111.16 116 120 C116 128.84 108.84 136 100 136 C91.16 136 84 128.84 84 120 C84 111.16 91.16 104 100 104 Z" fill="#E8B25A"/>
-<path d="M93.6 115.2 C95.19 115.2 96.48 116.99 96.48 119.2 C96.48 121.41 95.19 123.2 93.6 123.2 C92.01 123.2 90.72 121.41 90.72 119.2 C90.72 116.99 92.01 115.2 93.6 115.2 Z" fill="#101417"/>
-<path d="M106.4 115.2 C107.99 115.2 109.28 116.99 109.28 119.2 C109.28 121.41 107.99 123.2 106.4 123.2 C104.81 123.2 103.52 121.41 103.52 119.2 C103.52 116.99 104.81 115.2 106.4 115.2 Z" fill="#101417"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<defs>
+  <linearGradient id="k-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d6ecff"/><stop offset="1" stop-color="#6fa8e6"/></linearGradient>
+  <linearGradient id="k-gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.45"/><stop offset="0.5" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  <linearGradient id="k-rim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.55"/><stop offset="0.35" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.18"/></linearGradient>
+  <linearGradient id="k-dark" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34293f"/><stop offset="0.55" stop-color="#17101f"/><stop offset="1" stop-color="#09060d"/></linearGradient>
+  <linearGradient id="k-sheen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.26"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  <radialGradient id="k-petal" cx="0.5" cy="0.3" r="0.9"><stop offset="0" stop-color="#ffd884"/><stop offset="1" stop-color="#e0952a"/></radialGradient>
+  <filter id="k-soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5"/></filter>
+  <clipPath id="k-head"><path d="M100 83 C110 80 118 82 124 88 L148 60 C156 70 159 90 159 110 C159 141 136 157 100 157 C64 157 41 141 41 110 C41 90 44 70 52 60 L76 88 C82 82 90 80 100 83 Z"/></clipPath>
+</defs>
+<path d="M60 8 H140 C176 8 192 24 192 60 V140 C192 176 176 192 140 192 H60 C24 192 8 176 8 140 V60 C8 24 24 8 60 8 Z" fill="url(#k-bg)"/><path d="M60 8 H140 C176 8 192 24 192 60 V140 C192 176 176 192 140 192 H60 C24 192 8 176 8 140 V60 C8 24 24 8 60 8 Z" fill="url(#k-gloss)" opacity="0.5"/><path d="M60 8 H140 C176 8 192 24 192 60 V140 C192 176 176 192 140 192 H60 C24 192 8 176 8 140 V60 C8 24 24 8 60 8 Z" fill="none" stroke="url(#k-rim)" stroke-width="1.6"/>
+<ellipse cx="100" cy="164" rx="46" ry="7" fill="#000" opacity="0.35" filter="url(#k-soft)"/>
+<path d="M100 83 C110 80 118 82 124 88 L148 60 C156 70 159 90 159 110 C159 141 136 157 100 157 C64 157 41 141 41 110 C41 90 44 70 52 60 L76 88 C82 82 90 80 100 83 Z" fill="url(#k-dark)" stroke="url(#k-dark)" stroke-width="8" stroke-linejoin="round"/>
+<g clip-path="url(#k-head)"><rect x="40" y="54" width="120" height="62" fill="url(#k-sheen)"/></g>
+<ellipse cx="80" cy="115" rx="9.5" ry="13.5" fill="#fff" transform="rotate(7 80 115)"/><ellipse cx="120" cy="115" rx="9.5" ry="13.5" fill="#fff" transform="rotate(-7 120 115)"/>
+<circle cx="84" cy="108" r="2.6" fill="#fff" opacity="0.9"/><circle cx="124" cy="108" r="2.6" fill="#fff" opacity="0.9"/>
+<ellipse cx="100" cy="57.65" rx="4.68" ry="8.06" transform="rotate(0 100 70)" fill="url(#k-petal)"/><ellipse cx="100" cy="57.65" rx="4.68" ry="8.06" transform="rotate(40 100 70)" fill="url(#k-petal)"/><ellipse cx="100" cy="57.65" rx="4.68" ry="8.06" transform="rotate(80 100 70)" fill="url(#k-petal)"/><ellipse cx="100" cy="57.65" rx="4.68" ry="8.06" transform="rotate(120 100 70)" fill="url(#k-petal)"/><ellipse cx="100" cy="57.65" rx="4.68" ry="8.06" transform="rotate(160 100 70)" fill="url(#k-petal)"/><ellipse cx="100" cy="57.65" rx="4.68" ry="8.06" transform="rotate(200 100 70)" fill="url(#k-petal)"/><ellipse cx="100" cy="57.65" rx="4.68" ry="8.06" transform="rotate(240 100 70)" fill="url(#k-petal)"/><ellipse cx="100" cy="57.65" rx="4.68" ry="8.06" transform="rotate(280 100 70)" fill="url(#k-petal)"/><ellipse cx="100" cy="57.65" rx="4.68" ry="8.06" transform="rotate(320 100 70)" fill="url(#k-petal)"/><circle cx="100" cy="70" r="6.5" fill="#5a3410"/><circle cx="98.31" cy="68.05" r="1.95" fill="#fff" opacity="0.35"/>
 </svg>

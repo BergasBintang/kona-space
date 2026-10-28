@@ -1,113 +1,100 @@
-// Kona's logo: a cat head (pointed ears) with a sunflower in its face, and two gold eyes in the middle of the flower. The cat is the
-// name's owner; the sunflower is for the owner's girlfriend. Chosen from the options on 2026-10-28 (see CHANGELOG).
-// Drawn headless (no FigCraft window). Run:  node docs/design/build/build-logo.mjs
-// Writes: docs/design/kona-logo.figcraft and previews/logo.png (the board), docs/design/logo/kona-mark.svg and kona-icon.svg,
-//         app/public/favicon.svg and app/src/components/KonaMark.tsx (generated: do not edit by hand; change this script).
+// Kona's logo (version 2, chosen 2026-10-28 from the options in CHANGELOG 0.19.4): a black cat with soft pointed ears, two tilted white oval
+// eyes and a sunflower between the ears, on an ice-blue rounded square. The cat is the name's owner; the sunflower is for the owner's girlfriend.
+// Plain SVG, no FigCraft needed. Run:  node docs/design/build/build-logo.mjs
+// Writes: docs/design/logo/kona-icon.svg (the app icon), docs/design/logo/kona-mark.svg (the flat gold mark),
+//         app/public/favicon.svg (the icon again) and app/src/components/KonaMark.tsx (the mark as a component; generated, do not edit by hand).
 // The app's icon files (app/src-tauri/icons) are made from kona-icon.svg: see docs/design/logo/README.md
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { C, M, L, Q, Z, polar, petal, disc, oval, place, arcCmds, makeSteps } from './logo-lib.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const DOCS = path.resolve(HERE, '..');
+const LOGO = path.resolve(HERE, '../logo');
 const APP = path.resolve(HERE, '../../../app');
-const CLI = process.env.FIGCRAFT_CLI ?? 'C:/Program Files/FigCraft/figcraft-cli.exe';
+const CX = 100;
+const mx = ([x, y]) => [2 * CX - x, y];
+const f = (n) => Number(n.toFixed(2));
+const P = ([x, y]) => `${f(x)} ${f(y)}`;
 
-/** one cat head in one piece: a round head, two pointed ears with softened tips, a gentle dip between them. (cx, cy) is the head's centre, `u` scales it. */
-function head(name, fill, cx = 100, cy = 118, u = 1, soft = 5) {
-  const R = 66 * u, tipY = cy - 92 * u, tipDx = 38 * u;
-  const pA = polar(cx, cy, R, -80), pB = polar(cx, cy, R, -9), pA2 = polar(cx, cy, R, 80), pB2 = polar(cx, cy, R, 9);
-  const tipL = [cx - tipDx, tipY], tipR = [cx + tipDx, tipY];
-  const along = (from, to, d) => { const dx = to[0] - from[0], dy = to[1] - from[1], len = Math.hypot(dx, dy); return [from[0] + (dx / len) * d, from[1] + (dy / len) * d]; };
-  const d = soft * u;
-  const tipCmds = (tip, a, b) => { const p1 = along(tip, a, d), p2 = along(tip, b, d); return [L(...p1), Q(tip[0], tip[1], ...p2)]; };
-  return { name, fill, cmds: [M(...pA), ...tipCmds(tipL, pA, pB), L(...pB), Q(cx, cy - 58 * u, ...pB2), ...tipCmds(tipR, pB2, pA2), L(...pA2), ...arcCmds(cx, cy, R, 80, 280), Z] };
+// the head is drawn as its right half and mirrored, so it is exactly symmetric
+function mirrored(start, segs) {
+  const pts = [start, ...segs.map((s) => (s.L ? s.L[0] : s.C[2]))];
+  let d = `M${P(start)}`;
+  for (const s of segs) d += s.L ? ` L${P(s.L[0])}` : ` C${P(s.C[0])} ${P(s.C[1])} ${P(s.C[2])}`;
+  for (let i = segs.length - 1; i >= 0; i--) {
+    const s = segs[i], prev = pts[i];
+    d += s.L ? ` L${P(mx(prev))}` : ` C${P(mx(s.C[1]))} ${P(mx(s.C[0]))} ${P(mx(prev))}`;
+  }
+  return d + ' Z';
 }
-const rrect = (name, x, y, w, h, r, fill) => {
-  const k = 0.5523 * r;
-  return { name, fill, cmds: [M(x + r, y), L(x + w - r, y), { k: 'C', p: [[x + w - r + k, y], [x + w, y + r - k], [x + w, y + r]] }, L(x + w, y + h - r), { k: 'C', p: [[x + w, y + h - r + k], [x + w - r + k, y + h], [x + w - r, y + h]] }, L(x + r, y + h), { k: 'C', p: [[x + r - k, y + h], [x, y + h - r + k], [x, y + h - r]] }, L(x, y + r), { k: 'C', p: [[x, y + r - k], [x + r - k, y], [x + r, y]] }, Z] };
+const HEAD = mirrored([100, 83], [
+  { C: [[110, 80], [118, 82], [124, 88]] },
+  { L: [[148, 60]] },
+  { C: [[156, 70], [159, 90], [159, 110]] },
+  { C: [[159, 141], [136, 157], [100, 157]] },
+]);
+const SQUARE = 'M60 8 H140 C176 8 192 24 192 60 V140 C192 176 176 192 140 192 H60 C24 192 8 176 8 140 V60 C8 24 24 8 60 8 Z';
+const EYES = [[80, 115, 7], [120, 115, -7]]; // x, y, tilt in degrees
+const EYE_RX = 9.5, EYE_RY = 13.5;
+const FLOWER = { cx: 100, cy: 70, r: 13, petals: 9 };
+
+const petalEllipses = (fill) => {
+  const { cx, cy, r, petals } = FLOWER;
+  let s = '';
+  for (let i = 0; i < petals; i++) s += `<ellipse cx="${cx}" cy="${f(cy - r * 0.95)}" rx="${f(r * 0.36)}" ry="${f(r * 0.62)}" transform="rotate(${(360 / petals) * i} ${cx} ${cy})" fill="${fill}"/>`;
+  return s;
 };
 
-const BG = C.surface1;
-const GOLD = C.gold;
+// ---- the app icon: ice-blue square, black cat, white eyes, gold flower
+const icon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<defs>
+  <linearGradient id="k-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d6ecff"/><stop offset="1" stop-color="#6fa8e6"/></linearGradient>
+  <linearGradient id="k-gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.45"/><stop offset="0.5" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  <linearGradient id="k-rim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.55"/><stop offset="0.35" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.18"/></linearGradient>
+  <linearGradient id="k-dark" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34293f"/><stop offset="0.55" stop-color="#17101f"/><stop offset="1" stop-color="#09060d"/></linearGradient>
+  <linearGradient id="k-sheen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.26"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  <radialGradient id="k-petal" cx="0.5" cy="0.3" r="0.9"><stop offset="0" stop-color="#ffd884"/><stop offset="1" stop-color="#e0952a"/></radialGradient>
+  <filter id="k-soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5"/></filter>
+  <clipPath id="k-head"><path d="${HEAD}"/></clipPath>
+</defs>
+<path d="${SQUARE}" fill="url(#k-bg)"/><path d="${SQUARE}" fill="url(#k-gloss)" opacity="0.5"/><path d="${SQUARE}" fill="none" stroke="url(#k-rim)" stroke-width="1.6"/>
+<ellipse cx="100" cy="164" rx="46" ry="7" fill="#000" opacity="0.35" filter="url(#k-soft)"/>
+<path d="${HEAD}" fill="url(#k-dark)" stroke="url(#k-dark)" stroke-width="8" stroke-linejoin="round"/>
+<g clip-path="url(#k-head)"><rect x="40" y="54" width="120" height="62" fill="url(#k-sheen)"/></g>
+${EYES.map(([x, y, a]) => `<ellipse cx="${x}" cy="${y}" rx="${EYE_RX}" ry="${EYE_RY}" fill="#fff" transform="rotate(${a} ${x} ${y})"/>`).join('')}
+<circle cx="84" cy="108" r="2.6" fill="#fff" opacity="0.9"/><circle cx="124" cy="108" r="2.6" fill="#fff" opacity="0.9"/>
+${petalEllipses('url(#k-petal)')}<circle cx="${FLOWER.cx}" cy="${FLOWER.cy}" r="${f(FLOWER.r * 0.5)}" fill="#5a3410"/><circle cx="${f(FLOWER.cx - FLOWER.r * 0.13)}" cy="${f(FLOWER.cy - FLOWER.r * 0.15)}" r="${f(FLOWER.r * 0.15)}" fill="#fff" opacity="0.35"/>
+</svg>
+`;
 
-/** the mark on a tile: gold head, the petals and the middle cut out, two gold eyes in the middle (`cut` shapes are the cut-outs) */
-function mark() {
-  const s = [head('cat', GOLD)];
-  for (let i = 0; i < 12; i++) s.push({ ...petal('petal ' + i, 100, 118, i * 30, 25, 51, 5.4, BG), cut: true });
-  s.push({ ...disc('centre', 100, 118, 20, BG), cut: true });
-  s.push(oval('eye left', 92, 117, 3.6, 5, GOLD), oval('eye right', 108, 117, 3.6, 5, GOLD));
-  return s;
-}
-/** the app icon: a gold rounded square, the cat in the dark, the flower and eyes in gold and dark */
-function icon() {
-  const cx = 100, cy = 120, u = 0.8;
-  const s = [rrect('icon', 0, 0, 200, 200, 46, GOLD), head('cat', C.ground, cx, cy, u, 5)];
-  for (let i = 0; i < 12; i++) s.push(petal('petal ' + i, cx, cy, i * 30, 25 * u, 51 * u, 5.4 * u, GOLD));
-  s.push(disc('centre', cx, cy, 20 * u, GOLD));
-  s.push(oval('eye left', cx - 8 * u, cy - 1 * u, 3.6 * u, 5 * u, C.ground), oval('eye right', cx + 8 * u, cy - 1 * u, 3.6 * u, 5 * u, C.ground));
-  return s;
-}
+// ---- the flat mark: one colour (gold by default), the eyes and a ring around the flower cut out of the head
+const HALO = f(FLOWER.r * 1.7);
+const markBody = (id, color) => `<defs>
+  <mask id="${id}-head" maskUnits="userSpaceOnUse" x="0" y="0" width="200" height="200"><rect width="200" height="200" fill="#fff"/>
+    ${EYES.map(([x, y, a]) => `<ellipse cx="${x}" cy="${y}" rx="${EYE_RX}" ry="${EYE_RY}" fill="#000" transform="rotate(${a} ${x} ${y})"/>`).join('')}
+    <circle cx="${FLOWER.cx}" cy="${FLOWER.cy}" r="${HALO}" fill="#000"/></mask>
+  <mask id="${id}-flower" maskUnits="userSpaceOnUse" x="0" y="0" width="200" height="200"><rect width="200" height="200" fill="#fff"/>
+    <circle cx="${FLOWER.cx}" cy="${FLOWER.cy}" r="${f(FLOWER.r * 0.5)}" fill="#000"/></mask>
+</defs>
+<g mask="url(#${id}-head)"><path d="${HEAD}" fill="${color}" stroke="${color}" stroke-width="8" stroke-linejoin="round"/></g>
+<g mask="url(#${id}-flower)">${petalEllipses(color)}<circle cx="${FLOWER.cx}" cy="${FLOWER.cy}" r="${f(FLOWER.r * 0.5)}" fill="${color}"/></g>`;
+const markSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">\n${markBody('m', '#e8b25a')}\n</svg>\n`;
 
-// ---- the board in FigCraft
-const { steps, rect, text, drawing } = makeSteps();
-const W = 1200, H = 760;
-rect('canvas', 0, 0, W, H, C.canvas);
-text('title', 'Kona: the logo', 80, 56, 30, C.text, 'Bold');
-text('subtitle', 'A cat with pointed ears, a sunflower in its face, and two eyes in the flower.', 80, 100, 15, C.text2);
-rect('tile', 80, 160, 420, 420, BG, 24);
-drawing('big', place(mark(), 80 + 50, 160 + 50, 1.6));
-rect('icon tile', 540, 160, 420, 420, C.ground, 24);
-drawing('icon', place(icon(), 540 + 80, 160 + 80, 1.3));
-text('mark label', 'The mark', 80, 604, 20, C.text, 'Bold');
-text('mark note', 'Gold on Kona\'s dark surface. Used beside the name and in the sidebar.', 80, 638, 14, C.text2, 'Regular', 420);
-text('icon label', 'The app icon', 540, 604, 20, C.text, 'Bold');
-text('icon note', 'Window, taskbar and installer. Same drawing, dark on a gold square.', 540, 638, 14, C.text2, 'Regular', 420);
-rect('small tile', 1000, 160, 120, 420, C.ground, 16);
-[[64, 0.32, 200], [32, 0.16, 290], [24, 0.12, 345], [16, 0.08, 395]].forEach(([px, sc, y]) => drawing(`${px}`, place(mark(), 1034, 160 + y - 120 + 40, sc)));
-
-const script = path.join(HERE, '.logo-steps.json');
-fs.writeFileSync(script, JSON.stringify(steps));
-const file = path.join(DOCS, 'kona-logo.figcraft');
-const out = execFileSync(CLI, ['run', script, '--out', file], { encoding: 'utf8', maxBuffer: 1 << 26 });
-fs.rmSync(script);
-const bad = out.split('\n').filter((l) => /"error"|"ok":false/.test(l));
-if (bad.length) console.log(bad.slice(0, 5).join('\n'));
-fs.mkdirSync(path.join(DOCS, 'previews'), { recursive: true });
-execFileSync(CLI, ['render', file, '-o', path.join(DOCS, 'previews', 'logo.png')]);
-console.log('wrote', file, fs.statSync(file).size, 'bytes');
-
-// ---- plain files
-const ds = (shapes) => place(shapes, 0, 0, 1);
-const head0 = ds(mark());
-const cuts = head0.filter((s) => s.cut), solid = head0.filter((s) => !s.cut);
-const maskedSvg = (id, colour) => `<defs><mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="200" height="200"><path d="${solid[0].d}" fill="#fff"/>${cuts.map((c) => `<path d="${c.d}" fill="#000"/>`).join('')}</mask></defs>
-<path d="${solid[0].d}" fill="${colour}" mask="url(#${id})"/>${solid.slice(1).map((e) => `<path d="${e.d}" fill="${colour}"/>`).join('')}`;
-fs.mkdirSync(path.join(DOCS, 'logo'), { recursive: true });
-fs.writeFileSync(path.join(DOCS, 'logo', 'kona-mark.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">\n<title>Kona</title>\n${maskedSvg('cut', GOLD)}\n</svg>\n`);
-const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">\n<title>Kona</title>\n${ds(icon()).map((sh) => `<path d="${sh.d}" fill="${sh.fill}"/>`).join('\n')}\n</svg>\n`;
-fs.writeFileSync(path.join(DOCS, 'logo', 'kona-icon.svg'), iconSvg);
-fs.writeFileSync(path.join(APP, 'public', 'favicon.svg'), iconSvg);
-
-fs.writeFileSync(path.join(APP, 'src', 'components', 'KonaMark.tsx'), `// The Kona mark: a cat head with a sunflower in its face. GENERATED by docs/design/build/build-logo.mjs; change the script, not this file.
+const tsx = `// The Kona mark: a cat head with a sunflower between its ears. GENERATED by docs/design/build/build-logo.mjs; change the script, not this file.
 import { useId } from "react";
 
 export function KonaMark({ size = 24, color = "var(--color-brand)", title }: { size?: number; color?: string; title?: string }) {
-  const id = "kona-cut-" + useId().replace(/[^a-zA-Z0-9]/g, "");
+  const id = "kona-" + useId().replace(/[^a-zA-Z0-9]/g, "");
   return (
     <svg width={size} height={size} viewBox="0 0 200 200" role={title ? "img" : undefined} aria-label={title} aria-hidden={title ? undefined : true} className="shrink-0">
-      <defs>
-        <mask id={id} maskUnits="userSpaceOnUse" x="0" y="0" width="200" height="200">
-          <path d="${solid[0].d}" fill="#fff" />
-${cuts.map((c) => `          <path d="${c.d}" fill="#000" />`).join('\n')}
-        </mask>
-      </defs>
-      <path d="${solid[0].d}" fill={color} mask={\`url(#\${id})\`} />
-${solid.slice(1).map((e) => `      <path d="${e.d}" fill={color} />`).join('\n')}
+      ${markBody('${id}', '${color}').replace(/\n/g, '\n      ').replace(/stroke-width/g, 'strokeWidth').replace(/stroke-linejoin/g, 'strokeLinejoin').replace(/maskUnits/g, 'maskUnits').replace(/mask="url\(#\$\{id\}-(head|flower)\)"/g, 'mask={`url(#${id}-$1)`}').replace(/<mask id="\$\{id\}-(head|flower)"/g, '<mask id={`${id}-$1`}').replace(/fill="\$\{color\}"/g, 'fill={color}').replace(/stroke="\$\{color\}"/g, 'stroke={color}')}
     </svg>
   );
 }
-`);
-console.log('wrote the SVG files, the favicon and KonaMark.tsx');
+`;
+
+fs.writeFileSync(path.join(LOGO, 'kona-icon.svg'), icon);
+fs.writeFileSync(path.join(LOGO, 'kona-mark.svg'), markSvg);
+fs.writeFileSync(path.join(APP, 'public', 'favicon.svg'), icon);
+fs.writeFileSync(path.join(APP, 'src', 'components', 'KonaMark.tsx'), tsx);
+console.log('written: kona-icon.svg, kona-mark.svg, favicon.svg, KonaMark.tsx');

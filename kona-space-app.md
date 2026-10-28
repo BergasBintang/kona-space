@@ -128,6 +128,7 @@ This note holds no keys, tokens, passwords, IP addresses or e-mail addresses, on
 | 2026-10-28 | **Kona 0.19.1** (help buttons, map, crop fix) | Circled ? help dialogs, draggable and zoomable Brain map, Start a session no longer cropped. |
 | 2026-10-28 | **Kona 0.19.2** (softer look) | Lighter dark theme, gold touches (active place, mark on start screens, update card, selection). |
 | 2026-10-28 | **Kona 0.19.3** (costs per project) | Costs opens on the open project; All projects shows the whole ledger. |
+| 2026-10-28 | **Kona 0.19.4** (new logo, costs per project) | Ice-blue cat-and-sunflower icon, flat gold mark, Costs always one project. |
 
 **Where the work lives**
 - Design file: `docs/design/kona-design.figcraft` (open in FigCraft; it is also the clickable prototype). Previews: `docs/design/previews/`. Rules and tokens: `docs/DESIGN.md`.
@@ -1289,6 +1290,8 @@ Proposed. It moves accounts and the leftovers job object earlier than first sugg
 **A softer look (2026-10-28, Kona 0.19.1 to 0.19.2).** The owner asked for a lighter dark theme that is neither too dark nor too bright, with the Kona mark colour here and there. Every surface, line and text token in `app/src/index.css` moved up one step (ground `#101417` to `#1f262d`); contrast was computed again for text, accent, lines and state colours on the tinted backgrounds (the tint went from 14 to 10 percent). The gold (`--color-brand`) is used for the mark, the selection colour and a marker on the active place, never for buttons. Decision: gold stays the logo colour (Claude's orange was considered and rejected: too close to the error coral, and it would look like an official Claude app).
 
 **Costs per project (2026-10-28, Kona 0.19.3).** The ledger is global by design (one SQLite file, every folder), and the Costs screen used to show all of it. It now filters the rows to the open project's folder by default, with a This project or All projects switch; the old behaviour is one press away. Rows of removed projects stay in the ledger (they appear under All projects). Decision: removing a project from Kona does not delete its cost history; a clean-up of the ledger would need the owner's yes and a copy of kona.db first.
+
+**A new logo and Costs per project only (2026-10-28, Kona 0.19.4).** The owner gave two glossy cat app icons as examples and chose, from two rounds of options, the black cat with a flower between the ears on ice blue (ice blue because the flower is gold and gold on gold lost the flower). The app theme stays dusk slate with the teal accent: the ice blue is the same cool hue family, and a blue accent would sit too close to the idle colour. The flat mark in the sidebar is gold (the brand colour). `build-logo.mjs` was rewritten to plain SVG; `logo-lib.mjs` is no longer used. Costs lost its scope switch at the owner's request: the screen shows the open project only.
 
 Why this order:
 - Steps 1 to 3 replace the owner's daily use of one terminal session and fix the leftovers problem.

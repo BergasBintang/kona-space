@@ -10,7 +10,7 @@ import { MultiSelect } from "./pick";
 import { Help } from "./Help";
 
 const blank = (project_id: string): Server => ({ id: "", project_id, label: "", host: "", port: 22, user: "", key_path: "", fingerprints: [], roles: [], notes: "" });
-const field = "h-11 rounded-control border border-line-strong bg-inset px-3.5 text-[15px] text-text placeholder:text-text-tertiary";
+const field = "h-11 border border-line-strong bg-inset px-3.5 text-[15px] text-text placeholder:text-text-tertiary";
 
 /** A ready-to-paste entry for `~\.ssh\config`: the key is named, and only that key is tried. Kona never writes that file. */
 export const configEntry = (s: Server) => `Host ${s.host}\n  User ${s.user}\n  Port ${s.port}\n  IdentityFile ${s.key_path}\n  IdentitiesOnly yes`;
@@ -74,7 +74,7 @@ export function Servers({ project, roles }: { project: Project; roles: Role[] })
 
         {list === null && <p className="m-0 text-text-tertiary">Reading the list…</p>}
         {list && list.length === 0 && !draft && (
-          <div className="flex flex-col gap-2 rounded-card border border-dashed border-line-strong p-6">
+          <div className="flex flex-col gap-2 border border-dashed border-line-strong p-6">
             <span className="font-bold">No servers for this project yet.</span>
             <span className="text-[14px] leading-5 text-text-secondary">Until you add one, no role can run ssh, scp or sftp in this project: those commands are refused before they run.</span>
           </div>
@@ -83,7 +83,7 @@ export function Servers({ project, roles }: { project: Project; roles: Role[] })
         {(list ?? []).map((s) => {
           const st = state(s, look?.server.id === s.id ? look.prints : undefined);
           return (
-            <section key={s.id} aria-label={s.label} className="flex flex-col gap-4 rounded-card border border-line-subtle bg-surface-1 p-5">
+            <section key={s.id} aria-label={s.label} className="flex flex-col gap-4 border border-line-subtle bg-surface-1 p-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex min-w-0 flex-col gap-1">
                   <h2 className="m-0 truncate text-[18px] leading-7 font-bold">{s.label}</h2>
@@ -95,7 +95,7 @@ export function Servers({ project, roles }: { project: Project; roles: Role[] })
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[13px] leading-5 font-bold text-text-secondary">Roles that may use it:</span>
                 {s.roles.length === 0 && <span className="text-[13px] leading-5 text-state-waiting">none, so no role can connect</span>}
-                {s.roles.map((r) => <span key={r} className="flex items-center gap-1.5 rounded-full bg-surface-3 py-0.5 pr-2.5 pl-1 text-[12px] leading-5 font-bold"><RoleMark roleId={r} size={20} />{roleName(r)}</span>)}
+                {s.roles.map((r) => <span key={r} className="flex items-center gap-1.5 bg-surface-3 py-0.5 pr-2.5 pl-1 text-[12px] leading-5 font-bold"><RoleMark roleId={r} size={20} />{roleName(r)}</span>)}
               </div>
               <KeyLine path={s.key_path} />
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -112,7 +112,7 @@ export function Servers({ project, roles }: { project: Project; roles: Role[] })
         })}
 
         {draft && (
-          <section aria-label={draft.id ? "Edit server" : "Add a server"} className="flex flex-col gap-4 rounded-card border border-accent bg-surface-1 p-5">
+          <section aria-label={draft.id ? "Edit server" : "Add a server"} className="flex flex-col gap-4 border border-accent bg-surface-1 p-5">
             <h2 className="m-0 text-[18px] leading-7 font-bold">{draft.id ? "Edit the server" : "Add a server"}</h2>
             <div className="grid grid-cols-2 gap-4">
               <label className="flex flex-col gap-2"><span className="text-[13px] leading-5 font-bold text-text-secondary">Name</span><input value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} placeholder="Web server" aria-label="Name" className={field} /></label>
@@ -129,7 +129,7 @@ export function Servers({ project, roles }: { project: Project; roles: Role[] })
               {draft.key_path && <KeyLine path={draft.key_path} />}
             </div>
             <MultiSelect label="Roles that may use this server" values={draft.roles} onChange={(v) => setDraft({ ...draft, roles: v })} placeholder="None: no role can connect" options={roleOptions} />
-            <label className="flex flex-col gap-2"><span className="text-[13px] leading-5 font-bold text-text-secondary">Notes (no passwords or keys)</span><textarea value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} rows={2} aria-label="Notes" className="rounded-control border border-line-strong bg-inset px-3.5 py-3 text-[15px] leading-6 text-text" /></label>
+            <label className="flex flex-col gap-2"><span className="text-[13px] leading-5 font-bold text-text-secondary">Notes (no passwords or keys)</span><textarea value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} rows={2} aria-label="Notes" className="border border-line-strong bg-inset px-3.5 py-3 text-[15px] leading-6 text-text" /></label>
             {error && <div className="flex items-start gap-2.5 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
             <div className="flex justify-end gap-3"><Button variant="quiet" onClick={() => setDraft(null)}>Cancel</Button><Button onClick={() => save(draft)} disabled={busy || !draft.label.trim() || !draft.host.trim() || !draft.user.trim()}>{busy ? "Saving…" : "Save"}</Button></div>
           </section>

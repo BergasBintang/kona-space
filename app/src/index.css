@@ -9,7 +9,6 @@
   --font-pixel: "Pixelify Sans Variable", "Nunito Sans Variable", "Segoe UI", system-ui, sans-serif; /* the interface: headings, buttons, labels */
   --font-mono: "Cascadia Mono", Consolas, "Courier New", monospace; /* code, paths, file contents */
 
-  --color-canvas: #e8dec6;
   --color-ground: #f2e9d4;
   --color-surface-1: #ece1c9;
   --color-surface-2: #f8f1e1;
@@ -38,14 +37,7 @@
   --color-state-left: #a33727;
   --color-on-danger: #fffaf0;
 
-  /* hard edges: no rounded corners anywhere (pixel look) */
-  --radius-sm: 0px;
-  --radius-control: 0px;
-  --radius-card: 0px;
-  --radius-dialog: 0px;
-  --radius-lg: 0px;
-  --radius-xl: 0px;
-  --radius-2xl: 0px;
+  /* hard edges: no screen asks for a rounded corner any more (pixel look), so there are no radius tokens */
 }
 
 :root { --k: 1; } /* 100 / the zoom percent: wide pages use it to stay as wide as they were at 100% */

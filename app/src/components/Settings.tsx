@@ -13,7 +13,7 @@ import { KonaMark } from "./KonaMark";
 
 const size = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
 const when = (name: string) => name.replace(/^(\d{4}-\d{2}-\d{2})-(\d{2})-(\d{2})$/, "$1 $2:$3");
-const field = "h-11 rounded-control border border-line-strong bg-inset px-3.5 text-[15px] text-text placeholder:text-text-tertiary";
+const field = "h-11 border border-line-strong bg-inset px-3.5 text-[15px] text-text placeholder:text-text-tertiary";
 
 export function Settings({ projects, version, onProjects }: { projects: Project[]; version: string; onProjects: (next: Project[]) => void }) {
   const [s, setS] = useState<SettingsT | null>(null);
@@ -47,7 +47,7 @@ export function Settings({ projects, version, onProjects }: { projects: Project[
     <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
       <div className="mx-auto flex w-full max-w-[calc(960px*var(--k))] flex-col gap-8 px-8 pt-8 pb-10">
         <h1 className="m-0 text-[30px] leading-[38px] font-bold">Settings</h1>
-        {notice && <div role="status" className="flex items-start gap-2.5 rounded-control border border-line-subtle bg-surface-2 px-4 py-3 text-[14px] leading-5"><Glyph state="done" size={16} /> <span className="break-all">{notice}</span></div>}
+        {notice && <div role="status" className="flex items-start gap-2.5 border border-line-subtle bg-surface-2 px-4 py-3 text-[14px] leading-5"><Glyph state="done" size={16} /> <span className="break-all">{notice}</span></div>}
         {error && <div className="flex items-start gap-2.5 text-[14px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
 
         <section className="flex flex-col gap-3" aria-label="Size">
@@ -80,7 +80,7 @@ export function Settings({ projects, version, onProjects }: { projects: Project[
         <section className="flex flex-col gap-3" aria-label="Projects">
           <h2 className="m-0 text-[18px] leading-7 font-bold">Projects</h2>
           {projects.map((p) => (
-            <div key={p.id} className="flex flex-col gap-3 rounded-card border border-line-subtle bg-surface-1 p-4">
+            <div key={p.id} className="flex flex-col gap-3 border border-line-subtle bg-surface-1 p-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex min-w-0 flex-col"><span className="truncate font-bold">{p.name}</span><span className="truncate font-mono text-[12px] leading-5 text-text-tertiary" title={p.folder}>{p.folder}</span></div>
                 <Button variant="ghost" small onClick={() => setDropProject(p)}>Remove…</Button>
@@ -100,7 +100,7 @@ export function Settings({ projects, version, onProjects }: { projects: Project[
           </div>
           {backups.length === 0 && <p className="m-0 text-[14px] leading-5 text-text-tertiary">No backups yet. Kona never deletes one by itself.</p>}
           {backups.map((b) => (
-            <div key={b.name} className="flex items-center justify-between gap-4 rounded-card border border-line-subtle bg-surface-1 px-4 py-3">
+            <div key={b.name} className="flex items-center justify-between gap-4 border border-line-subtle bg-surface-1 px-4 py-3">
               <div className="flex min-w-0 flex-col"><span className="font-bold">{when(b.name)}</span><span className="text-[13px] leading-5 text-text-tertiary">{b.files} files · {size(b.bytes)}</span></div>
               <div className="flex shrink-0 gap-2"><Button variant="ghost" small onClick={() => void revealItemInDir(b.path)}>Show in Explorer</Button><Button variant="ghost" small onClick={() => setDropBackup(b)}>Delete…</Button></div>
             </div>

@@ -1,6 +1,6 @@
 # Kona
 
-A desktop workspace for [Claude Code](https://claude.com/claude-code), for Windows. One window to start Claude Code sessions per project, browse the project's files, give each session a role, keep track of what it costs, and run a small board of tickets that Claude can read and update itself.
+A desktop workspace for [Claude Code](https://claude.com/claude-code), for Windows. One window to start Claude Code sessions per project, browse the project's files, give each session a role (a cat at its own desk in a small pixel office), keep track of what it costs, and run a small board of tickets that Claude can read and update itself.
 
 Kona is a personal project, made by one person for their own PC. It is early (see `VERSION`), it changes often, and nothing is promised.
 
@@ -8,8 +8,9 @@ Kona is a personal project, made by one person for their own PC. It is early (se
 
 - **Projects and files:** add a project (a folder), browse it, read files (text, JSON, markdown, pictures, PDFs). Read-only.
 - **Sessions:** chat with Claude Code per project, see each step, approve or refuse each command or file change (or always allow one here), paste pictures, resume an earlier session. At most two run at once by default.
-- **Roles:** ten starting roles (Product, Design, Frontend, Backend, QA, Security, DevOps, Marketing, Content and SEO, Support), each with a model, a permission mode and a short brief. You can change them and add your own.
-- **Accounts:** two or more Claude logins, chosen per session.
+- **The office:** Kona opens on a welcome page with a card per project, then an isometric pixel-art office with a room for every place below. A cat sits at a desk for each role and types, waves or blinks from what its session is doing. A top bar keeps the project, a list of every room, what waits on you, the account and the plan bars in view.
+- **Roles:** ten roles (Product, Design, Frontend, Backend, QA, Security, DevOps, Marketing, Content and SEO, Support) and a Secretary at the front desk who turns what you say into tickets. Each has a model, a permission mode and a short brief. They come with Kona and cannot be changed.
+- **Accounts:** two or more Claude logins. Each project uses exactly one, chosen on the welcome page.
 - **Costs:** what sessions cost in dollars (an estimate at list price, not a bill), by project, role, ticket, account, model, day or session.
 - **Needs check:** which local tools (Git, Node, PHP, Docker and so on) a role or project needs, and which are missing. It only looks; it never installs.
 - **Voice:** how Claude talks to you in chat, set once.
@@ -59,7 +60,7 @@ To make an installer instead: `npm run tauri build` in `app`. It writes `app/src
 
 ## Your data
 
-Kona keeps its own data on your PC: `%APPDATA%\Kona` (projects, roles, accounts, the voice, the cost ledger) and a hidden `.kona` folder inside each project you add (tickets), which Kona tells Git to ignore. Nothing leaves your PC except what Claude Code itself sends to Anthropic, and the update check (one request to GitHub for a small file, which you can turn off). Kona never stores a login or a key; each account is a folder that Claude Code owns.
+Kona keeps its own data on your PC: `%APPDATA%\Kona` (projects, accounts, the voice, the cost ledger) and a hidden `.kona` folder inside each project you add (tickets), which Kona tells Git to ignore. Nothing leaves your PC except what Claude Code itself sends to Anthropic, and the update check (one request to GitHub for a small file, which you can turn off). Kona never stores a login or a key; each account is a folder that Claude Code owns.
 
 ## License
 

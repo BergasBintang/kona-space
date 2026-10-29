@@ -99,7 +99,7 @@ function Picker({ multiple, values, onChange, label, ariaLabel, options, placeho
               <input ref={searchBox} type="search" value={query} onChange={(e) => { setQuery(e.target.value); setCursor(0); }} onKeyDown={onKey}
                 placeholder={label ? `Search ${where}` : "Search"} aria-label={label ? `Search ${where}` : "Search"} autoComplete="off" role="combobox" aria-expanded="true"
                 aria-controls={`${uid}-list`} aria-activedescendant={active}
-                className="h-10 w-full rounded-control border border-line-strong bg-inset px-3 text-[14px] text-text placeholder:text-text-tertiary" />
+                className="h-10 w-full border border-line-strong bg-inset px-3 text-[14px] text-text placeholder:text-text-tertiary" />
             </div>
           )}
           <div id={`${uid}-list`} role="listbox" aria-multiselectable={multiple || undefined} aria-label={label ?? ariaLabel} className="min-h-0 flex-1 overflow-y-auto p-1.5">
@@ -113,7 +113,7 @@ function Picker({ multiple, values, onChange, label, ariaLabel, options, placeho
           {multiple && (
             <div className="flex items-center justify-between border-t border-line-subtle px-3.5 py-2 text-[13px] leading-5 text-text-secondary">
               <span>{chosen.length === 0 ? "Nothing chosen" : `${chosen.length} chosen`}</span>
-              <button type="button" disabled={chosen.length === 0} onMouseDown={(e) => e.preventDefault()} onClick={() => onChange([])} className="rounded font-bold hover:text-text disabled:text-text-disabled">Clear</button>
+              <button type="button" disabled={chosen.length === 0} onMouseDown={(e) => e.preventDefault()} onClick={() => onChange([])} className="font-bold hover:text-text disabled:text-text-disabled">Clear</button>
             </div>
           )}
         </Popover>

@@ -11,7 +11,7 @@ import { localDate } from "../../lib/brain/text.ts";
 
 export const LAYER_WORD: Record<string, string> = { project: "Project", starter: "Starter", memory: "Claude's memory" };
 
-export const Chip = ({ children, tone = "" }: { children: React.ReactNode; tone?: string }) => <span className={`rounded-full bg-surface-3 px-2.5 py-0.5 text-[12px] leading-5 font-bold ${tone || "text-text-secondary"}`}>{children}</span>;
+export const Chip = ({ children, tone = "" }: { children: React.ReactNode; tone?: string }) => <span className={`bg-surface-3 px-2.5 py-0.5 text-[12px] leading-5 font-bold ${tone || "text-text-secondary"}`}>{children}</span>;
 
 const slug = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
 const today = () => localDate();
@@ -83,12 +83,12 @@ export function NoteView({ projectId, brain, note, draftTitle, onOpen, onClose, 
           {fresh && (
             <label className="flex flex-col gap-2">
               <span className="text-[13px] leading-5 font-bold text-text-secondary">Name (lower-case letters, digits and dashes)</span>
-              <input value={name} onChange={(e) => setName(slug(e.target.value))} aria-label="Note name" className="h-11 rounded-control border border-line-strong bg-inset px-3.5 font-mono text-[14px] text-text" />
+              <input value={name} onChange={(e) => setName(slug(e.target.value))} aria-label="Note name" className="h-11 border border-line-strong bg-inset px-3.5 font-mono text-[14px] text-text" />
             </label>
           )}
           <label className="flex flex-col gap-2">
             <span className="text-[13px] leading-5 font-bold text-text-secondary">The note (markdown). Link to another note with [[its name]].</span>
-            <textarea value={text} onChange={(e) => setText(e.target.value)} rows={18} aria-label="The note" spellCheck={false} className="rounded-control border border-line-strong bg-inset p-3.5 font-mono text-[13px] leading-5 text-text" />
+            <textarea value={text} onChange={(e) => setText(e.target.value)} rows={18} aria-label="The note" spellCheck={false} className="border border-line-strong bg-inset p-3.5 font-mono text-[13px] leading-5 text-text" />
           </label>
           {error && <div className="flex items-start gap-2.5 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
           <div className="flex justify-end gap-3">
@@ -103,11 +103,11 @@ export function NoteView({ projectId, brain, note, draftTitle, onOpen, onClose, 
       {note && !editing && (
         <div className="grid grid-cols-2 gap-4">
           {([["This note links to", out.map((e) => ({ id: e.t, trust: e.trust, kind: e.k, line: lineOf(note.id, e.t) }))], ["Linked from", into.map((e) => ({ id: e.s, trust: e.trust, kind: e.k, line: lineOf(e.s, note.id) }))]] as const).map(([label, rows]) => (
-            <section key={label} className="flex flex-col gap-2 rounded-card border border-line-subtle bg-surface-1 p-4" aria-label={label}>
+            <section key={label} className="flex flex-col gap-2 border border-line-subtle bg-surface-1 p-4" aria-label={label}>
               <h3 className="m-0 text-[14px] leading-5 font-bold">{label}</h3>
               {rows.length === 0 && <span className="text-[13px] leading-5 text-text-tertiary">Nothing.</span>}
               {rows.map((r) => (
-                <button key={r.id} type="button" onClick={() => onOpen(r.id)} className="flex items-center justify-between gap-3 rounded text-left text-[14px] leading-5 hover:text-accent">
+                <button key={r.id} type="button" onClick={() => onOpen(r.id)} className="flex items-center justify-between gap-3 text-left text-[14px] leading-5 hover:text-accent">
                   <span className="truncate font-bold">{title(r.id)}</span>
                   <span className="shrink-0 text-[12px] text-text-tertiary">{r.trust === "written" ? "written" : "guessed"}{r.kind === "ref" ? ", named" : ""}{r.line ? ` · line ${r.line}` : ""}</span>
                 </button>

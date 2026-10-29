@@ -129,7 +129,7 @@ export function SmartSearch({ label, ariaLabel, placeholder, where, options = []
           className="bare min-w-0 flex-1 bg-transparent text-text outline-none placeholder:text-text-tertiary" />
         {text && !disabled && (
           <button type="button" aria-label="Clear" onMouseDown={(e) => e.preventDefault()} onClick={() => { setText(""); ownClear.current = true; onChange(null); setOpen(true); search("", true); input.current?.focus(); }}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-text-secondary hover:text-text">
+            className="flex h-6 w-6 shrink-0 items-center justify-center text-text-secondary hover:text-text">
             <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4 L12 12 M12 4 L4 12" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" /></svg>
           </button>
         )}

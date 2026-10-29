@@ -25,7 +25,7 @@ export function UpdateCard({ running }: { running: number }) {
       {u.phase === "downloading" && (
         <>
           <div className="flex items-center gap-2.5"><Glyph state="live" size={18} /><span className="font-bold">Downloading Kona {u.version}{pct !== null ? `: ${pct}%` : "…"}</span></div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-inset" aria-hidden="true"><div className="h-full bg-accent" style={{ width: `${pct ?? 4}%` }} /></div>
+          <div className="h-1.5 overflow-hidden bg-inset" aria-hidden="true"><div className="h-full bg-accent" style={{ width: `${pct ?? 4}%` }} /></div>
         </>
       )}
       {u.phase === "error" && (

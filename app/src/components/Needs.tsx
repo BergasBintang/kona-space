@@ -39,12 +39,12 @@ export function Needs({ project, role }: { project: Project; role: Role | null }
   };
 
   return (
-    <section aria-label="Tools this session needs" className="flex flex-col gap-3 rounded-control border border-line-subtle bg-surface-1 px-4 py-3.5">
+    <section aria-label="Tools this session needs" className="flex flex-col gap-3 border border-line-subtle bg-surface-1 px-4 py-3.5">
       <div className="flex items-center justify-between gap-3">
         <span className="text-[13px] leading-5 font-bold text-text-secondary">Tools this session needs</span>
         <span className="flex items-center gap-3 text-[13px] leading-5 text-text-tertiary">
           {status === null ? "Looking…" : missing === 0 ? "All here" : `${missing} missing`}
-          <button type="button" onClick={() => setAgain((n) => n + 1)} className="rounded font-bold text-text-secondary hover:text-text">Check again</button>
+          <button type="button" onClick={() => setAgain((n) => n + 1)} className="font-bold text-text-secondary hover:text-text">Check again</button>
         </span>
       </div>
       <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
@@ -58,8 +58,8 @@ export function Needs({ project, role }: { project: Project; role: Role | null }
             </div>
             {!r.installed && (
               <div className="ml-[26px] flex items-center gap-3">
-                <code className="min-w-0 truncate rounded bg-inset px-2 py-1 font-mono text-[13px] text-text-secondary" title={r.install}>{r.install}</code>
-                {r.install.startsWith("winget") && <button type="button" onClick={() => copy(r.id, r.install)} className="shrink-0 rounded text-[13px] font-bold text-text-secondary hover:text-text">{copied === r.id ? "Copied" : "Copy"}</button>}
+                <code className="min-w-0 truncate bg-inset px-2 py-1 font-mono text-[13px] text-text-secondary" title={r.install}>{r.install}</code>
+                {r.install.startsWith("winget") && <button type="button" onClick={() => copy(r.id, r.install)} className="shrink-0 text-[13px] font-bold text-text-secondary hover:text-text">{copied === r.id ? "Copied" : "Copy"}</button>}
               </div>
             )}
           </li>

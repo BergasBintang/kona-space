@@ -13,12 +13,12 @@ const size = (b: number) => (b < 1024 ? `${b} bytes` : b < 1024 * 1024 ? `${(b /
 
 function Row({ it, who, onStop, onIgnore }: { it: LeftoverItem; who: string; onStop: () => void; onIgnore?: () => void }) {
   return (
-    <div className="flex flex-col gap-2 rounded-card border border-line-subtle bg-surface-1 p-4">
+    <div className="flex flex-col gap-2 border border-line-subtle bg-surface-1 p-4">
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="text-[15px] font-bold">{it.name}</span>
-            {it.ports.map((p) => <span key={p} className="rounded-full bg-surface-3 px-2.5 py-0.5 font-mono text-[12px] leading-5 text-text">Port {p}</span>)}
+            {it.ports.map((p) => <span key={p} className="bg-surface-3 px-2.5 py-0.5 font-mono text-[12px] leading-5 text-text">Port {p}</span>)}
           </div>
           <span className="truncate font-mono text-[12px] leading-5 text-text-tertiary" title={it.cmd || it.name}>{it.cmd || "(command not readable)"}</span>
           <span className="text-[13px] leading-5 text-text-secondary">Started by {who} · running for {age(it.age_secs)} · pid {it.pid}</span>
@@ -74,7 +74,7 @@ export function Leftovers({ state, roles, overview, onRefresh }: { state: State;
     <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
       <div className="mx-auto flex w-full max-w-[calc(1160px*var(--k))] flex-col gap-7 px-8 pt-8 pb-10">
         <div className="flex items-center gap-3"><h1 className="m-0 text-[30px] leading-[38px] font-bold">Leftovers</h1><Help title="Leftovers"><p className="m-0">Programs your sessions started (dev servers, watchers) and what is still running after a session ended.</p><p className="m-0">Kona only sees sessions it started itself, and when Kona closes it stops all of them.</p></Help></div>
-        {notice && <div role="status" className="flex items-start gap-2.5 rounded-control border border-line-subtle bg-surface-2 px-4 py-3 text-[14px] leading-5"><Glyph state="done" size={16} /> {notice}</div>}
+        {notice && <div role="status" className="flex items-start gap-2.5 border border-line-subtle bg-surface-2 px-4 py-3 text-[14px] leading-5"><Glyph state="done" size={16} /> {notice}</div>}
 
         <section className="flex flex-col gap-3" aria-label="Left behind">
           <h2 className="m-0 flex items-center gap-2.5 text-[17px] leading-6 font-bold"><Glyph state={left.length ? "left" : "done"} size={18} />{left.length ? `${left.length} left behind` : "Nothing left behind"}</h2>
@@ -89,7 +89,7 @@ export function Leftovers({ state, roles, overview, onRefresh }: { state: State;
 
         {ignored.length > 0 && (
           <section className="flex flex-col gap-2" aria-label="Ignored">
-            <button type="button" onClick={() => setShowIgnored((v) => !v)} aria-expanded={showIgnored} className="self-start rounded text-[14px] leading-5 font-bold text-text-secondary hover:text-text">{showIgnored ? "Hide" : "Show"} {ignored.length} ignored</button>
+            <button type="button" onClick={() => setShowIgnored((v) => !v)} aria-expanded={showIgnored} className="self-start text-[14px] leading-5 font-bold text-text-secondary hover:text-text">{showIgnored ? "Hide" : "Show"} {ignored.length} ignored</button>
             {showIgnored && ignored.map((it) => <Row key={it.key} it={it} who={who(it.session_id)} onStop={() => { setStopping(it); setError(null); }} />)}
           </section>
         )}
@@ -100,7 +100,7 @@ export function Leftovers({ state, roles, overview, onRefresh }: { state: State;
           {bigTemps.map((t) => {
             const live = state.sessions[t.session_id]?.run !== "ended";
             return (
-              <div key={t.session_id} className="flex items-center justify-between gap-4 rounded-card border border-line-subtle bg-surface-1 p-4">
+              <div key={t.session_id} className="flex items-center justify-between gap-4 border border-line-subtle bg-surface-1 p-4">
                 <div className="flex min-w-0 flex-col gap-1">
                   <span className="truncate font-bold">{who(t.session_id)}</span>
                   <span className="text-[13px] leading-5 text-text-secondary">{size(t.bytes)} in {t.files}{t.partial ? "+" : ""} {t.files === 1 ? "file" : "files"}{live ? " · session still open" : ""}</span>
@@ -119,7 +119,7 @@ export function Leftovers({ state, roles, overview, onRefresh }: { state: State;
       {stopping && (
         <Confirm title={`Stop ${stopping.name}?`} confirmLabel="Stop it" danger busy={busy} error={error} onConfirm={doStop} onCancel={() => setStopping(null)}>
           <p className="m-0">Started by {who(stopping.session_id)}{stopping.left_behind ? ", which has ended" : ", which is still open"}.</p>
-          <p className="m-0 break-all rounded-control bg-inset px-3 py-2 font-mono text-[13px] leading-5 text-text">{stopping.cmd || stopping.name}</p>
+          <p className="m-0 break-all bg-inset px-3 py-2 font-mono text-[13px] leading-5 text-text">{stopping.cmd || stopping.name}</p>
           {stopping.ports.length > 0 && <p className="m-0">It is listening on {stopping.ports.map((p) => `port ${p}`).join(", ")}. Anything using it will lose the connection.</p>}
           <p className="m-0">Kona also stops anything this program started. Unsaved work in it is lost.</p>
           {!stopping.left_behind && <p className="m-0 font-bold text-state-waiting">The session is still open and may be using it.</p>}

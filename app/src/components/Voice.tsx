@@ -18,7 +18,7 @@ function Check({ label, hint, on, onChange }: { label: string; hint?: string; on
   );
 }
 
-const field = "h-11 rounded-control border border-line-strong bg-inset px-3.5 text-[15px] text-text placeholder:text-text-tertiary";
+const field = "h-11 border border-line-strong bg-inset px-3.5 text-[15px] text-text placeholder:text-text-tertiary";
 
 export function Voice({ persona, onChanged }: { persona: Persona; onChanged: (p: Persona) => void }) {
   const [draft, setDraft] = useState<Persona>(persona);
@@ -53,7 +53,7 @@ export function Voice({ persona, onChanged }: { persona: Persona; onChanged: (p:
         <label className="flex flex-col gap-2">
           <span className="text-[13px] leading-5 font-bold text-text-secondary">Describe the voice</span>
           <textarea value={draft.voice} onChange={(e) => set({ voice: e.target.value })} rows={3}
-            className="rounded-control border border-line-strong bg-inset px-3.5 py-3 text-[15px] leading-6 text-text placeholder:text-text-tertiary" placeholder="A terse operator. Short sentences. Facts first." />
+            className="border border-line-strong bg-inset px-3.5 py-3 text-[15px] leading-6 text-text placeholder:text-text-tertiary" placeholder="A terse operator. Short sentences. Facts first." />
           <span className={`text-[13px] leading-5 ${words > 300 ? "text-state-left" : "text-text-tertiary"}`}>{words} words. It is sent at the start of every session, so keep it under 300.</span>
         </label>
 
@@ -86,7 +86,7 @@ export function Voice({ persona, onChanged }: { persona: Persona; onChanged: (p:
           <span className="text-[13px] leading-5 text-text-tertiary">Write <code className="font-mono">{"{project}"}</code> where the project's name should go. Permission questions, warnings and error messages always stay plain.</span>
         </fieldset>
 
-        <details className="rounded-control border border-line-subtle bg-surface-1 px-4 py-3">
+        <details className="border border-line-subtle bg-surface-1 px-4 py-3">
           <summary className="cursor-pointer text-[14px] leading-5 font-bold text-text-secondary">What Claude is told</summary>
           <p className="mt-3 mb-0 whitespace-pre-wrap font-mono text-[13px] leading-5 text-text-secondary">{prompt || "Nothing: the voice is off."}</p>
         </details>

@@ -2,6 +2,15 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.20.1, 2026-10-30
+
+Cleanup of what the old look left behind. Nothing new to learn.
+
+- The leftover rounded-corner classes (100 uses) and the radius tokens of the soft look are gone, along with an unused colour token.
+- A command nothing called (`running_sessions`) is removed, and the backup no longer copies the old `roles.json`.
+- The README and the Accounts help now describe the office, the fixed roles and one account per project.
+- Still waiting for a decision (ticket T-0003): the old design files in `docs/design`, the FigCraft guide, the early trials and spikes, and a few files outside the project.
+
 ## 0.20.0, 2026-10-30
 
 The office: a new look, a welcome page, one account per project, and a pixel office instead of the sidebar.

@@ -81,14 +81,14 @@ export function BrainPlace({ project, onAsk }: { project: Project; onAsk: (quest
   else if (tab === "notes") {
     body = (
       <div className="flex flex-col gap-4">
-        <div role="group" aria-label="Layer" className="flex self-start rounded-control border border-line-strong p-0.5">
+        <div role="group" aria-label="Layer" className="flex self-start border border-line-strong p-0.5">
           {([["all", "All"], ["project", "Project"], ["starter", "Starter"], ["memory", "Claude's memory"]] as const).map(([id, word]) => (
-            <button key={id} type="button" aria-pressed={layer === id} onClick={() => setLayer(id)} className={`h-9 rounded-[10px] px-3.5 text-[14px] ${layer === id ? "bg-surface-3 font-bold text-text" : "text-text-secondary hover:text-text"}`}>{word}{id !== "all" ? ` (${counts[id]})` : ""}</button>
+            <button key={id} type="button" aria-pressed={layer === id} onClick={() => setLayer(id)} className={`h-9 px-3.5 text-[14px] ${layer === id ? "bg-surface-3 font-bold text-text" : "text-text-secondary hover:text-text"}`}>{word}{id !== "all" ? ` (${counts[id]})` : ""}</button>
           ))}
         </div>
         {data?.memory_dir === null && layer === "memory" && <p className="m-0 text-[14px] leading-5 text-text-tertiary">Claude has no memory folder for this project yet.</p>}
         {noteList.map((n) => (
-          <button key={n.id} type="button" onClick={() => openNote(n.id)} className="flex items-start justify-between gap-4 rounded-card border border-line-subtle bg-surface-1 p-4 text-left hover:bg-surface-2">
+          <button key={n.id} type="button" onClick={() => openNote(n.id)} className="flex items-start justify-between gap-4 border border-line-subtle bg-surface-1 p-4 text-left hover:bg-surface-2">
             <span className="flex min-w-0 flex-col gap-1.5">
               <span className="truncate text-[15px] leading-6 font-bold">{n.title}</span>
               <span className="line-clamp-2 text-[13px] leading-5 text-text-secondary">{n.sections[0]?.text.split("\n").map((l) => l.trim()).find((l) => l && !/^#/.test(l))?.replace(/[*`]/g, "")}</span>
@@ -120,11 +120,11 @@ export function BrainPlace({ project, onAsk }: { project: Project; onAsk: (quest
         </div>
 
         <form className="flex gap-3" onSubmit={(e) => { e.preventDefault(); void ask(); }} role="search">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ask the brain, for example: what is a worktree?" aria-label="Ask the brain" className="h-12 min-w-0 flex-1 rounded-control border border-line-strong bg-inset px-4 text-[15px] text-text placeholder:text-text-tertiary" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ask the brain, for example: what is a worktree?" aria-label="Ask the brain" className="h-12 min-w-0 flex-1 border border-line-strong bg-inset px-4 text-[15px] text-text placeholder:text-text-tertiary" />
           <Button type="submit" disabled={!q.trim() || data === null}>Ask</Button>
         </form>
 
-        {notice && <div role="status" className="flex items-start gap-2.5 rounded-control border border-line-subtle bg-surface-2 px-4 py-3 text-[14px] leading-5"><Glyph state="done" size={16} /> {notice}</div>}
+        {notice && <div role="status" className="flex items-start gap-2.5 border border-line-subtle bg-surface-2 px-4 py-3 text-[14px] leading-5"><Glyph state="done" size={16} /> {notice}</div>}
         {busy && <p className="m-0 text-[13px] text-text-tertiary">Starting a session…</p>}
 
         {open === null && !asked && (
@@ -140,7 +140,7 @@ export function BrainPlace({ project, onAsk }: { project: Project; onAsk: (quest
       {web && (
         <Confirm title="Search the web for this?" confirmLabel="Open my browser" onConfirm={() => { void openUrl(`https://duckduckgo.com/?q=${encodeURIComponent(web)}`); setWeb(null); }} onCancel={() => setWeb(null)}>
           <p className="m-0">Your browser opens a search with exactly these words. They are sent to the search site, so leave out anything private.</p>
-          <p className="m-0 rounded-control bg-inset px-3 py-2 text-[14px] leading-5 text-text">{web}</p>
+          <p className="m-0 bg-inset px-3 py-2 text-[14px] leading-5 text-text">{web}</p>
         </Confirm>
       )}
     </main>

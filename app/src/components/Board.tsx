@@ -33,7 +33,7 @@ function Card({ t, role, live, active, onOpen }: { t: TicketView; role?: Role; l
     <div role="button" tabIndex={0} draggable aria-label={`${t.id} ${t.title}`}
       onClick={onOpen} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } }}
       onDragStart={(e) => { e.dataTransfer.setData("text/kona-ticket", t.id); e.dataTransfer.effectAllowed = "move"; }}
-      className={`flex cursor-grab flex-col gap-2.5 rounded-card border px-3.5 py-3 text-left active:cursor-grabbing ${active ? "border-accent bg-surface-2" : "border-line-subtle bg-surface-1 hover:bg-surface-2"}`}>
+      className={`flex cursor-grab flex-col gap-2.5 border px-3.5 py-3 text-left active:cursor-grabbing ${active ? "border-accent bg-surface-2" : "border-line-subtle bg-surface-1 hover:bg-surface-2"}`}>
       <div className="flex items-center justify-between gap-2">
         <span className="font-mono text-[12px] text-text-tertiary">{t.id}</span>
         {live && (
@@ -55,7 +55,7 @@ function Card({ t, role, live, active, onOpen }: { t: TicketView; role?: Role; l
 
 type Draft = { title: string; description: string; acceptance: string; role: string; status: string; next: string; waiting: boolean; own_copy: string };
 const draftOf = (t: TicketView | null): Draft => ({ title: t?.title ?? "", description: t?.description ?? "", acceptance: t?.acceptance ?? "", role: t?.role ?? "", status: t?.status ?? "backlog", next: t?.next ?? "", waiting: t?.waiting ?? false, own_copy: t?.own_copy ?? "auto" });
-const field = "rounded-control border border-line-strong bg-inset px-3.5 text-[15px] text-text placeholder:text-text-tertiary";
+const field = "border border-line-strong bg-inset px-3.5 text-[15px] text-text placeholder:text-text-tertiary";
 
 function Drawer({ project, roles, ticket, state, guardDone, onClose, onSaved, onRemoved, onStart, onOpenSession }: {
   project: Project; roles: Role[]; ticket: TicketView | null; state: State; guardDone: (t: TicketView) => Promise<boolean>; onClose: () => void;
@@ -131,7 +131,7 @@ function Drawer({ project, roles, ticket, state, guardDone, onClose, onSaved, on
             { value: "yes", label: "Its own copy of the repo", hint: "A separate folder on its own branch" },
             { value: "no", label: "The main folder", hint: "Claude works in your project folder itself" }]} />
           {!fresh && ticket!.branch && (
-            <div className="flex flex-col gap-1 rounded-control border border-line-subtle bg-inset px-3.5 py-2.5 text-[13px] leading-5">
+            <div className="flex flex-col gap-1 border border-line-subtle bg-inset px-3.5 py-2.5 text-[13px] leading-5">
               <span className="font-mono text-text-secondary">{ticket!.branch}</span>
               <span className="truncate font-mono text-text-tertiary" title={ticket!.worktree}>{ticket!.worktree}</span>
               {wt?.exists ? <span className="text-text-secondary">{wt.ahead} {wt.ahead === 1 ? "commit" : "commits"} ahead of {wt.base}, {wt.behind} behind · {wt.changed} {wt.changed === 1 ? "file" : "files"} changed, not committed</span> : <span className="text-text-tertiary">The folder is gone. A new session makes it again.</span>}
@@ -164,7 +164,7 @@ function Drawer({ project, roles, ticket, state, guardDone, onClose, onSaved, on
               {ticket!.sessions.map((id) => (
                 <div key={id} className="flex items-center justify-between gap-3 text-[14px] leading-5">
                   <span className="font-mono text-text-secondary">{id.slice(0, 8)}</span>
-                  {state.sessions[id] ? <button type="button" onClick={() => onOpenSession(id)} className="rounded font-bold text-text-secondary hover:text-text">Open</button> : <span className="text-text-tertiary">Not open in this window</span>}
+                  {state.sessions[id] ? <button type="button" onClick={() => onOpenSession(id)} className="font-bold text-text-secondary hover:text-text">Open</button> : <span className="text-text-tertiary">Not open in this window</span>}
                 </div>
               ))}
               {ticket!.cost > 0 && <span className="font-mono text-[13px] text-text-secondary">{dollars(ticket!.cost)} so far <span className="font-sans text-text-tertiary">· an estimate, not your bill</span></span>}
@@ -250,7 +250,7 @@ export function Board({ project, roles, state, onStart, onOpenSession }: {
           {COLUMNS.map((c) => (
             <section key={c.id} aria-label={c.name}
               onDragOver={(e) => { e.preventDefault(); setOver(c.id); }} onDragLeave={() => setOver((o) => (o === c.id ? null : o))} onDrop={(e) => drop(c.id, e)}
-              className={`flex min-w-[168px] max-w-[300px] flex-1 basis-0 flex-col gap-2.5 rounded-card border px-2.5 pt-3 pb-2.5 ${over === c.id ? "border-accent bg-surface-1" : "border-transparent bg-ground"}`}>
+              className={`flex min-w-[168px] max-w-[300px] flex-1 basis-0 flex-col gap-2.5 border px-2.5 pt-3 pb-2.5 ${over === c.id ? "border-accent bg-surface-1" : "border-transparent bg-ground"}`}>
               <div className="flex items-baseline justify-between px-1.5">
                 <h2 className="m-0 text-[15px] leading-6 font-bold">{c.name}</h2>
                 <span className="font-mono text-[13px] text-text-tertiary">{byColumn[c.id].length}</span>

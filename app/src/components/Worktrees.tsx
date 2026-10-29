@@ -20,7 +20,7 @@ function Graph({ list }: { list: WorktreeInfo[] }) {
   const height = 56 + others.length * rowH;
   const stateColor = (w: WorktreeInfo) => (w.conflicts.length ? "var(--color-state-left)" : w.changed > 0 ? "var(--color-state-waiting)" : "var(--color-accent)");
   return (
-    <div className="overflow-x-auto rounded-card border border-line-subtle bg-surface-1 p-4">
+    <div className="overflow-x-auto border border-line-subtle bg-surface-1 p-4">
       <svg width={width} height={height} role="img" aria-label={`The branches of ${main.branch || "the main folder"}: ${others.map((w) => `${w.branch || "detached"} is ${w.ahead} ahead and ${w.behind} behind`).join("; ") || "no other copies"}`}>
         <text x={0} y={24} fontSize="14" fontWeight="700" fill="currentColor">{main.branch || "main folder"}</text>
         <line x1={labelW + x0} y1={20} x2={labelW + x0 + L * step} y2={20} stroke="var(--color-line-strong)" strokeWidth="2" />
@@ -92,7 +92,7 @@ export function Worktrees({ project, onChanged }: { project: Project; onChanged:
 
         {error && <div className="flex items-start gap-2.5 text-[14px] leading-5 text-text-secondary"><Glyph state="idle" size={16} /> {error}</div>}
         {list === null && !error && <p className="m-0 text-text-tertiary">Asking Git…</p>}
-        {notice && <div role="status" className="flex items-start gap-2.5 rounded-control border border-line-subtle bg-surface-2 px-4 py-3 text-[14px] leading-5"><Glyph state="done" size={16} /> {notice}</div>}
+        {notice && <div role="status" className="flex items-start gap-2.5 border border-line-subtle bg-surface-2 px-4 py-3 text-[14px] leading-5"><Glyph state="done" size={16} /> {notice}</div>}
 
         {list && list.length > 0 && <Graph list={list} />}
         {list && list.length > 0 && others.length === 0 && !error && <p className="m-0 text-text-tertiary">Only the main folder so far. Start a session from a Frontend or Backend ticket and its own copy appears here.</p>}
@@ -101,13 +101,13 @@ export function Worktrees({ project, onChanged }: { project: Project; onChanged:
           {(list ?? []).map((x) => {
             const s = state(x);
             return (
-              <section key={x.path} aria-label={x.branch || x.path} className="flex flex-col gap-3 rounded-card border border-line-subtle bg-surface-1 p-5">
+              <section key={x.path} aria-label={x.branch || x.path} className="flex flex-col gap-3 border border-line-subtle bg-surface-1 p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex min-w-0 flex-col gap-1">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                       <span className="truncate font-mono text-[15px] font-bold">{x.branch || "(no branch)"}</span>
-                      {x.is_main && <span className="rounded-full bg-surface-3 px-2.5 py-0.5 text-[12px] leading-5 font-bold text-text-secondary">Main folder</span>}
-                      {x.ticket_id && <span className="rounded-full bg-surface-3 px-2.5 py-0.5 text-[12px] leading-5 font-bold text-text-secondary">{x.ticket_id} · {x.ticket_title}</span>}
+                      {x.is_main && <span className="bg-surface-3 px-2.5 py-0.5 text-[12px] leading-5 font-bold text-text-secondary">Main folder</span>}
+                      {x.ticket_id && <span className="bg-surface-3 px-2.5 py-0.5 text-[12px] leading-5 font-bold text-text-secondary">{x.ticket_id} · {x.ticket_title}</span>}
                       {!x.is_main && !x.ticket_id && <span className="text-[13px] text-text-tertiary">Not from a ticket</span>}
                     </div>
                     <span className="truncate font-mono text-[12px] leading-5 text-text-tertiary" title={x.path}>{x.path}</span>
@@ -146,7 +146,7 @@ export function Worktrees({ project, onChanged }: { project: Project; onChanged:
             ? <p className="m-0">Its branch has nothing the main branch lacks, so the branch is deleted too.</p>
             : <p className="m-0">Its branch has {w.ahead} {w.ahead === 1 ? "commit" : "commits"} that are not merged. The branch is kept unless you choose to throw it away.</p>)}
           {(w.changed > 0 || (w.ahead > 0 && !w.missing)) && (
-            <label className="flex cursor-pointer items-start gap-3 rounded-control border border-line-subtle bg-inset px-3.5 py-3">
+            <label className="flex cursor-pointer items-start gap-3 border border-line-subtle bg-inset px-3.5 py-3">
               <input type="checkbox" checked={discard} onChange={(e) => setDiscard(e.target.checked)} className="mt-1 h-4 w-4 accent-[var(--color-state-left)]" />
               <span className="text-[14px] leading-5 text-text">Also throw away {[w.changed > 0 ? `${w.changed} ${w.changed === 1 ? "changed file" : "changed files"}` : "", w.ahead > 0 ? `the branch and its ${w.ahead} unmerged ${w.ahead === 1 ? "commit" : "commits"}` : ""].filter(Boolean).join(" and ")}. This cannot be undone.</span>
             </label>

@@ -34,9 +34,9 @@ export function OptionRow({ id, hit, chosen, active, box, onPick, onHover }: {
   return (
     <div id={id} role="option" aria-selected={chosen} aria-disabled={o.disabled || undefined}
       onMouseDown={(e) => e.preventDefault() /* keep the focus where it is */} onClick={() => { if (!o.disabled) onPick(); }} onMouseMove={onHover}
-      className={`flex min-h-10 cursor-pointer items-center gap-3 rounded-lg px-3 py-1.5 ${active ? "bg-surface-3" : ""} ${o.disabled ? "cursor-not-allowed text-text-disabled" : ""}`}>
+      className={`flex min-h-10 cursor-pointer items-center gap-3 px-3 py-1.5 ${active ? "bg-surface-3" : ""} ${o.disabled ? "cursor-not-allowed text-text-disabled" : ""}`}>
       {box ? (
-        <span className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border ${chosen ? "border-accent bg-accent text-on-accent" : "border-line-strong"}`}>
+        <span className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center border ${chosen ? "border-accent bg-accent text-on-accent" : "border-line-strong"}`}>
           {chosen && <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">{TICK}</svg>}
         </span>
       ) : (
@@ -56,8 +56,8 @@ export function NoMatch({ query, where, suggestion, onSuggest, onClear }: { quer
     <div className="flex flex-col gap-2 px-3 py-3 text-[14px] leading-5 text-text-secondary">
       <span>Nothing matches “{query}” in {where}.</span>
       <span className="flex flex-wrap gap-x-4 gap-y-1">
-        {suggestion && <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => onSuggest(suggestion)} className="rounded font-bold text-text hover:underline">Did you mean “{suggestion}”?</button>}
-        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={onClear} className="rounded font-bold text-text-secondary hover:text-text hover:underline">Clear the search</button>
+        {suggestion && <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => onSuggest(suggestion)} className="font-bold text-text hover:underline">Did you mean “{suggestion}”?</button>}
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={onClear} className="font-bold text-text-secondary hover:text-text hover:underline">Clear the search</button>
       </span>
     </div>
   );

@@ -28,7 +28,7 @@ export function Confirm({ title, children, confirmLabel, danger = false, busy = 
         <div className="flex flex-col gap-3 text-[15px] leading-6 text-text-secondary">{children}</div>
         {error && <div className="flex items-start gap-2.5 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
         <div className="flex justify-end gap-3 pt-1">
-          <button ref={cancel} type="button" onClick={onCancel} className="inline-flex h-11 items-center justify-center rounded-control border border-line-strong px-5 text-[15px] font-bold text-text hover:bg-surface-3">Cancel</button>
+          <button ref={cancel} type="button" onClick={onCancel} className="inline-flex h-11 items-center justify-center border border-line-strong px-5 text-[15px] font-bold text-text hover:bg-surface-3">Cancel</button>
           <Button variant={danger ? "danger" : "primary"} onClick={onConfirm} disabled={disabled || busy}>{busy ? "Working…" : confirmLabel}</Button>
         </div>
       </div>

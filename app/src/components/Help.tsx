@@ -11,7 +11,7 @@ export function Help({ title, children }: { title: string; children: ReactNode }
   return (
     <>
       <button ref={opener} type="button" onClick={() => setOpen(true)} aria-label={`About ${title}`} aria-haspopup="dialog" title="What is this?"
-        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-line-strong text-[13px] leading-none font-bold text-text-secondary transition-colors hover:bg-surface-3 hover:text-text">?</button>
+        className="inline-flex h-6 w-6 shrink-0 items-center justify-center border border-line-strong text-[13px] leading-none font-bold text-text-secondary transition-colors hover:bg-surface-3 hover:text-text">?</button>
       {open && <HelpDialog title={title} onClose={close}>{children}</HelpDialog>}
     </>
   );
@@ -33,7 +33,7 @@ function HelpDialog({ title, children, onClose }: { title: string; children: Rea
         className="flex max-h-full w-full max-w-[520px] flex-col gap-4 overflow-y-auto px-card px-shadow p-3">
         <h2 className="m-0 text-[20px] leading-7 font-bold">{title}</h2>
         <div className="flex flex-col gap-3 text-[15px] leading-6 text-text-secondary">{children}</div>
-        <div className="flex justify-end pt-1"><button ref={closer} type="button" onClick={onClose} className="inline-flex h-11 items-center justify-center rounded-control border border-line-strong px-5 text-[15px] font-bold text-text hover:bg-surface-3">Close</button></div>
+        <div className="flex justify-end pt-1"><button ref={closer} type="button" onClick={onClose} className="inline-flex h-11 items-center justify-center border border-line-strong px-5 text-[15px] font-bold text-text hover:bg-surface-3">Close</button></div>
       </div>
     </div>,
     document.body,

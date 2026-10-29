@@ -89,7 +89,7 @@ export function MapView({ brain, onOpen }: { brain: Brain; onOpen: (id: string) 
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_300px] gap-5">
-      <div className="overflow-hidden rounded-card border border-line-subtle bg-surface-1">
+      <div className="overflow-hidden border border-line-subtle bg-surface-1">
         <svg ref={svgRef} viewBox={`${v.x} ${v.y} ${v.w} ${(v.w * H) / W}`} width="100%" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} role="img" aria-label={`A map of ${brain.notes.size} notes in ${brain.clusters.length} groups. The notes tab lists the same notes as text.`} className={`block touch-none select-none ${dragging ? "cursor-grabbing" : "cursor-grab"}`}>
           {regions.map((g) => (
             <g key={g.id}>
@@ -138,7 +138,7 @@ export function MapView({ brain, onOpen }: { brain: Brain; onOpen: (id: string) 
         </div>
       </div>
 
-      <aside className="flex flex-col gap-3 rounded-card border border-line-subtle bg-surface-1 p-4" aria-label="Selected note">
+      <aside className="flex flex-col gap-3 border border-line-subtle bg-surface-1 p-4" aria-label="Selected note">
         {!note && <p className="m-0 text-[14px] leading-5 text-text-tertiary">Pick a dot to see its note: what it says, what it links to and what links to it.</p>}
         {note && (
           <>

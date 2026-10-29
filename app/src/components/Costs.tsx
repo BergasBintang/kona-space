@@ -31,10 +31,10 @@ type Line = { key: string; label: string; sub?: string; cost: number; input: num
 
 function Chips<T extends string>({ label, value, onChange, items }: { label: string; value: T; onChange: (v: T) => void; items: { id: T; word: string }[] }) {
   return (
-    <div role="group" aria-label={label} className="flex rounded-control border border-line-strong p-0.5">
+    <div role="group" aria-label={label} className="flex border border-line-strong p-0.5">
       {items.map((i) => (
         <button key={i.id} type="button" aria-pressed={value === i.id} onClick={() => onChange(i.id)}
-          className={`h-9 rounded-[10px] px-3.5 text-[14px] ${value === i.id ? "bg-surface-3 font-bold text-text" : "text-text-secondary hover:text-text"}`}>{i.word}</button>
+          className={`h-9 px-3.5 text-[14px] ${value === i.id ? "bg-surface-3 font-bold text-text" : "text-text-secondary hover:text-text"}`}>{i.word}</button>
       ))}
     </div>
   );
@@ -110,7 +110,7 @@ export function Costs({ project, roles, accounts }: { project: Project | null; r
         {error && <div className="flex items-start gap-2.5 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
         {rows === null && !error && <p className="m-0 text-text-tertiary">Reading the ledger…</p>}
         {shown !== null && lines.length === 0 && (
-          <div className="flex flex-col gap-2 rounded-card border border-dashed border-line-strong p-6">
+          <div className="flex flex-col gap-2 border border-dashed border-line-strong p-6">
             <span className="font-bold">Nothing spent {project ? `in ${project.name} ` : ""}{period === "all" ? "yet" : "in this period"}.</span>
             <span className="text-[14px] leading-5 text-text-secondary">{period === "all" ? "Start a session and each finished turn is saved here." : "Try a longer period."}</span>
           </div>
@@ -123,7 +123,7 @@ export function Costs({ project, roles, accounts }: { project: Project | null; r
               <span role="columnheader" className="text-right">Sent</span><span role="columnheader" className="text-right">Written</span><span role="columnheader" className="text-right">Dollars</span>
             </div>
             {lines.map((l) => (
-              <div role="row" key={l.key} className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_88px_88px_104px] items-center gap-4 rounded-lg px-3 py-3 hover:bg-surface-1">
+              <div role="row" key={l.key} className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_88px_88px_104px] items-center gap-4 px-3 py-3 hover:bg-surface-1">
                 <span role="cell" className="flex min-w-0 flex-col">
                   <span className="truncate font-bold" title={l.label}>{l.label}</span>
                   <span className="truncate text-[13px] leading-5 text-text-tertiary" title={l.sub}>
@@ -131,7 +131,7 @@ export function Costs({ project, roles, accounts }: { project: Project | null; r
                   </span>
                 </span>
                 <span role="cell" className="flex items-center gap-2.5" aria-label={`${total > 0 ? Math.round((l.cost / total) * 100) : 0} percent of the total`}>
-                  <span className="h-2 flex-1 overflow-hidden rounded bg-surface-3"><span className="block h-full rounded bg-accent" style={{ width: `${top > 0 ? Math.max(3, (l.cost / top) * 100) : 0}%` }} /></span>
+                  <span className="h-2 flex-1 overflow-hidden bg-surface-3"><span className="block h-full bg-accent" style={{ width: `${top > 0 ? Math.max(3, (l.cost / top) * 100) : 0}%` }} /></span>
                   <span className="w-10 text-right font-mono text-[13px] text-text-secondary">{total > 0 ? Math.round((l.cost / total) * 100) : 0}%</span>
                 </span>
                 <span role="cell" className="text-right font-mono text-[13px] text-text-secondary" title="Tokens Claude read, new and from cache">{tokens(l.input + l.cache)}</span>

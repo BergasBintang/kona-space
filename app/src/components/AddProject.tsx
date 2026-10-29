@@ -39,7 +39,7 @@ export function AddProject({ first, accounts, onDone, onCancel, onOpenAccounts }
         <div className="flex flex-col gap-2">
           <span className="text-[13px] leading-5 font-bold text-text-secondary">Folder</span>
           <div className="flex gap-3">
-            <div className="flex h-11 min-w-0 flex-1 items-center rounded-control border border-line-strong bg-inset px-3.5 font-mono text-[14px]">
+            <div className="flex h-11 min-w-0 flex-1 items-center border border-line-strong bg-inset px-3.5 font-mono text-[14px]">
               <span className={`truncate ${folder ? "" : "text-text-tertiary"}`}>{folder || "No folder picked yet"}</span>
             </div>
             <Button variant="quiet" onClick={choose}>Choose a folder</Button>
@@ -47,11 +47,11 @@ export function AddProject({ first, accounts, onDone, onCancel, onOpenAccounts }
         </div>
         <label className="flex flex-col gap-2">
           <span className="text-[13px] leading-5 font-bold text-text-secondary">Name</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="shop-api" className="h-11 rounded-control border border-line-strong bg-inset px-3.5 text-[15px] text-text placeholder:text-text-tertiary" />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="shop-api" className="h-11 border border-line-strong bg-inset px-3.5 text-[15px] text-text placeholder:text-text-tertiary" />
         </label>
         <label className="flex flex-col gap-2">
           <span className="text-[13px] leading-5 font-bold text-text-secondary">GitHub address (optional)</span>
-          <input value={github} onChange={(e) => setGithub(e.target.value)} placeholder="owner/name" aria-label="GitHub address" className="h-11 rounded-control border border-line-strong bg-inset px-3.5 font-mono text-[15px] text-text placeholder:text-text-tertiary" />
+          <input value={github} onChange={(e) => setGithub(e.target.value)} placeholder="owner/name" aria-label="GitHub address" className="h-11 border border-line-strong bg-inset px-3.5 font-mono text-[15px] text-text placeholder:text-text-tertiary" />
         </label>
         <div className="flex flex-col gap-2">
           {signedIn.length > 0 || asking

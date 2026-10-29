@@ -46,7 +46,7 @@ function ToolLine({ it }: { it: Extract<Item, { kind: "tool" }> }) {
   const state: GlyphState = it.status === "running" ? "live" : it.status === "done" ? "done" : it.status === "denied" ? "stopped" : "left";
   const word = it.status === "running" ? "Running" : it.status === "done" ? "Done" : it.status === "denied" ? "You said no" : "Failed";
   return (
-    <div className="flex max-w-[calc(980px*var(--k))] items-center gap-2.5 rounded-control border border-line-subtle bg-surface-1 px-3.5 py-2.5">
+    <div className="flex max-w-[calc(980px*var(--k))] items-center gap-2.5 border border-line-subtle bg-surface-1 px-3.5 py-2.5">
       <Glyph state={state} size={16} />
       <span className="text-[13px] leading-5 text-text-secondary">{it.name}: {word}</span>
       {it.summary && <span className="truncate font-mono text-[13px] leading-5 text-text-tertiary">{it.summary}</span>}
@@ -57,20 +57,20 @@ function ToolLine({ it }: { it: Extract<Item, { kind: "tool" }> }) {
 function PermissionCard({ it, onAnswer }: { it: Extract<Item, { kind: "permission" }>; onAnswer: (allow: boolean, remember?: unknown[]) => void }) {
   const open = it.status === "asking";
   return (
-    <div className="flex max-w-[680px] flex-col gap-4 rounded-dialog border border-line-subtle bg-surface-2 p-6" role="group" aria-label={permissionTitle(it.toolName)}>
+    <div className="flex max-w-[680px] flex-col gap-4 border border-line-subtle bg-surface-2 p-6" role="group" aria-label={permissionTitle(it.toolName)}>
       <div className="flex items-center gap-3">
         <Glyph state={open ? "waiting" : it.status === "allowed" ? "done" : "stopped"} size={22} />
         <h2 className="m-0 text-[17px] leading-6 font-bold">{permissionTitle(it.toolName)}</h2>
       </div>
       {it.servers && it.servers.length > 0 && (
-        <div className="flex flex-col gap-1.5 rounded-control border border-state-waiting bg-surface-1 p-3.5">
+        <div className="flex flex-col gap-1.5 border border-state-waiting bg-surface-1 p-3.5">
           <span className="flex items-center gap-2 text-[14px] leading-5 font-bold text-state-waiting"><Glyph state="waiting" size={16} />This command reaches a server</span>
           {it.servers.map((sv) => <span key={sv.host} className="text-[14px] leading-5"><span className="font-bold">{sv.label}</span> <span className="font-mono text-text-secondary">{sv.user}@{sv.host}</span> <span className="text-text-tertiary">· {sv.checked ? "fingerprint saved" : "fingerprint not checked"}</span></span>)}
         </div>
       )}
       {it.description && <p className="m-0 text-text-secondary">{it.description}</p>}
       {it.command && (
-        <div className="flex flex-col gap-1 rounded-control border border-line-subtle bg-inset p-3.5">
+        <div className="flex flex-col gap-1 border border-line-subtle bg-inset p-3.5">
           <code className="font-mono text-[13px] leading-5 break-all whitespace-pre-wrap">{it.command}</code>
           {it.where && <span className="font-mono text-[13px] leading-5 text-text-tertiary">in {it.where}</span>}
         </div>
@@ -120,8 +120,8 @@ function Transcript({ s, onAnswer }: { s: Session; onAnswer: (it: Extract<Item, 
         if (it.kind === "user")
           return (
             <div key={it.id} className="flex justify-end">
-              <div className="flex max-w-[560px] flex-col gap-2 rounded-2xl bg-surface-3 px-[18px] py-3.5">
-                {it.images.length > 0 && <div className="flex flex-wrap gap-2">{it.images.map((src, i) => <img key={i} src={src} alt="A picture you sent" className="h-20 rounded-control" />)}</div>}
+              <div className="flex max-w-[560px] flex-col gap-2 bg-surface-3 px-[18px] py-3.5">
+                {it.images.length > 0 && <div className="flex flex-wrap gap-2">{it.images.map((src, i) => <img key={i} src={src} alt="A picture you sent" className="h-20" />)}</div>}
                 <span className="whitespace-pre-wrap">{it.text}</span>
               </div>
             </div>
@@ -173,13 +173,13 @@ function Composer({ s, onSend }: { s: Session; onSend: (text: string, images: At
 
   return (
     <div className="px-8 pb-6">
-      <div className="flex flex-col gap-3 rounded-2xl border border-line-strong bg-surface-2 px-[18px] pt-3.5 pb-3" onDrop={(e) => { e.preventDefault(); void add([...e.dataTransfer.files]); }} onDragOver={(e) => e.preventDefault()}>
+      <div className="flex flex-col gap-3 border border-line-strong bg-surface-2 px-[18px] pt-3.5 pb-3" onDrop={(e) => { e.preventDefault(); void add([...e.dataTransfer.files]); }} onDragOver={(e) => e.preventDefault()}>
         {images.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {images.map((im, i) => (
               <div key={i} className="relative">
-                <img src={im.url} alt="A picture waiting to be sent" className="h-16 rounded-control" />
-                <button className="absolute -top-2 -right-2 h-6 w-6 rounded-full border border-line-strong bg-surface-3 text-[13px] leading-none" aria-label="Remove this picture" onClick={() => setImages((cur) => cur.filter((_, j) => j !== i))}>×</button>
+                <img src={im.url} alt="A picture waiting to be sent" className="h-16" />
+                <button className="absolute -top-2 -right-2 h-6 w-6 border border-line-strong bg-surface-3 text-[13px] leading-none" aria-label="Remove this picture" onClick={() => setImages((cur) => cur.filter((_, j) => j !== i))}>×</button>
               </div>
             ))}
           </div>
@@ -225,7 +225,7 @@ export function Chat({ s, role, account, dispatch, onNote, onSaveAnswer }: { s: 
       <div className="mx-8 h-px bg-line-subtle" />
       <Transcript s={s} onAnswer={answer} />
       {s.brainQuestion && s.run === "ready" && lastAnswer && onSaveAnswer && (
-        <div className="mx-8 mb-3 flex items-center justify-between gap-4 rounded-control border border-line-subtle bg-surface-2 px-4 py-3">
+        <div className="mx-8 mb-3 flex items-center justify-between gap-4 border border-line-subtle bg-surface-2 px-4 py-3">
           <span className="text-[14px] leading-5 text-text-secondary">Save this answer to the brain? It becomes a note you can edit. Anything that looks like a secret is hidden first.</span>
           <span className="flex shrink-0 gap-2"><Button variant="ghost" small onClick={() => dispatch({ type: "brain-question", sessionId: s.id, question: null })}>Not now</Button><Button small onClick={() => onSaveAnswer(lastAnswer.text)}>Save to the brain</Button></span>
         </div>

@@ -46,7 +46,7 @@ export function Welcome({ project, roles, accounts, persona, accountId, initialR
           {claude && claude !== "missing" && (<><Glyph state="done" size={18} /><span className="text-text-secondary">Claude Code {claude.version ?? ""} found</span></>)}
         </div>
 
-        <div className="flex flex-col gap-1.5 rounded-control border border-line-subtle bg-surface-1 px-4 py-3">
+        <div className="flex flex-col gap-1.5 border border-line-subtle bg-surface-1 px-4 py-3">
           <span className="text-[15px] leading-6 font-bold">{project.name}</span>
           <span className="truncate font-mono text-[13px] leading-5 text-text-tertiary" title={project.folder}>{project.folder}</span>
         </div>
@@ -57,7 +57,7 @@ export function Welcome({ project, roles, accounts, persona, accountId, initialR
               const on = (r?.id ?? null) === roleId;
               return (
                 <button key={r?.id ?? "none"} type="button" onClick={() => pickRole(r)} aria-pressed={on}
-                  className={`flex h-11 items-center gap-2.5 rounded-control border pr-4 pl-2 text-[15px] ${on ? "border-accent bg-surface-3 font-bold" : "border-line-strong text-text-secondary hover:bg-surface-2"}`}>
+                  className={`flex h-11 items-center gap-2.5 border pr-4 pl-2 text-[15px] ${on ? "border-accent bg-surface-3 font-bold" : "border-line-strong text-text-secondary hover:bg-surface-2"}`}>
                   {r ? <RoleMark roleId={r.id} size={28} /> : <span className="w-2" />}
                   {r?.name ?? "No role"}
                 </button>

@@ -12,7 +12,7 @@ export function Report({ brain, wanted, onOpen, onWrite, onDrop }: {
   const warns = rep.warnings.filter((w) => w.severity === "warn");
   const infos = rep.warnings.filter((w) => w.severity === "info" && w.code !== "wanted");
   const Card = ({ title, children, count, help }: { title: string; children: React.ReactNode; count?: number; help?: React.ReactNode }) => (
-    <section className="flex flex-col gap-3 rounded-card border border-line-subtle bg-surface-1 p-5" aria-label={title}>
+    <section className="flex flex-col gap-3 border border-line-subtle bg-surface-1 p-5" aria-label={title}>
       <div className="flex items-center gap-2.5">
         <h2 className="m-0 flex items-baseline gap-3 text-[17px] leading-6 font-bold">{title}{count !== undefined && <span className="font-mono text-[13px] font-normal text-text-tertiary">{count}</span>}</h2>
         {help && <Help title={title}>{help}</Help>}
@@ -37,18 +37,18 @@ export function Report({ brain, wanted, onOpen, onWrite, onDrop }: {
         {warns.map((w, i) => (
           <div key={i} className="flex items-start justify-between gap-4 text-[14px] leading-5">
             <span className="flex items-start gap-2.5"><Glyph state="waiting" size={16} /><span className="text-text-secondary">{w.text}{w.line ? ` (line ${w.line})` : ""}</span></span>
-            {w.noteId && <button type="button" onClick={() => onOpen(w.noteId!)} className="shrink-0 rounded font-bold text-text-secondary hover:text-text">Open</button>}
+            {w.noteId && <button type="button" onClick={() => onOpen(w.noteId!)} className="shrink-0 font-bold text-text-secondary hover:text-text">Open</button>}
           </div>
         ))}
         {infos.map((w, i) => (
           <div key={`i${i}`} className="flex items-start justify-between gap-4 text-[13px] leading-5 text-text-tertiary">
-            <span>{w.text}</span>{w.noteId && <button type="button" onClick={() => onOpen(w.noteId!)} className="shrink-0 rounded font-bold hover:text-text">Open</button>}
+            <span>{w.text}</span>{w.noteId && <button type="button" onClick={() => onOpen(w.noteId!)} className="shrink-0 font-bold hover:text-text">Open</button>}
           </div>
         ))}
       </Card>
 
       <Card title="Most connected" count={rep.hubs.length}>
-        {rep.hubs.map((h) => <button key={h.id} type="button" onClick={() => onOpen(h.id)} className="flex items-center justify-between gap-4 rounded text-left text-[14px] leading-5 hover:text-accent"><span className="truncate font-bold">{h.title}</span><span className="font-mono text-[12px] text-text-tertiary">{h.strength}</span></button>)}
+        {rep.hubs.map((h) => <button key={h.id} type="button" onClick={() => onOpen(h.id)} className="flex items-center justify-between gap-4 text-left text-[14px] leading-5 hover:text-accent"><span className="truncate font-bold">{h.title}</span><span className="font-mono text-[12px] text-text-tertiary">{h.strength}</span></button>)}
         {rep.hubs.length === 0 && <p className="m-0 text-[14px] leading-5 text-text-tertiary">No links yet.</p>}
       </Card>
 

@@ -27,7 +27,7 @@ export function SessionList({ state, project, roles, leftBehind, earlier, onResu
           const on = state.selected === id && !creating;
           return (
             <button key={id} onClick={() => onSelect(id)} aria-current={on ? "true" : undefined}
-              className={`flex h-16 items-center gap-3 rounded-xl px-3.5 text-left transition-colors ${on ? "bg-surface-3" : "hover:bg-surface-2"}`}>
+              className={`flex h-16 items-center gap-3 px-3.5 text-left transition-colors ${on ? "bg-surface-3" : "hover:bg-surface-2"}`}>
               <Glyph state={r.state} size={18} />
               {role && <RoleMark roleId={role.id} size={26} />}
               <span className="flex min-w-0 flex-1 flex-col">
@@ -40,11 +40,11 @@ export function SessionList({ state, project, roles, leftBehind, earlier, onResu
         })}
         {earlier.length > 0 && (
           <div className="mt-3 flex flex-col gap-0.5 border-t border-line-subtle pt-3">
-            <button type="button" onClick={() => setShowEarlier((v) => !v)} aria-expanded={showEarlier} className="flex items-center justify-between rounded-lg px-3.5 py-2 text-left text-[14px] leading-5 font-bold text-text-secondary hover:text-text">
+            <button type="button" onClick={() => setShowEarlier((v) => !v)} aria-expanded={showEarlier} className="flex items-center justify-between px-3.5 py-2 text-left text-[14px] leading-5 font-bold text-text-secondary hover:text-text">
               <span>Earlier sessions</span><span className="font-mono text-[12px] font-normal text-text-tertiary">{earlier.length}</span>
             </button>
             {showEarlier && earlier.map((e) => (
-              <div key={e.id} data-earlier={e.id} className="flex items-center gap-3 rounded-xl px-3.5 py-2 hover:bg-surface-2">
+              <div key={e.id} data-earlier={e.id} className="flex items-center gap-3 px-3.5 py-2 hover:bg-surface-2">
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-[14px] leading-5">{e.title || "(no first message)"}</span>
                   <span className="text-[12px] leading-5 text-text-tertiary">{new Date(e.modified).toLocaleString([], { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</span>

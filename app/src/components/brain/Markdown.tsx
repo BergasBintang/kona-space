@@ -16,9 +16,9 @@ function inline(text: string, resolve: (raw: string) => string | null, open: (id
       const target = resolve(m[1]);
       const label = (m[3] ?? m[1]).trim();
       out.push(target
-        ? <button key={`${key}-${i++}`} type="button" onClick={() => open(target)} className="rounded font-bold text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent">{label}</button>
+        ? <button key={`${key}-${i++}`} type="button" onClick={() => open(target)} className="font-bold text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent">{label}</button>
         : <span key={`${key}-${i++}`} title="No such note" className="text-state-left line-through decoration-state-left/60">{label} <span className="no-underline">(no such note)</span></span>);
-    } else if (m[4] !== undefined) out.push(<code key={`${key}-${i++}`} className="rounded bg-inset px-1.5 py-0.5 font-mono text-[13px] text-text">{m[4]}</code>);
+    } else if (m[4] !== undefined) out.push(<code key={`${key}-${i++}`} className="bg-inset px-1.5 py-0.5 font-mono text-[13px] text-text">{m[4]}</code>);
     else out.push(<strong key={`${key}-${i++}`} className="font-bold text-text">{m[5]}</strong>);
     last = at + m[0].length;
   }
@@ -37,7 +37,7 @@ export function Markdown({ text, resolve, open, wiki = true }: { text: string; r
       const code: string[] = []; i++;
       while (i < lines.length && !/^\s*```/.test(lines[i])) code.push(lines[i++]);
       i++;
-      blocks.push(<pre key={k++} className="m-0 overflow-x-auto rounded-control bg-inset p-3 font-mono text-[13px] leading-5 text-text-secondary">{code.join("\n")}</pre>);
+      blocks.push(<pre key={k++} className="m-0 overflow-x-auto bg-inset p-3 font-mono text-[13px] leading-5 text-text-secondary">{code.join("\n")}</pre>);
     } else if (/^#{1,6}\s/.test(l)) {
       const level = l.match(/^#+/)![0].length;
       const body = l.replace(/^#+\s+/, "");

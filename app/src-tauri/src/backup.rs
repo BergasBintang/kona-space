@@ -91,7 +91,7 @@ pub fn make(base: &Path, projects: &[(String, String)], ledger_copy: impl Fn(&Pa
     if dest.exists() { return Err("A backup was already made this minute".into()); }
     fs::create_dir_all(&dest).map_err(|e| format!("Could not make the backup folder: {e}"))?;
     let (mut files, mut bytes) = (0u64, 0u64);
-    for f in ["projects.json", "roles.json", "accounts.json", "persona.json", "ssh-hosts.json", "settings.json", "leftovers.jsonl"] {
+    for f in ["projects.json", "accounts.json", "persona.json", "ssh-hosts.json", "settings.json", "leftovers.jsonl"] {
         let src = base.join(f);
         if src.is_file() { bytes += fs::copy(&src, dest.join(f)).map_err(|e| e.to_string())?; files += 1; }
     }

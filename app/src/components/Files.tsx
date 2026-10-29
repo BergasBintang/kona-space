@@ -78,7 +78,7 @@ function TreePanel({ project, selected, onPick }: { project: Project; selected: 
             aria-expanded={e.is_dir ? isOpen : undefined}
             aria-current={on ? "true" : undefined}
             title={e.path}
-            className={`flex h-8 w-full items-center gap-1.5 rounded-lg pr-2.5 text-left text-[14px] transition-colors ${on ? "bg-surface-3" : "hover:bg-surface-2"} ${QUIET.has(e.name) ? "text-text-tertiary" : ""}`}
+            className={`flex h-8 w-full items-center gap-1.5 pr-2.5 text-left text-[14px] transition-colors ${on ? "bg-surface-3" : "hover:bg-surface-2"} ${QUIET.has(e.name) ? "text-text-tertiary" : ""}`}
             style={{ paddingLeft: 8 + depth * 18 }}
           >
             {e.is_dir ? <Chevron open={isOpen} /> : <span className="w-4 shrink-0" />}
@@ -175,7 +175,7 @@ function Viewer({ project, entry }: { project: Project; entry: Entry | null }) {
         <h2 className="m-0 truncate text-[22px] leading-[30px] font-bold">{entry.name}</h2>
         <div className="flex flex-wrap gap-x-4 text-[13px] leading-5 text-text-tertiary">
           <span className="truncate font-mono">{rel}</span>
-          {(ext === "md" || ext === "markdown") && <button type="button" onClick={() => setRendered((r) => !r)} aria-pressed={rendered} className="rounded font-bold text-text-secondary hover:text-text">{rendered ? "Show the text" : "Show it as a page"}</button>}
+          {(ext === "md" || ext === "markdown") && <button type="button" onClick={() => setRendered((r) => !r)} aria-pressed={rendered} className="font-bold text-text-secondary hover:text-text">{rendered ? "Show the text" : "Show it as a page"}</button>}
           <span>{humanSize(entry.size)}</span>
           {entry.modified && <span>changed {new Date(entry.modified * 1000).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</span>}
         </div>

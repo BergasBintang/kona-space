@@ -4,10 +4,12 @@ Newest first. How versions are named: `docs/VERSIONING.md`.
 
 ## 0.20.3, 2026-10-30
 
-The design document is rewritten. Nothing in the app changed.
+The first release with the office: a welcome page, one account per project, a pixel-art office with a cat for every role instead of the sidebar, a light paper look and a pixel font. This release holds everything from 0.20.0 to 0.20.3; their entries are below.
 
-- `docs/DESIGN.md` is now version 4: the paper look, the pixel frames and font, the office, the top bar and the welcome page, with the real colours and their measured contrast, the eleven roles and their cats, and a plain list of what has not been checked.
-- A note in the plan about the reference clones that were agreed to be removed.
+- Opens on a welcome page with a card per project and its account; a project without an account asks which one it uses.
+- An isometric pixel office with a room for every place; cats type, wave and blink from what their sessions are doing.
+- Fixed roles plus a secretary, a light cream look and a clean pixel font.
+- Since 0.20.2 the old design files are gone, and `docs/DESIGN.md` is rewritten (version 4). Nothing else changed in the app in this step.
 
 ## 0.20.2, 2026-10-30
 

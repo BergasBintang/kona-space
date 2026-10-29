@@ -1,45 +1,51 @@
 @import "@fontsource-variable/nunito-sans";
+@import "@fontsource-variable/pixelify-sans";
 @import "tailwindcss";
 
-/* Kona's tokens, from docs/DESIGN.md. Meaning-based names. Dark first, warm, roomy. */
+/* Kona's tokens (decision 48): light paper and cream, bright but never pure white. Meaning-based names. Every pair of colours was computed against
+   the contrast rules (text 4.5 to 1, control borders and the focus ring 3 to 1): see tools/contrast.mjs. Hover goes darker on a light ground. */
 @theme {
-  --font-sans: "Nunito Sans Variable", "Segoe UI", system-ui, sans-serif;
-  --font-mono: "Cascadia Mono", Consolas, "Courier New", monospace;
+  --font-sans: "Nunito Sans Variable", "Segoe UI", system-ui, sans-serif; /* long text: replies, notes, tickets */
+  --font-pixel: "Pixelify Sans Variable", "Nunito Sans Variable", "Segoe UI", system-ui, sans-serif; /* the interface: headings, buttons, labels */
+  --font-mono: "Cascadia Mono", Consolas, "Courier New", monospace; /* code, paths, file contents */
 
-  /* a softer dark ("dusk"): lifted from the first near-black set so the screen is not heavy, still well short of bright */
-  --color-canvas: #171d22;
-  --color-ground: #1f262d;
-  --color-surface-1: #252d35;
-  --color-surface-2: #2d3640;
-  --color-surface-3: #38434e;
-  --color-inset: #171d22;
+  --color-canvas: #e8dec6;
+  --color-ground: #f2e9d4;
+  --color-surface-1: #ece1c9;
+  --color-surface-2: #f8f1e1;
+  --color-surface-3: #e3d6ba;
+  --color-inset: #fbf6ea;
 
-  --color-line-subtle: #404b56;
-  --color-line-strong: #838f98;
+  --color-line-subtle: #d6c8a8;
+  --color-line-strong: #85755a;
 
-  --color-text: #f4efe5;
-  --color-text-secondary: #d0cbc1;
-  --color-text-tertiary: #aeb3b5;
-  --color-text-disabled: #78828a;
+  --color-text: #2d2218;
+  --color-text-secondary: #54452f;
+  --color-text-tertiary: #6b5b43;
+  --color-text-disabled: #9a8c72;
 
-  --color-brand: #e8b25a; /* the logo's gold: the mark, the text selection and the active place's marker; "waiting" is the same gold, so it is never a button colour */
-  --color-accent: #74cbb9;
-  --color-accent-hover: #8ed8c9;
-  --color-accent-pressed: #5fb4a2;
-  --color-on-accent: #0d1517;
+  --color-brand: #b57a14; /* the gold: the logo, the active place and hover outlines; "waiting" is a darker gold, so it is never a button colour */
+  --color-accent: #1a6558;
+  --color-accent-hover: #145045;
+  --color-accent-pressed: #0f4037;
+  --color-on-accent: #fffaf0;
 
-  --color-state-live: #74cbb9;
-  --color-state-waiting: #e8b25a;
-  --color-state-idle: #a2b4be;
-  --color-state-done: #9ac98a;
-  --color-state-stopped: #a9b0b5;
-  --color-state-left: #f2958a;
-  --color-on-danger: #1a0e0c;
+  --color-state-live: #1a6558;
+  --color-state-waiting: #7a4f03;
+  --color-state-idle: #4f6068;
+  --color-state-done: #2f6228;
+  --color-state-stopped: #565c61;
+  --color-state-left: #a33727;
+  --color-on-danger: #fffaf0;
 
-  --radius-sm: 6px;
-  --radius-control: 10px;
-  --radius-card: 14px;
-  --radius-dialog: 18px;
+  /* hard edges: no rounded corners anywhere (pixel look) */
+  --radius-sm: 0px;
+  --radius-control: 0px;
+  --radius-card: 0px;
+  --radius-dialog: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
 }
 
 :root { --k: 1; } /* 100 / the zoom percent: wide pages use it to stay as wide as they were at 100% */
@@ -48,6 +54,7 @@ html, body, #root { height: 100%; }
    scrolling it, which pushed the whole app up and left an empty strip below. */
 html, body { overflow: hidden; }
 #root { overflow: clip; }
+h1, h2, h3, h4, button, summary, legend, .font-pixel { font-family: var(--font-pixel); }
 body {
   margin: 0;
   background: var(--color-ground);
@@ -77,3 +84,52 @@ body {
    process alone; 4 steps a second looks the same at this speed and costs almost nothing. */
 @keyframes kona-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
 .kona-live-core { animation: kona-breathe 3s steps(12, end) infinite; }
+
+/* The word shown while Claude works: a soft gold light sweeps across the text. It moves in steps for the same reason as the mark above.
+   Reduced motion turns the sweep off and the word stays a plain gold. */
+@keyframes kona-shimmer { from { background-position: 120% 0; } to { background-position: -20% 0; } }
+.kona-shimmer {
+  color: var(--color-brand);
+  background: linear-gradient(100deg, var(--color-text-tertiary) 35%, var(--color-text) 50%, var(--color-text-tertiary) 65%) 120% 0 / 250% 100% no-repeat;
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: kona-shimmer 2.4s steps(30, end) infinite;
+}
+@media (prefers-reduced-motion: reduce) { .kona-shimmer { -webkit-text-fill-color: var(--color-text-secondary); background: none; } }
+
+/* ---- the pixel look (decision 46 and 48) ----
+   Edges are 2 px hard lines. The big parts use tiled frames drawn in art/ (corners stay, edges repeat): paper for cards, dialogs, inputs and quiet
+   buttons, teal for the one main button, red for a button that cannot be undone. A frame is drawn at twice its size: 6 px tiles show as 12 px
+   (large), 4 px tiles as 8 px (small). Pixels are never stretched, only repeated. They sit in the components layer, so a utility class on an
+   element can override them; an input that must stay bare (inside a frame of its own) carries the class "bare". */
+@layer components {
+  .border { border-width: 2px; }
+  img.pixel, .pixel { image-rendering: pixelated; }
+  .px-shadow { box-shadow: 4px 4px 0 0 rgb(45 34 24 / 0.2); }
+
+  .px-card, .px-btn, .px-field {
+    border-style: solid; border-color: transparent; background-clip: padding-box; image-rendering: pixelated;
+  }
+  .px-card { border-width: 12px; border-image: url("./assets/frames/frame-paper-normal.png") 6 / 12px repeat; background-color: var(--color-surface-2); }
+  .px-btn, .px-field { border-width: 8px; line-height: 1.2; }
+  .px-btn-paper, .px-field { border-image: url("./assets/frames/frame-paper-sm-normal.png") 4 / 8px repeat; background-color: var(--color-surface-2); color: var(--color-text); }
+  .px-field { background-color: var(--color-inset); }
+  .px-btn-teal { border-image: url("./assets/frames/frame-teal-sm-normal.png") 4 / 8px repeat; background-color: var(--color-accent); color: var(--color-on-accent); }
+  .px-btn-red { border-image: url("./assets/frames/frame-red-sm-normal.png") 4 / 8px repeat; background-color: var(--color-state-left); color: var(--color-on-danger); }
+  .px-btn:not(:disabled), .px-btn-paper { cursor: pointer; }
+  .px-btn-paper:hover:not(:disabled), .px-field:hover:not(:disabled) { border-image-source: url("./assets/frames/frame-paper-sm-hover.png"); }
+  .px-btn-paper:active:not(:disabled) { border-image-source: url("./assets/frames/frame-paper-sm-pressed.png"); background-color: var(--color-surface-3); }
+  .px-btn-teal:hover:not(:disabled) { border-image-source: url("./assets/frames/frame-teal-sm-hover.png"); background-color: var(--color-accent-hover); }
+  .px-btn-teal:active:not(:disabled) { border-image-source: url("./assets/frames/frame-teal-sm-pressed.png"); background-color: var(--color-accent-pressed); }
+  .px-btn-red:hover:not(:disabled) { border-image-source: url("./assets/frames/frame-red-sm-hover.png"); }
+  .px-btn-red:active:not(:disabled) { border-image-source: url("./assets/frames/frame-red-sm-pressed.png"); }
+  .px-btn:disabled, .px-field:disabled { opacity: 0.55; cursor: not-allowed; }
+  .px-btn:active:not(:disabled) { padding-top: 2px; } /* a pressed button sits one pixel lower */
+  .px-field:focus-visible, .px-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+  /* the text boxes get the field frame without each one asking for it */
+  input:where(:not([type]), [type="text"], [type="search"], [type="url"], [type="email"], [type="password"], [type="number"]):not(.bare) {
+    border-width: 8px; border-style: solid; border-color: transparent; border-image: url("./assets/frames/frame-paper-sm-normal.png") 4 / 8px repeat; background-clip: padding-box;
+    image-rendering: pixelated; background-color: var(--color-inset);
+  }
+  input:where(:not([type]), [type="text"], [type="search"], [type="url"], [type="email"], [type="password"], [type="number"]):not(.bare):hover:not(:disabled) { border-image-source: url("./assets/frames/frame-paper-sm-hover.png"); }
+  input:where(:not([type]), [type="text"], [type="search"], [type="url"], [type="email"], [type="password"], [type="number"]):not(.bare):disabled { opacity: 0.55; }
+}

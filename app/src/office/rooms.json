@@ -1,0 +1,427 @@
+{
+  "picture": "office.png",
+  "width": 544,
+  "height": 316,
+  "tile": [
+    32,
+    16
+  ],
+  "tiles": [
+    20,
+    12
+  ],
+  "wallHeight": 34,
+  "content": [
+    11,
+    5,
+    533,
+    310
+  ],
+  "rooms": [
+    {
+      "id": "board",
+      "name": "Board",
+      "cell": [
+        0,
+        0
+      ],
+      "holds": "Board",
+      "polygon": [
+        [
+          208,
+          44
+        ],
+        [
+          272,
+          76
+        ],
+        [
+          208,
+          108
+        ],
+        [
+          144,
+          76
+        ]
+      ]
+    },
+    {
+      "id": "library",
+      "name": "Library",
+      "cell": [
+        1,
+        0
+      ],
+      "holds": "Brain",
+      "polygon": [
+        [
+          272,
+          76
+        ],
+        [
+          336,
+          108
+        ],
+        [
+          272,
+          140
+        ],
+        [
+          208,
+          108
+        ]
+      ]
+    },
+    {
+      "id": "archive",
+      "name": "Archive",
+      "cell": [
+        2,
+        0
+      ],
+      "holds": "Files",
+      "polygon": [
+        [
+          336,
+          108
+        ],
+        [
+          400,
+          140
+        ],
+        [
+          336,
+          172
+        ],
+        [
+          272,
+          140
+        ]
+      ]
+    },
+    {
+      "id": "servers",
+      "name": "Server room",
+      "cell": [
+        3,
+        0
+      ],
+      "holds": "Servers",
+      "polygon": [
+        [
+          400,
+          140
+        ],
+        [
+          464,
+          172
+        ],
+        [
+          400,
+          204
+        ],
+        [
+          336,
+          172
+        ]
+      ]
+    },
+    {
+      "id": "git",
+      "name": "Git room",
+      "cell": [
+        4,
+        0
+      ],
+      "holds": "Worktrees, the GitHub address, DevOps desk",
+      "polygon": [
+        [
+          464,
+          172
+        ],
+        [
+          528,
+          204
+        ],
+        [
+          464,
+          236
+        ],
+        [
+          400,
+          204
+        ]
+      ]
+    },
+    {
+      "id": "plan",
+      "name": "Plan",
+      "cell": [
+        0,
+        1
+      ],
+      "holds": "Product and Design desks, the staff board (Roles, read-only)",
+      "polygon": [
+        [
+          144,
+          76
+        ],
+        [
+          208,
+          108
+        ],
+        [
+          144,
+          140
+        ],
+        [
+          80,
+          108
+        ]
+      ]
+    },
+    {
+      "id": "build",
+      "name": "Build",
+      "cell": [
+        1,
+        1
+      ],
+      "holds": "Frontend, Backend, QA and Security desks",
+      "polygon": [
+        [
+          208,
+          108
+        ],
+        [
+          272,
+          140
+        ],
+        [
+          208,
+          172
+        ],
+        [
+          144,
+          140
+        ]
+      ]
+    },
+    {
+      "id": "secretary",
+      "name": "Front desk",
+      "cell": [
+        2,
+        1
+      ],
+      "holds": "The secretary and general chat",
+      "polygon": [
+        [
+          272,
+          140
+        ],
+        [
+          336,
+          172
+        ],
+        [
+          272,
+          204
+        ],
+        [
+          208,
+          172
+        ]
+      ]
+    },
+    {
+      "id": "grow",
+      "name": "Grow",
+      "cell": [
+        3,
+        1
+      ],
+      "holds": "Marketing, Content and SEO, Support desks",
+      "polygon": [
+        [
+          336,
+          172
+        ],
+        [
+          400,
+          204
+        ],
+        [
+          336,
+          236
+        ],
+        [
+          272,
+          204
+        ]
+      ]
+    },
+    {
+      "id": "costs",
+      "name": "Accounting",
+      "cell": [
+        4,
+        1
+      ],
+      "holds": "Costs",
+      "polygon": [
+        [
+          400,
+          204
+        ],
+        [
+          464,
+          236
+        ],
+        [
+          400,
+          268
+        ],
+        [
+          336,
+          236
+        ]
+      ]
+    },
+    {
+      "id": "backoffice",
+      "name": "Back office",
+      "cell": [
+        0,
+        2
+      ],
+      "holds": "Voice and Settings",
+      "polygon": [
+        [
+          80,
+          108
+        ],
+        [
+          144,
+          140
+        ],
+        [
+          80,
+          172
+        ],
+        [
+          16,
+          140
+        ]
+      ]
+    },
+    {
+      "id": "closet",
+      "name": "Storage closet",
+      "cell": [
+        1,
+        2
+      ],
+      "holds": "Leftovers",
+      "polygon": [
+        [
+          144,
+          140
+        ],
+        [
+          208,
+          172
+        ],
+        [
+          144,
+          204
+        ],
+        [
+          80,
+          172
+        ]
+      ]
+    },
+    {
+      "id": "entrance",
+      "name": "Entrance",
+      "cell": [
+        2,
+        2
+      ],
+      "holds": "Accounts (the key desk)",
+      "polygon": [
+        [
+          208,
+          172
+        ],
+        [
+          272,
+          204
+        ],
+        [
+          208,
+          236
+        ],
+        [
+          144,
+          204
+        ]
+      ]
+    },
+    {
+      "id": "lounge",
+      "name": "Lounge",
+      "cell": [
+        3,
+        2
+      ],
+      "holds": "Nothing yet (a rest area)",
+      "polygon": [
+        [
+          272,
+          204
+        ],
+        [
+          336,
+          236
+        ],
+        [
+          272,
+          268
+        ],
+        [
+          208,
+          236
+        ]
+      ]
+    },
+    {
+      "id": "garden",
+      "name": "Garden",
+      "cell": [
+        4,
+        2
+      ],
+      "holds": "Nothing yet",
+      "polygon": [
+        [
+          336,
+          236
+        ],
+        [
+          400,
+          268
+        ],
+        [
+          336,
+          300
+        ],
+        [
+          272,
+          268
+        ]
+      ]
+    }
+  ]
+}

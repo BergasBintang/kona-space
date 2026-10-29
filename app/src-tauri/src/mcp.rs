@@ -1,5 +1,5 @@
 // The built-in tool server for the board (feature F10). Kona starts a session with `--mcp-config` pointing at Kona's own program
-// in this mode (`app --mcp-board --folder ... --session ... --role ... --data ...`). Claude Code starts it, talks to it over
+// in this mode (`app --mcp-board --folder ... --session ... --role ...`). Claude Code starts it, talks to it over
 // standard input and output (one JSON message per line, the Model Context Protocol), and stops it with the session.
 // Because the server is started for one known session, "who raised this ticket" is exact: it is the session id and role given here.
 // The server only touches that project's ticket files, through tickets.rs, and an agent can never move a ticket to Done or remove one.
@@ -20,10 +20,9 @@ fn arg(args: &[String], name: &str) -> String {
     args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)).cloned().unwrap_or_default()
 }
 
-fn read_roles(data: &Path) -> Vec<(String, String)> {
-    let Ok(text) = std::fs::read_to_string(data.join("roles.json")) else { return vec![] };
-    let Ok(v) = serde_json::from_str::<Value>(&text) else { return vec![] };
-    v["roles"].as_array().map(|a| a.iter().filter_map(|r| Some((r["id"].as_str()?.to_string(), r["name"].as_str()?.to_string()))).collect()).unwrap_or_default()
+// the roles are a fixed list since 0.20.0 (decision 43), so the tool server no longer reads a file for them
+fn read_roles() -> Vec<(String, String)> {
+    crate::roles::starting_roles().into_iter().map(|r| (r.id, r.name)).collect()
 }
 
 fn tools() -> Value {
@@ -161,7 +160,7 @@ pub fn run(args: &[String]) {
     let folder = arg(args, "--folder");
     let session = arg(args, "--session");
     let role = arg(args, "--role");
-    let roles = read_roles(Path::new(&arg(args, "--data")));
+    let roles = read_roles();
     let role_name = roles.iter().find(|r| r.0 == role).map(|r| r.1.clone());
     let who = format!("session {}{}", &session[..session.len().min(8)], role_name.map(|n| format!(" (role: {n})")).unwrap_or_default());
     let ctx = Ctx { dir: tickets::dir(Path::new(&folder)), project: PathBuf::from(&folder), who, roles };

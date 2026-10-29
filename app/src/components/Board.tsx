@@ -46,7 +46,7 @@ function Card({ t, role, live, active, onOpen }: { t: TicketView; role?: Role; l
       {t.branch && <span className="truncate font-mono text-[12px] leading-4 text-text-tertiary" title={t.branch}>{t.branch}</span>}
       {t.next && <span className="line-clamp-2 text-[13px] leading-[18px] text-text-secondary">Next: {t.next}</span>}
       <div className="flex items-center justify-between gap-2 text-[13px] leading-5 text-text-tertiary">
-        <span className="flex min-w-0 items-center gap-2">{role ? (<><RoleMark mark={role.mark} size={22} /><span className="truncate">{role.name}</span></>) : <span>No role</span>}</span>
+        <span className="flex min-w-0 items-center gap-2">{role ? (<><RoleMark roleId={role.id} size={22} /><span className="truncate">{role.name}</span></>) : <span>No role</span>}</span>
         {t.cost > 0 && <span className="shrink-0 font-mono">{dollars(t.cost)}</span>}
       </div>
     </div>
@@ -108,7 +108,7 @@ function Drawer({ project, roles, ticket, state, guardDone, onClose, onSaved, on
   const why = fresh ? "" : dirty ? "Save your changes first." : draft.role === "" ? "Choose a role first." : ticket!.status === "done" ? "This ticket is done." : "";
 
   return (
-    <aside aria-label={fresh ? "New ticket" : `Ticket ${ticket!.id}`} className="absolute inset-y-0 right-0 z-20 flex w-[500px] max-w-full flex-col border-l border-line-subtle bg-surface-1 shadow-[-16px_0_40px_-12px_rgba(0,0,0,0.5)]">
+    <aside aria-label={fresh ? "New ticket" : `Ticket ${ticket!.id}`} className="absolute inset-y-0 right-0 z-20 flex w-[500px] max-w-full flex-col border-l-2 border-line-strong bg-surface-1 px-shadow">
       <div className="flex items-center justify-between gap-3 px-6 pt-6 pb-3">
         <div className="flex min-w-0 flex-col gap-1">
           <span className="font-mono text-[13px] text-text-tertiary">{fresh ? "New ticket" : ticket!.id}</span>

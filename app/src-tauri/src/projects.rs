@@ -12,6 +12,9 @@ pub struct Project {
     pub folder: String,
     #[serde(default)]
     pub github: Option<String>,
+    /// the one account every session in this project uses (an account id); none until the owner picks one
+    #[serde(default)]
+    pub account: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -63,7 +66,7 @@ impl Projects {
         self.list.lock().unwrap().clone()
     }
 
-    pub fn add(&self, folder: &str, name: Option<String>) -> Result<AddResult, String> {
+    pub fn add(&self, folder: &str, name: Option<String>, account: Option<String>) -> Result<AddResult, String> {
         let path = Path::new(folder);
         if !path.is_dir() {
             return Err("That folder does not exist".into());
@@ -73,7 +76,7 @@ impl Projects {
             return Err("That folder is already a project".into());
         }
         let name = name.filter(|n| !n.trim().is_empty()).unwrap_or_else(|| path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| folder.to_string()));
-        let project = Project { id: uuid::Uuid::new_v4().to_string(), name, folder: folder.to_string(), github: None };
+        let project = Project { id: uuid::Uuid::new_v4().to_string(), name, folder: folder.to_string(), github: None, account: account.filter(|a| !a.trim().is_empty()) };
 
         // the hidden folder for Kona's notes and tickets, kept out of Git without touching any tracked file
         let hidden_folder = fs::create_dir_all(path.join(".kona")).is_ok();
@@ -110,6 +113,24 @@ impl Projects {
         let out = p.clone();
         self.save(&list)?;
         Ok(out)
+    }
+
+    /// The account of a project. Every session in the project uses it (decision 42).
+    pub fn set_account(&self, id: &str, account: &str) -> Result<Project, String> {
+        let mut list = self.list.lock().unwrap();
+        let p = list.iter_mut().find(|p| p.id == id).ok_or("That project does not exist any more")?;
+        p.account = if account.trim().is_empty() { None } else { Some(account.trim().to_string()) };
+        let out = p.clone();
+        self.save(&list)?;
+        Ok(out)
+    }
+
+    /// An account was removed: the projects that used it have none until the owner picks another.
+    pub fn clear_account(&self, account: &str) -> Result<(), String> {
+        let mut list = self.list.lock().unwrap();
+        let mut changed = false;
+        for p in list.iter_mut().filter(|p| p.account.as_deref() == Some(account)) { p.account = None; changed = true; }
+        if changed { self.save(&list) } else { Ok(()) }
     }
 
     pub fn remove(&self, id: &str) -> Result<(), String> {

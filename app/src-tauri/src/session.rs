@@ -28,8 +28,6 @@ struct Handle {
 pub struct Sessions {
     map: Mutex<HashMap<String, Handle>>,
     pub ledger: Arc<Ledger>,
-    /// Kona's own data folder (the board's tool server reads the role names from it)
-    pub base: PathBuf,
     /// what each session started and what is still alive after it ended
     pub tracker: Arc<crate::leftovers::Tracker>,
 }
@@ -41,8 +39,8 @@ pub struct ImageIn {
 }
 
 impl Sessions {
-    pub fn new(ledger: Ledger, base: PathBuf, tracker: Arc<crate::leftovers::Tracker>) -> Self {
-        Self { map: Mutex::new(HashMap::new()), ledger: Arc::new(ledger), base, tracker }
+    pub fn new(ledger: Ledger, tracker: Arc<crate::leftovers::Tracker>) -> Self {
+        Self { map: Mutex::new(HashMap::new()), ledger: Arc::new(ledger), tracker }
     }
 
     fn send_line(&self, session_id: &str, value: Value) -> Result<(), String> {
@@ -138,7 +136,7 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     // the board's tool server: Kona's own program, started by Claude Code for this one session (see mcp.rs)
     if let Ok(me) = std::env::current_exe() {
         let config = json!({"mcpServers": {"kona-board": {"command": me.to_string_lossy(), "args": [
-            "--mcp-board", "--folder", folder, "--session", id, "--role", role.as_ref().map(|r| r.id.as_str()).unwrap_or(""), "--data", sessions.base.to_string_lossy()
+            "--mcp-board", "--folder", folder, "--session", id, "--role", role.as_ref().map(|r| r.id.as_str()).unwrap_or("")
         ]}}});
         cmd.args(["--mcp-config", &config.to_string(), "--allowedTools", "mcp__kona-board"]);
     }

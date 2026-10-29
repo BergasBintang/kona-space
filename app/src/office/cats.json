@@ -1,0 +1,70 @@
+{
+  "frameWidth": 28,
+  "frameHeight": 20,
+  "frames": [
+    "idle",
+    "blink",
+    "typeA",
+    "typeB",
+    "waitA",
+    "waitB",
+    "happy"
+  ],
+  "rows": [
+    {
+      "id": "product",
+      "name": "Product",
+      "group": "Plan"
+    },
+    {
+      "id": "design",
+      "name": "Design",
+      "group": "Plan"
+    },
+    {
+      "id": "frontend",
+      "name": "Frontend",
+      "group": "Build"
+    },
+    {
+      "id": "backend",
+      "name": "Backend",
+      "group": "Build"
+    },
+    {
+      "id": "qa",
+      "name": "QA",
+      "group": "Build"
+    },
+    {
+      "id": "security",
+      "name": "Security",
+      "group": "Build"
+    },
+    {
+      "id": "devops",
+      "name": "DevOps",
+      "group": "Ship"
+    },
+    {
+      "id": "marketing",
+      "name": "Marketing",
+      "group": "Grow"
+    },
+    {
+      "id": "content",
+      "name": "Content and SEO",
+      "group": "Grow"
+    },
+    {
+      "id": "support",
+      "name": "Support",
+      "group": "Grow"
+    },
+    {
+      "id": "secretary",
+      "name": "Secretary",
+      "group": "Office"
+    }
+  ]
+}

@@ -104,13 +104,13 @@ export function useScrollIntoView(listRef: RefObject<HTMLElement | null>, active
 export function Popover({ place, children, listRef }: { place: Place; children: ReactNode; listRef?: RefObject<HTMLDivElement | null> }) {
   return (
     <div ref={listRef} style={{ position: "fixed", left: place.left, width: place.width, top: place.top, bottom: place.bottom, maxHeight: place.maxHeight }}
-      className="z-50 flex flex-col overflow-hidden rounded-card border border-line-strong bg-surface-2 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.5)]">
+      className="z-50 flex flex-col overflow-hidden border-2 border-line-strong bg-surface-2 px-shadow">
       {children}
     </div>
   );
 }
 
-export const triggerBase = "flex h-11 w-full items-center gap-2.5 rounded-control border border-line-strong bg-inset px-3.5 text-left text-[15px] text-text disabled:cursor-not-allowed disabled:border-line-subtle disabled:text-text-disabled";
+export const triggerBase = "px-field flex h-12 w-full items-center gap-2.5 px-2 text-left text-[15px] text-text disabled:cursor-not-allowed";
 
 /** Pick the next row that is not disabled, moving by `step` from `from`; stays put at the ends. */
 export function step(hits: Hit<Option>[], from: number, by: 1 | -1): number {

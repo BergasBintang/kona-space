@@ -14,22 +14,21 @@ const MODES = [["default", "Ask every time"], ["acceptEdits", "Edits free, comma
 
 const opts = (pairs: string[][]) => pairs.map(([value, label]) => ({ value, label }));
 
-export function Welcome({ project, roles, accounts, persona, lastAccount, onStart, onOpenAccounts, error }: {
-  project: Project; roles: Role[]; accounts: Account[]; persona: Persona; lastAccount: string; onOpenAccounts: () => void;
+export function Welcome({ project, roles, accounts, persona, accountId, initialRole = null, onStart, onOpenAccounts, error }: {
+  initialRole?: Role | null; project: Project; roles: Role[]; accounts: Account[]; persona: Persona; accountId: string; onOpenAccounts: () => void;
   onStart: (folder: string, roleId: string | null, accountId: string, voice: boolean, model: string, mode: string) => Promise<void>; error: string | null;
 }) {
   const [claude, setClaude] = useState<ClaudeInfo | "missing" | null>(null);
-  const [model, setModel] = useState("sonnet");
-  const [mode, setMode] = useState("default");
-  const [roleId, setRoleId] = useState<string | null>(null);
-  const [accountId, setAccountId] = useState(accounts.some((a) => a.id === lastAccount) ? lastAccount : accounts[0]?.id ?? "main");
+  const [model, setModel] = useState(initialRole?.model ?? "sonnet");
+  const [mode, setMode] = useState(initialRole?.mode ?? "default");
+  const [roleId, setRoleId] = useState<string | null>(initialRole?.id ?? null);
   const [signedIn, setSignedIn] = useState<AccountStatus | null>(null); // null while asking
   const [voice, setVoice] = useState(persona.enabled);
   const [busy, setBusy] = useState(false);
   const role = roles.find((r) => r.id === roleId) ?? null;
-  const pickRole = (r: Role | null) => { setRoleId(r?.id ?? null); setModel(r?.model ?? "sonnet"); setMode(r?.mode ?? "default"); if (r?.account && accounts.some((a) => a.id === r.account)) setAccountId(r.account); };
+  const pickRole = (r: Role | null) => { setRoleId(r?.id ?? null); setModel(r?.model ?? "sonnet"); setMode(r?.mode ?? "default"); };
 
-  useEffect(() => { setSignedIn(null); accountStatus(accountId).then(setSignedIn).catch(() => setSignedIn({ logged_in: false })); }, [accountId]);
+  useEffect(() => { setSignedIn(null); if (!accountId) { setSignedIn({ logged_in: false }); return; } accountStatus(accountId).then(setSignedIn).catch(() => setSignedIn({ logged_in: false })); }, [accountId]);
   useEffect(() => { invoke<ClaudeInfo>("check_claude").then(setClaude).catch(() => setClaude("missing")); }, []);
   const start = async () => { setBusy(true); try { await onStart(project.folder, roleId, accountId, voice, model, mode); } finally { setBusy(false); } };
 
@@ -59,7 +58,7 @@ export function Welcome({ project, roles, accounts, persona, lastAccount, onStar
               return (
                 <button key={r?.id ?? "none"} type="button" onClick={() => pickRole(r)} aria-pressed={on}
                   className={`flex h-11 items-center gap-2.5 rounded-control border pr-4 pl-2 text-[15px] ${on ? "border-accent bg-surface-3 font-bold" : "border-line-strong text-text-secondary hover:bg-surface-2"}`}>
-                  {r ? <RoleMark mark={r.mark} size={28} /> : <span className="w-2" />}
+                  {r ? <RoleMark roleId={r.id} size={28} /> : <span className="w-2" />}
                   {r?.name ?? "No role"}
                 </button>
               );
@@ -68,8 +67,9 @@ export function Welcome({ project, roles, accounts, persona, lastAccount, onStar
           <p className="m-0 text-[13px] leading-5 text-text-tertiary">{role ? role.brief || "This role has no brief." : "A plain session. Claude gets no role and you choose what it may do."}</p>
         </fieldset>
         <div className="flex flex-col gap-2">
-          {accounts.length > 1 && <Select label="Account" value={accountId} onChange={setAccountId} options={accounts.map((a) => ({ value: a.id, label: a.label }))} />}
-          {signedIn && !signedIn.logged_in && (
+          {accountId && accounts.length > 1 && <div className="flex flex-col gap-1"><span className="text-[13px] leading-5 font-bold text-text-secondary">Account</span><span className="text-[15px] leading-6">{accounts.find((a) => a.id === accountId)?.label ?? accountId}<span className="text-text-tertiary"> · the account of this project</span></span></div>}
+          {!accountId && <div className="flex items-center gap-2.5 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> This project has no account yet. Click the Kona mark and choose one.</div>}
+          {accountId && signedIn && !signedIn.logged_in && (
             <div className="flex items-center gap-2.5 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {accounts.length > 1 ? "This account is not signed in." : "You are not signed in to Claude."}
               <button type="button" onClick={onOpenAccounts} className="font-bold underline">Open Accounts</button></div>
           )}

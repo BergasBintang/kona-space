@@ -9,7 +9,7 @@ export function UpdateCard({ running }: { running: number }) {
   if (!shown) return null;
   const pct = u.phase === "downloading" && u.total > 0 ? Math.min(100, Math.round((u.done / u.total) * 100)) : null;
   return (
-    <div role="status" aria-label="Update" className="absolute top-6 right-6 z-10 flex w-[380px] flex-col gap-3 rounded-card border border-line-subtle bg-surface-2 px-[18px] py-4 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.4)]">
+    <div role="status" aria-label="Update" className="absolute top-6 right-6 z-10 flex w-[380px] flex-col gap-3 px-card px-shadow p-2">
       {u.phase === "available" && (
         <>
           <div className="flex items-center gap-2.5"><KonaMark size={22} /><span className="font-bold">Kona {u.version} is ready</span></div>

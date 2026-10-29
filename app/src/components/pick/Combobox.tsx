@@ -126,7 +126,7 @@ export function SmartSearch({ label, ariaLabel, placeholder, where, options = []
         <input ref={input} id={`${uid}-in`} value={text} disabled={disabled} onChange={(e) => typed(e.target.value)} onFocus={openList} onClick={openList} onKeyDown={onKey} onBlur={() => { if (open) revert(); }}
           role="combobox" aria-expanded={open} aria-controls={`${uid}-list`} aria-autocomplete="list" aria-activedescendant={active} aria-label={label ? undefined : ariaLabel ?? `Search ${where}`}
           placeholder={placeholder ?? `Search ${where}`} autoComplete="off" spellCheck={false}
-          className="min-w-0 flex-1 bg-transparent text-text outline-none placeholder:text-text-tertiary" />
+          className="bare min-w-0 flex-1 bg-transparent text-text outline-none placeholder:text-text-tertiary" />
         {text && !disabled && (
           <button type="button" aria-label="Clear" onMouseDown={(e) => e.preventDefault()} onClick={() => { setText(""); ownClear.current = true; onChange(null); setOpen(true); search("", true); input.current?.focus(); }}
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-text-secondary hover:text-text">

@@ -95,7 +95,7 @@ export function Servers({ project, roles }: { project: Project; roles: Role[] })
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[13px] leading-5 font-bold text-text-secondary">Roles that may use it:</span>
                 {s.roles.length === 0 && <span className="text-[13px] leading-5 text-state-waiting">none, so no role can connect</span>}
-                {s.roles.map((r) => <span key={r} className="flex items-center gap-1.5 rounded-full bg-surface-3 py-0.5 pr-2.5 pl-1 text-[12px] leading-5 font-bold"><RoleMark mark={roles.find((x) => x.id === r)?.mark ?? "dot"} size={20} />{roleName(r)}</span>)}
+                {s.roles.map((r) => <span key={r} className="flex items-center gap-1.5 rounded-full bg-surface-3 py-0.5 pr-2.5 pl-1 text-[12px] leading-5 font-bold"><RoleMark roleId={r} size={20} />{roleName(r)}</span>)}
               </div>
               <KeyLine path={s.key_path} />
               <div className="flex flex-wrap items-center justify-between gap-3">

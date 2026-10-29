@@ -141,8 +141,9 @@ fn list_projects(projects: State<'_, Projects>) -> Vec<Project> {
 }
 
 #[tauri::command]
-fn add_project(projects: State<'_, Projects>, folder: String, name: Option<String>, github: Option<String>) -> Result<AddResult, String> {
-    let r = projects.add(&folder, name)?;
+fn add_project(projects: State<'_, Projects>, accounts: State<'_, Accounts>, folder: String, name: Option<String>, github: Option<String>, account: Option<String>) -> Result<AddResult, String> {
+    if let Some(a) = account.as_deref().map(str::trim).filter(|a| !a.is_empty()) && accounts.get(a).is_none() { return Err("That account does not exist".into()); }
+    let r = projects.add(&folder, name, account)?;
     match github.filter(|g| !g.trim().is_empty()) {
         Some(g) => match projects.set_github(&r.project.id, &g) {
             Ok(p) => Ok(AddResult { project: p, ..r }),
@@ -429,6 +430,13 @@ fn ssh_key_state(projects: State<'_, Projects>, path: String) -> ssh::KeyState {
     ssh::key_state(&path, &folders)
 }
 
+/// Choose the account of a project. Every session in it uses this account.
+#[tauri::command]
+fn set_project_account(projects: State<'_, Projects>, accounts: State<'_, Accounts>, id: String, account: String) -> Result<Project, String> {
+    if !account.trim().is_empty() && accounts.get(account.trim()).is_none() { return Err("That account does not exist".into()); }
+    projects.set_account(&id, &account)
+}
+
 /// Change a project's GitHub repository (owner/name; empty clears it).
 #[tauri::command]
 fn set_project_github(projects: State<'_, Projects>, id: String, github: String) -> Result<Project, String> {
@@ -481,17 +489,6 @@ fn list_roles(roles: State<'_, Roles>) -> Vec<Role> {
     roles.all()
 }
 
-/// Add a role (empty id) or change one.
-#[tauri::command]
-fn save_role(roles: State<'_, Roles>, role: Role) -> Result<Role, String> {
-    roles.save_role(role)
-}
-
-#[tauri::command]
-fn remove_role(roles: State<'_, Roles>, id: String) -> Result<(), String> {
-    roles.remove(&id)
-}
-
 #[tauri::command]
 fn list_accounts(accounts: State<'_, Accounts>) -> Vec<Account> {
     accounts.all()
@@ -509,8 +506,9 @@ fn rename_account(accounts: State<'_, Accounts>, id: String, label: String) -> R
 
 /// Forget an account. Its folder is left where it is.
 #[tauri::command]
-fn remove_account(accounts: State<'_, Accounts>, id: String) -> Result<(), String> {
-    accounts.remove(&id)
+fn remove_account(accounts: State<'_, Accounts>, projects: State<'_, Projects>, id: String) -> Result<(), String> {
+    accounts.remove(&id)?;
+    projects.clear_account(&id)
 }
 
 /// Is this account signed in? Asks Claude Code; saves nothing.
@@ -560,7 +558,7 @@ pub fn run() {
             let ledger = ledger::Ledger::open(&base.join("kona.db")).map_err(|e| format!("could not open the cost ledger: {e}"))?;
             let tracker = std::sync::Arc::new(leftovers::Tracker::new(&base));
             app.manage(tracker.clone());
-            app.manage(Sessions::new(ledger, base.clone(), tracker.clone()));
+            app.manage(Sessions::new(ledger, tracker.clone()));
             // while sessions are open (or something is alive) look every 4 seconds; otherwise do nothing
             tauri::async_runtime::spawn(async move {
                 loop {
@@ -573,14 +571,14 @@ pub fn run() {
                 }
             });
             app.manage(Projects::load(&base));
-            app.manage(Roles::load(&base));
+            app.manage(Roles::load());
             app.manage(Accounts::load(&base));
             app.manage(Voice::load(&base));
             app.manage(ssh::Servers::load(&base));
             app.manage(backup::SettingsStore::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, set_project_github, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, remove_role, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
+        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, running_sessions, list_projects, add_project, remove_project, cost_rows, set_project_github, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

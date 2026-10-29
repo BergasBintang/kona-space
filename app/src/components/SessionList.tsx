@@ -29,7 +29,7 @@ export function SessionList({ state, project, roles, leftBehind, earlier, onResu
             <button key={id} onClick={() => onSelect(id)} aria-current={on ? "true" : undefined}
               className={`flex h-16 items-center gap-3 rounded-xl px-3.5 text-left transition-colors ${on ? "bg-surface-3" : "hover:bg-surface-2"}`}>
               <Glyph state={r.state} size={18} />
-              {role && <RoleMark mark={role.mark} size={26} />}
+              {role && <RoleMark roleId={role.id} size={26} />}
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate">{s.title || baseName(s.folder)}</span>
                 <span className="truncate text-[13px] leading-5 text-text-tertiary">{r.word} · {role ? role.name : s.model}{leftBehind[id] > 0 && <span className="ml-2 font-bold text-state-left">{leftBehind[id]} left behind</span>}</span>

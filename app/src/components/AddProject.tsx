@@ -1,14 +1,23 @@
 // Add a project: pick the folder, name it. Kona adds a hidden folder for its notes and tells Git to ignore it.
-import { useState } from "react";
-import { addProject, baseName, pickFolder, type AddResult } from "../lib/api";
+import { useEffect, useMemo, useState } from "react";
+import { accountStatusCached, addProject, baseName, pickFolder, type Account, type AccountStatus, type AddResult } from "../lib/api";
+import { Select } from "./pick";
 import { Button, Glyph } from "./ui";
 import { Help } from "./Help";
 import { KonaMark } from "./KonaMark";
 
-export function AddProject({ first, onDone, onCancel }: { first: boolean; onDone: (r: AddResult) => void; onCancel: () => void }) {
+export function AddProject({ first, accounts, onDone, onCancel, onOpenAccounts }: { first: boolean; accounts: Account[]; onDone: (r: AddResult) => void; onCancel: () => void; onOpenAccounts: () => void }) {
   const [folder, setFolder] = useState("");
   const [name, setName] = useState("");
   const [github, setGithub] = useState("");
+  const [account, setAccount] = useState("");
+  const [status, setStatus] = useState<Record<string, AccountStatus>>({}); // an account with no entry has not answered yet
+  useEffect(() => {
+    accounts.forEach((a) => { accountStatusCached(a.id).then((r) => setStatus((s) => ({ ...s, [a.id]: r }))).catch(() => setStatus((s) => ({ ...s, [a.id]: { logged_in: false } }))); });
+  }, [accounts]);
+  const signedIn = useMemo(() => accounts.filter((a) => status[a.id]?.logged_in), [accounts, status]);
+  const asking = accounts.some((a) => status[a.id] === undefined);
+  useEffect(() => { if (!account && signedIn.length === 1) setAccount(signedIn[0].id); }, [signedIn, account]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -18,7 +27,7 @@ export function AddProject({ first, onDone, onCancel }: { first: boolean; onDone
   };
   const add = async () => {
     setBusy(true); setError(null);
-    try { onDone(await addProject(folder, name.trim() || undefined, github.trim() || undefined)); }
+    try { onDone(await addProject(folder, name.trim() || undefined, github.trim() || undefined, account)); }
     catch (e) { setError(String(e)); }
     finally { setBusy(false); }
   };
@@ -44,10 +53,16 @@ export function AddProject({ first, onDone, onCancel }: { first: boolean; onDone
           <span className="text-[13px] leading-5 font-bold text-text-secondary">GitHub address (optional)</span>
           <input value={github} onChange={(e) => setGithub(e.target.value)} placeholder="owner/name" aria-label="GitHub address" className="h-11 rounded-control border border-line-strong bg-inset px-3.5 font-mono text-[15px] text-text placeholder:text-text-tertiary" />
         </label>
+        <div className="flex flex-col gap-2">
+          {signedIn.length > 0 || asking
+            ? <Select label="Account" value={account} onChange={setAccount} placeholder={asking ? "Checking the accounts…" : "Choose an account"} disabled={asking} options={signedIn.map((a) => ({ value: a.id, label: a.label, hint: status[a.id]?.email ?? undefined }))} />
+            : <div className="flex flex-col items-start gap-2"><span className="text-[13px] leading-5 font-bold text-text-secondary">Account</span><span className="text-[14px] leading-5 text-text-secondary">No account is signed in. A project needs one.</span><Button variant="quiet" small onClick={onOpenAccounts}>Sign in to an account</Button></div>}
+          <span className="text-[13px] leading-5 text-text-tertiary">Every session in this project will use this account.</span>
+        </div>
         {error && <div className="flex items-start gap-2.5 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
         <div className="flex justify-end gap-3">
           {!first && <Button variant="quiet" onClick={onCancel}>Cancel</Button>}
-          <Button onClick={add} disabled={!folder || busy}>{busy ? "Adding…" : "Add project"}</Button>
+          <Button onClick={add} disabled={!folder || !account || busy}>{busy ? "Adding…" : "Add project"}</Button>
         </div>
       </div>
     </div>

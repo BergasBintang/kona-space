@@ -1,9 +1,9 @@
 // The commands the Rust core offers, with their shapes (see src-tauri/src/lib.rs).
 import { invoke } from "@tauri-apps/api/core";
 
-export type Project = { id: string; name: string; folder: string; github?: string | null };
+export type Project = { id: string; name: string; folder: string; github?: string | null; account?: string | null };
 export type AddResult = { project: Project; hidden_folder: boolean; git_ignored: boolean };
-export type Role = { id: string; name: string; group: string; mark: string; model: string; mode: string; brief: string; account?: string | null; needs: string[]; own_copy?: boolean };
+export type Role = { id: string; name: string; group: string; model: string; mode: string; brief: string; needs: string[]; own_copy?: boolean };
 export type ToolInfo = { id: string; name: string; install: string };
 export type ToolStatus = { id: string; name: string; installed: boolean; version?: string | null; install: string };
 export type Hint = { id: string; because: string };
@@ -51,7 +51,8 @@ export type FileView =
   | { kind: "toolarge"; size: number };
 
 export const listProjects = () => invoke<Project[]>("list_projects");
-export const addProject = (folder: string, name?: string, github?: string) => invoke<AddResult>("add_project", { folder, name: name ?? null, github: github ?? null });
+export const addProject = (folder: string, name?: string, github?: string, account?: string) => invoke<AddResult>("add_project", { folder, name: name ?? null, github: github ?? null, account: account ?? null });
+export const setProjectAccount = (id: string, account: string) => invoke<Project>("set_project_account", { id, account });
 export const removeProject = (id: string) => invoke<void>("remove_project", { id });
 export const listTools = () => invoke<ToolInfo[]>("list_tools");
 export const checkTools = (ids: string[]) => invoke<ToolStatus[]>("check_tools", { ids });
@@ -96,14 +97,22 @@ export const setProjectGithub = (id: string, github: string) => invoke<Project>(
 export const earlierSessions = (projectId: string) => invoke<Earlier[]>("earlier_sessions", { projectId });
 export const costRows = (sinceDay: string | null) => invoke<CostRow[]>("cost_rows", { sinceDay });
 export const listRoles = () => invoke<Role[]>("list_roles");
-export const saveRole = (role: Role) => invoke<Role>("save_role", { role });
-export const removeRole = (id: string) => invoke<void>("remove_role", { id });
 export const listAccounts = () => invoke<Account[]>("list_accounts");
-export const addAccount = (label: string) => invoke<Account>("add_account", { label });
+export const addAccount = async (label: string) => { try { return await invoke<Account>("add_account", { label }); } finally { statusCache.clear(); } };
 export const renameAccount = (id: string, label: string) => invoke<Account>("rename_account", { id, label });
-export const removeAccount = (id: string) => invoke<void>("remove_account", { id });
+export const removeAccount = async (id: string) => { try { return await invoke<void>("remove_account", { id }); } finally { statusCache.clear(); } };
 export const accountStatus = (id: string) => invoke<AccountStatus>("account_status", { id });
-export const signInAccount = (id: string) => invoke<void>("sign_in_account", { id });
+// Asking Claude Code is a process on this small PC, so the welcome page and the add-project form share one recent answer (a minute) per account.
+const statusCache = new Map<string, { at: number; value: AccountStatus }>();
+export async function accountStatusCached(id: string, maxAgeMs = 60_000): Promise<AccountStatus> {
+  const hit = statusCache.get(id);
+  if (hit && Date.now() - hit.at < maxAgeMs) return hit.value;
+  const value = await accountStatus(id);
+  statusCache.set(id, { at: Date.now(), value });
+  return value;
+}
+export const forgetAccountStatus = (id: string) => { statusCache.delete(id); };
+export const signInAccount = async (id: string) => { try { return await invoke<void>("sign_in_account", { id }); } finally { statusCache.clear(); } };
 export const listDir = (path: string) => invoke<Entry[]>("list_dir", { path });
 export const readFile = (path: string) => invoke<FileView>("read_file", { path });
 

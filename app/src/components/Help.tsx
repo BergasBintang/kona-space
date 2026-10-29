@@ -30,7 +30,7 @@ function HelpDialog({ title, children, onClose }: { title: string; children: Rea
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div ref={box} role="dialog" aria-modal="true" aria-label={title} onKeyDown={onKey}
-        className="flex max-h-full w-full max-w-[520px] flex-col gap-4 overflow-y-auto rounded-card border border-line-strong bg-surface-2 p-6 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.6)]">
+        className="flex max-h-full w-full max-w-[520px] flex-col gap-4 overflow-y-auto px-card px-shadow p-3">
         <h2 className="m-0 text-[20px] leading-7 font-bold">{title}</h2>
         <div className="flex flex-col gap-3 text-[15px] leading-6 text-text-secondary">{children}</div>
         <div className="flex justify-end pt-1"><button ref={closer} type="button" onClick={onClose} className="inline-flex h-11 items-center justify-center rounded-control border border-line-strong px-5 text-[15px] font-bold text-text hover:bg-surface-3">Close</button></div>

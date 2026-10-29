@@ -4,7 +4,11 @@ import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { initialState, loadPlans, reducer, savePlans } from "./lib/sessions";
 import { PLAIN_LINES, leftoverOverview, listAccounts, listProjects, accountStatus, getPersona, listRoles, listTools, samePlace, type Account, type AddResult, type Project, type Persona, type LeftoverOverview, type Role, type TicketView, type ToolInfo } from "./lib/api";
-import { Sidebar, type Place } from "./components/Sidebar";
+import { TopBar } from "./components/TopBar";
+import type { Place } from "./lib/places";
+import { Office } from "./components/Office";
+import { officeLooks, looksSignature } from "./lib/office";
+import { Hello } from "./components/Hello";
 import { SessionList } from "./components/SessionList";
 import { Welcome } from "./components/Welcome";
 import { AddProject } from "./components/AddProject";
@@ -41,10 +45,15 @@ export default function App() {
   const [lo, setLo] = useState<LeftoverOverview>({ items: [], sessions: [] }); // what sessions started and left behind
   const [tools, setTools] = useState<ToolInfo[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accountsReady, setAccountsReady] = useState(false); // the welcome page needs the accounts, or every project looks accountless
+  const [helloNote, setHelloNote] = useState<string | null>(null); // why the welcome page came back
   const [lastAccount, setLastAccount] = useState(remembered("kona.account") ?? "main"); // the account used last
-  const [place, setPlace] = useState<Place>("sessions");
-  const [folded, setFolded] = useState(remembered("kona.sidebar") === "folded"); // the sidebar as a narrow strip of icons
-  const toggleSidebar = useCallback(() => setFolded((f) => { remember("kona.sidebar", f ? "open" : "folded"); return !f; }), []);
+  const [place, setPlace] = useState<Place>("office");
+  const [greeted, setGreeted] = useState(false); // the welcome page comes first on every launch
+  // the account of a project, or null when it has none (or its account was removed): then nothing starts until the owner picks one on the welcome page
+  const accountOf = (p: Project | null | undefined) => (p?.account && accounts.some((a) => a.id === p.account) ? p.account : null);
+  const NO_ACCOUNT = "This project has no account yet. Click the Kona mark and choose one.";
+  const [presetRole, setPresetRole] = useState<string | null>(null); // a role chosen in the office, for the start screen
   const [adding, setAdding] = useState(false); // the Add a project screen
   const [creating, setCreating] = useState(false); // the Start a session screen
   const [notice, setNotice] = useState<string | null>(null);
@@ -56,7 +65,7 @@ export default function App() {
   const noting = useRef(new Set<string>());
   const [earlier, setEarlier] = useState<Earlier[]>([]); // sessions Claude Code saved earlier, for Resume
 
-  // the window size (100, 90, 80 percent) and the keys for it and for the sidebar; the window itself never scrolls
+  // the window size (100, 90, 80 percent) and the keys for it; the window itself never scrolls
   useEffect(() => {
     loadZoom();
     const keys = (e: KeyboardEvent) => {
@@ -64,13 +73,12 @@ export default function App() {
       if (e.key === "-" || e.key === "_") { e.preventDefault(); stepZoom(-1); }
       else if (e.key === "=" || e.key === "+") { e.preventDefault(); stepZoom(1); }
       else if (e.key === "0") { e.preventDefault(); stepZoom(0); }
-      else if (e.key.toLowerCase() === "b") { e.preventDefault(); toggleSidebar(); }
     };
     const stay = () => { if (window.scrollX || window.scrollY) window.scrollTo(0, 0); };
     window.addEventListener("keydown", keys);
     window.addEventListener("scroll", stay);
     return () => { window.removeEventListener("keydown", keys); window.removeEventListener("scroll", stay); };
-  }, [toggleSidebar]);
+  }, []);
 
   // a few seconds after start, look for a newer version (if the owner has not turned that off); offline or a failure stays quiet
   useEffect(() => {
@@ -88,7 +96,7 @@ export default function App() {
     listRoles().then(setRoles).catch(() => setRoles([]));
     getPersona().then(setPersona).catch(() => setPersona(null));
     listTools().then(setTools).catch(() => setTools([]));
-    listAccounts().then(setAccounts).catch(() => setAccounts([]));
+    listAccounts().then((a) => { setAccounts(a); setAccountsReady(true); }).catch(() => { setAccounts([]); setAccountsReady(true); });
     // every message from every running `claude`, forwarded by the Rust core
     const un = listen<{ sessionId: string; record: unknown }>("session-event", (e) => {
       dispatch({ type: "event", sessionId: e.payload.sessionId, record: e.payload.record });
@@ -118,14 +126,22 @@ export default function App() {
 
   const project = useMemo(() => projects?.find((p) => p.id === projectId) ?? projects?.[0] ?? null, [projects, projectId]);
   const mine = useMemo(() => (project ? state.order.filter((id) => samePlace(state.sessions[id].folder, project.folder)) : []), [state, project]);
+  const looksSig = looksSignature(state);
+  const looks = useMemo(() => officeLooks(project, state), [project, looksSig]); // eslint-disable-line react-hooks/exhaustive-deps
   const attention = useMemo(() => state.order.filter((id) => state.sessions[id].run === "waiting").length, [state]);
   const current = state.selected && mine.includes(state.selected) ? state.sessions[state.selected] : null;
 
-  const pickProject = useCallback((id: string) => { setProjectId(id); remember("kona.project", id); setCreating(false); }, []);
+  const pickProject = useCallback((id: string) => { setProjectId(id); remember("kona.project", id); setCreating(false); setPresetRole(null); }, []);
+  useEffect(() => { if (place !== "sessions") setPresetRole(null); }, [place]);
+  // the office's three actions keep one identity, so the office does not redraw for a reason it cannot see
+  const openPlace = useCallback((p: Place) => setPlace(p), []);
+  const startRoleHere = useCallback((id: string) => { setPresetRole(id); setError(null); setCreating(true); setPlace("sessions"); }, []);
+  const openSessionHere = useCallback((id: string) => { dispatch({ type: "select", id }); setCreating(false); setPlace("sessions"); }, []);
 
   const added = (r: AddResult) => {
     setProjects((cur) => [...(cur ?? []), r.project]);
     pickProject(r.project.id);
+    setGreeted(true);
     setAdding(false);
     setPlace("sessions");
     setNotice(r.hidden_folder ? `Added ${r.project.name}. A hidden folder for Kona's notes is inside it${r.git_ignored ? ", and Git ignores it" : ""}.` : `Added ${r.project.name}.`);
@@ -153,6 +169,7 @@ export default function App() {
   const shownEarlier = useMemo(() => earlier.filter((e) => !state.sessions[e.id]), [earlier, state.sessions]);
 
   // Resume an earlier session: the same session id, in the same folder, with no role (the old session's role is not recorded)
+  // Resuming keeps the account the session was saved under: its transcript lives in that account's folder, so no other account can find it.
   const resume = async (e: Earlier) => {
     if (!project || !persona) return;
     setError(null);
@@ -171,7 +188,7 @@ export default function App() {
     setError(null);
     try {
       const brainDigest = await buildDigest(project?.id ?? "", { roleId, roleName: roles.find((r) => r.id === roleId)?.name });
-      await invoke<string>("start_session", { folder, roleId, accountId, useVoice, ticketId: null, brainDigest, model, mode, resume: null }); setLastAccount(accountId); remember("kona.account", accountId); setCreating(false); }
+      await invoke<string>("start_session", { folder, roleId, accountId, useVoice, ticketId: null, brainDigest, model, mode, resume: null }); setLastAccount(accountId); remember("kona.account", accountId); setCreating(false); setPresetRole(null); }
     catch (e) { setError(String(e)); }
   };
 
@@ -180,7 +197,8 @@ export default function App() {
     if (!project || !persona) return;
     const role = roles.find((r) => r.id === t.role);
     if (!role) throw new Error("Choose a role for this ticket first");
-    const accountId = role.account && accounts.some((a) => a.id === role.account) ? role.account : accounts.some((a) => a.id === lastAccount) ? lastAccount : "main";
+    const accountId = accountOf(project);
+    if (!accountId) throw new Error(NO_ACCOUNT);
     const status = await accountStatus(accountId);
     if (!status.logged_in) throw new Error("That account is not signed in. Open Accounts to sign in.");
     const brainDigest = await buildDigest(project.id, { roleId: role.id, roleName: role.name, ticketId: t.id });
@@ -195,7 +213,8 @@ export default function App() {
   // Ask Claude a question from the Brain: a new session in plan-only mode (it can read, not change), with the question sent at once.
   const askClaude = async (question: string) => {
     if (!project) return;
-    const accountId = accounts.some((a) => a.id === lastAccount) ? lastAccount : "main";
+    const accountId = accountOf(project);
+    if (!accountId) throw new Error(NO_ACCOUNT);
     const status = await accountStatus(accountId);
     if (!status.logged_in) throw new Error("That account is not signed in. Open Accounts to sign in.");
     const brainDigest = await buildDigest(project.id, {});
@@ -225,15 +244,32 @@ export default function App() {
 
   if (import.meta.env.DEV && window.location.hash === "#kit") return <Kit />; // the base pickers on show, development only
 
-  if (projects === null || persona === null) return <div className="flex h-full items-center justify-center text-text-tertiary">Opening Kona…</div>;
+  if (projects === null || persona === null || !accountsReady) return <div className="flex h-full items-center justify-center text-text-tertiary">Opening Kona…</div>;
+
+  if (!greeted && projects.length > 0) {
+    return (
+      <div className="flex h-full overflow-hidden">
+        <Hello projects={projects} accounts={accounts} persona={persona}
+          note={helloNote}
+          onOpen={(id) => { pickProject(id); setHelloNote(null); setGreeted(true); setAdding(false); setPlace("office"); }}
+          onAdd={() => { setGreeted(true); setAdding(true); }}
+          onOpenAccounts={() => { setGreeted(true); setAdding(false); setPlace("accounts"); }}
+          onProjects={setProjects} />
+      </div>
+    );
+  }
 
   let content: React.ReactNode;
-  if (adding || !project) {
-    content = <AddProject first={!project} onDone={added} onCancel={() => setAdding(false)} />;
+  if (place === "accounts" && !adding) {
+    content = <Accounts accounts={accounts} onChanged={setAccounts} />;
+  } else if (adding || !project) {
+    content = <AddProject first={!project} accounts={accounts} onDone={added} onCancel={() => setAdding(false)} onOpenAccounts={() => { setAdding(false); setPlace("accounts"); }} />;
+  } else if (place === "office") {
+    content = <Office project={project} roles={roles} looks={looks} onOpen={openPlace} onStartRole={startRoleHere} onOpenSession={openSessionHere} />;
   } else if (place === "files") {
     content = <Files project={project} />;
   } else if (place === "roles") {
-    content = <Roles roles={roles} accounts={accounts} tools={tools} onChanged={setRoles} />;
+    content = <Roles roles={roles} tools={tools} />;
   } else if (place === "settings") {
     content = <Settings projects={projects} version={version} onProjects={(next) => { setProjects(next); if (projectId && !next.some((p) => p.id === projectId)) { setProjectId(next[0]?.id ?? null); remember("kona.project", next[0]?.id ?? ""); } }} />;
   } else if (place === "servers") {
@@ -250,29 +286,28 @@ export default function App() {
     content = <Voice persona={persona} onChanged={setPersona} />;
   } else if (place === "costs") {
     content = <Costs project={project} roles={roles} accounts={accounts} />;
-  } else if (place === "accounts") {
-    content = <Accounts accounts={accounts} onChanged={setAccounts} />;
   } else {
     content = (
       <>
-        <SessionList state={state} project={project} roles={roles} leftBehind={leftBehind} earlier={shownEarlier} onResume={(e) => void resume(e)} creating={creating || !current} onSelect={(id) => { setCreating(false); dispatch({ type: "select", id }); }} onNew={() => { setError(null); setCreating(true); }} />
+        <SessionList state={state} project={project} roles={roles} leftBehind={leftBehind} earlier={shownEarlier} onResume={(e) => void resume(e)} creating={creating || !current} onSelect={(id) => { setPresetRole(null); setCreating(false); dispatch({ type: "select", id }); }} onNew={() => { setPresetRole(null); setError(null); setCreating(true); }} />
         <div className="w-px bg-line-subtle" />
         <main className="flex min-w-0 flex-1 flex-col">
-          {creating || !current ? <Welcome key={project.id} project={project} roles={roles} accounts={accounts} persona={persona} lastAccount={lastAccount} onOpenAccounts={() => setPlace("accounts")} onStart={start} error={error} /> : <Chat key={current.id} s={current} onNote={() => void noteSession(current.id, true)} onSaveAnswer={(t) => void saveAnswer(current.id, t)} role={roles.find((r) => r.id === current.roleId)} account={accounts.length > 1 ? accounts.find((a) => a.id === current.accountId)?.label : undefined} dispatch={dispatch} />}
+          {creating || !current ? <Welcome key={`${project.id}-${presetRole ?? ""}`} initialRole={roles.find((r) => r.id === presetRole) ?? null} project={project} roles={roles} accounts={accounts} persona={persona} accountId={accountOf(project) ?? ""} onOpenAccounts={() => setPlace("accounts")} onStart={start} error={error} /> : <Chat key={current.id} s={current} onNote={() => void noteSession(current.id, true)} onSaveAnswer={(t) => void saveAnswer(current.id, t)} role={roles.find((r) => r.id === current.roleId)} account={accounts.length > 1 ? accounts.find((a) => a.id === current.accountId)?.label : undefined} dispatch={dispatch} />}
         </main>
       </>
     );
   }
 
   return (
-    <div className="flex h-full overflow-hidden">
-      <Sidebar projects={projects} project={project} onProject={pickProject} onAddProject={() => setAdding(true)} place={place}
-        onPlace={(p) => { setAdding(false); setPlace(p); }} attention={attention} leftBehind={leftTotal} plan={state.plans[current?.accountId ?? lastAccount]} limitLine={persona.enabled ? persona.lines.limit : PLAIN_LINES.limit} accountLabel={accounts.length > 1 ? accounts.find((a) => a.id === (current?.accountId ?? lastAccount))?.label ?? null : null} version={version} collapsed={folded} onToggle={toggleSidebar} />
-      <div className="relative flex min-w-0 flex-1">
+    <div className="flex h-full flex-col overflow-hidden">
+      <TopBar projects={projects} project={project} onProject={(id) => { pickProject(id); setAdding(false); const p = projects.find((x) => x.id === id); if (!accountOf(p)) { setHelloNote(`${p?.name ?? "That project"} has no account yet. Choose one on its card.`); setGreeted(false); } }} onHome={() => { setAdding(false); setGreeted(false); }} place={place}
+        onPlace={(p) => { setAdding(false); setPlace(p); }} attention={attention} leftBehind={leftTotal} plan={state.plans[current?.accountId ?? accountOf(project) ?? lastAccount]}
+        limitLine={persona.enabled ? persona.lines.limit : PLAIN_LINES.limit} accountLabel={project ? accounts.find((a) => a.id === (current?.accountId ?? accountOf(project)))?.label ?? null : null} version={version} />
+      <div className="relative flex min-h-0 min-w-0 flex-1">
         {content}
         <UpdateCard running={state.order.filter((id) => state.sessions[id].run !== "ended").length} />
         {notice && (
-          <div role="status" className="absolute right-6 bottom-6 flex max-w-[440px] items-start gap-3 rounded-card border border-line-subtle bg-surface-2 px-[18px] py-4 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.4)]">
+          <div role="status" className="absolute right-6 bottom-6 flex max-w-[440px] items-start gap-3 px-card px-shadow p-2">
             <Glyph state="done" size={20} />
             <span className="text-[14px] leading-5 text-text-secondary">{notice}</span>
             <button className="ml-2 text-[13px] font-bold text-text-secondary hover:text-text" onClick={() => setNotice(null)}>Close</button>

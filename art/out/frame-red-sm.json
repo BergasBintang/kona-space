@@ -1,0 +1,10 @@
+{
+  "tile": 4,
+  "size": 12,
+  "css": "border-image: url(frame-red-sm-normal.png) 4 / 8px repeat; image-rendering: pixelated;",
+  "looks": [
+    "normal",
+    "hover",
+    "pressed"
+  ]
+}

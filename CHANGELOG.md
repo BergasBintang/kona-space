@@ -2,6 +2,20 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.20.0, 2026-10-30
+
+The office: a new look, a welcome page, one account per project, and a pixel office instead of the sidebar.
+
+- **Welcome page.** Kona opens on a page with a card for each project: its account, and whether that account is signed in. A signed-out account offers Sign in or Use another account. A project with no account yet asks "Which account does this project use?" once. The Kona mark in the top bar brings you back to it.
+- **One account per project.** Every session in a project (a role, a ticket, a Brain question) uses the project's account. Adding a project asks for one of the signed-in accounts. The account of a role is gone. Removing an account clears it from the projects that used it, and they ask for another on the welcome page. Resuming an old session keeps the account it was saved under, because its transcript lives there.
+- **The office.** The sidebar is replaced by one isometric pixel-art building with a room for every place (Board, Brain, Files, Servers, Git, Costs and so on). Click a room to zoom in and open what it holds. A top bar stays in view with the project, a Go to list of every place, a way back to the office, what is waiting on you, the account, and the two plan bars.
+- **Cats at their desks.** Every role is its own cat, at its own desk. A cat types while its session works, raises a paw when it waits on you, and looks pleased when it is done, with a small bubble that says so in words. Cats blink when idle. Motion stops under Windows "reduce motion" and when the window is hidden.
+- **A secretary.** A new role at the front desk for general questions. She turns what you say into tickets for the other roles.
+- **Roles are fixed.** The ten roles and the secretary come with Kona and cannot be edited. Roles now shows them read-only. The old roles file is no longer read (it is left where it is). A custom role made before this version is no longer available: a ticket that used one asks you to choose a role again.
+- **A light paper look.** Warm cream and paper colours, bright but not too bright, with dark brown text. Every pair of colours is checked by `npm run contrast` (text 4.5 to 1, borders and the focus ring 3 to 1). Hover goes darker. No rounded corners anywhere.
+- **Pixel art everywhere.** A new pixel logo and app icon (the orange cat), pixel state marks, tiled pixel frames for buttons, cards, dialogs and text boxes (paper for most, teal for the main button, red for a button that cannot be undone), and a clean pixel font (Pixelify Sans, licence OFL) for headings, buttons and labels. Long text, code and paths keep plain fonts.
+- Not done: the window zoom steps (90 and 80 percent) make pixels uneven, so the office and frames look slightly rough there; moving furniture and a way to add rooms; the cleanup ticket (T-0003) that removes the leftovers of the old look and design files.
+
 ## 0.19.4, 2026-10-28
 
 A new logo, and Costs is always one project.

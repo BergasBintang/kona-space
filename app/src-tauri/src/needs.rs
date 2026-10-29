@@ -31,10 +31,6 @@ static TOOLS: &[Tool] = &[
     Tool { id: "ssh", name: "OpenSSH client", run: &["ssh", "-V"], install: "Settings, Apps, Optional features, add OpenSSH Client" },
 ];
 
-pub fn known(id: &str) -> bool {
-    TOOLS.iter().any(|t| t.id == id)
-}
-
 #[derive(Serialize, Clone)]
 pub struct ToolInfo {
     pub id: String,

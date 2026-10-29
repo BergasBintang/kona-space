@@ -1,0 +1,83 @@
+{
+  "frameWidth": 28,
+  "frameHeight": 20,
+  "cats": [
+    {
+      "role": "product",
+      "x": 133,
+      "y": 76,
+      "depth": 6.7,
+      "occluder": true
+    },
+    {
+      "role": "design",
+      "x": 108,
+      "y": 88,
+      "depth": 8.3,
+      "occluder": true
+    },
+    {
+      "role": "frontend",
+      "x": 194,
+      "y": 106,
+      "depth": 10.5,
+      "occluder": true
+    },
+    {
+      "role": "backend",
+      "x": 165,
+      "y": 120,
+      "depth": 12.3,
+      "occluder": true
+    },
+    {
+      "role": "qa",
+      "x": 223,
+      "y": 120,
+      "depth": 12.3,
+      "occluder": true
+    },
+    {
+      "role": "security",
+      "x": 194,
+      "y": 135,
+      "depth": 14.1,
+      "occluder": true
+    },
+    {
+      "role": "secretary",
+      "x": 271,
+      "y": 148,
+      "depth": 16,
+      "occluder": true
+    },
+    {
+      "role": "marketing",
+      "x": 322,
+      "y": 170,
+      "depth": 18.5,
+      "occluder": true
+    },
+    {
+      "role": "devops",
+      "x": 456,
+      "y": 183,
+      "depth": 20.1,
+      "occluder": true
+    },
+    {
+      "role": "content",
+      "x": 293,
+      "y": 184,
+      "depth": 20.3,
+      "occluder": true
+    },
+    {
+      "role": "support",
+      "x": 336,
+      "y": 192,
+      "depth": 21.200000000000003,
+      "occluder": true
+    }
+  ]
+}

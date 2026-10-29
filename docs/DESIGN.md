@@ -1,5 +1,7 @@
 # Kona design, version 3
 
+> **Out of date for the look (2026-10-30, Kona 0.20.0).** The dark theme, the sidebar and the soft rounded look in this file were replaced by a light paper look, a pixel-art office, tiled pixel frames and a pixel font (decisions 42 to 48 in `kona-space-app.md`, tickets T-0001 to T-0003 in the project's `.kona/tickets`). The rules about words, states, contrast and plain wording still apply. The real colours are the tokens in `app/src/index.css`, checked by `npm run contrast`. Rewriting this file is part of the cleanup ticket T-0003.
+
 Drafted on 2026-10-25 in FigCraft (0.7.0, early alpha) at the owner's request. The owner approved version 0 ("love it, go on"), then asked for the full front end (version 1) and then for a clickable prototype with the first-run flow, a full SaaS team of roles, and one tidy file that is the source of truth (version 2). Nothing here is built in code yet.
 
 **Version 3 (2026-10-27)** changes two things the owner asked for. (1) The Brain is now a graph of linked notes with a starter brain and an honest "is this in the brain?" answer (six screens, section "The Brain" below). (2) The sidebar can fold down to a 72 px rail that keeps the Kona mark (section "The collapsed sidebar"). Every other screen is unchanged except for the fold button added to its sidebar.

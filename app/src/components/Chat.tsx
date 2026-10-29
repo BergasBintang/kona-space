@@ -23,7 +23,7 @@ export function Header({ s, role, account, onStop, onNote }: { s: Session; role?
         <h1 className="m-0 truncate text-[22px] leading-[30px] font-bold">{folderName(s.folder)}</h1>
         <div className="flex flex-wrap items-center gap-3 text-[13px] leading-5 text-text-secondary">
           <Badge state={b.state} label={b.label} />
-          {role && <span className="inline-flex items-center gap-2 font-bold text-text"><RoleMark mark={role.mark} size={22} />{role.name}</span>}
+          {role && <span className="inline-flex items-center gap-2 font-bold text-text"><RoleMark roleId={role.id} size={22} />{role.name}</span>}
           {account && <span>Account: {account}</span>}
           <span>{s.model}</span>
           <span>{modeWord(s.mode)}</span>
@@ -90,9 +90,27 @@ function PermissionCard({ it, onAnswer }: { it: Extract<Item, { kind: "permissio
   );
 }
 
+// Shown while Claude works, so a quiet moment never looks like nothing happened: a live mark and a word that changes every few seconds.
+const THINKING_WORDS = ["Mulling", "Pondering", "Shimmering", "Musing", "Brewing", "Tinkering", "Weaving", "Sifting", "Untangling", "Percolating", "Noodling", "Kneading", "Polishing", "Stirring", "Simmering", "Whittling"];
+const pickWord = (not?: string) => { let w = not; while (w === not) w = THINKING_WORDS[Math.floor(Math.random() * THINKING_WORDS.length)]; return w!; };
+
+function Thinking() {
+  const [word, setWord] = useState(() => pickWord());
+  useEffect(() => {
+    const t = setInterval(() => setWord((w) => pickWord(w)), 3200);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <div className="flex items-center gap-2.5" role="status" aria-label="Claude is working">
+      <Glyph state="live" size={16} color="var(--color-brand)" />
+      <span className="kona-shimmer text-[14px] leading-5">{word}…</span>
+    </div>
+  );
+}
+
 function Transcript({ s, onAnswer }: { s: Session; onAnswer: (it: Extract<Item, { kind: "permission" }>, allow: boolean, remember?: unknown[]) => void }) {
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [s.items.length, s.draft]);
+  useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [s.items.length, s.draft, s.run]);
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-8 pt-6 pb-3">
       {s.items.length === 0 && !s.draft && (
@@ -118,6 +136,7 @@ function Transcript({ s, onAnswer }: { s: Session; onAnswer: (it: Extract<Item, 
         );
       })}
       {s.draft && <p className="m-0 max-w-[calc(980px*var(--k))] whitespace-pre-wrap">{s.draft}</p>}
+      {s.run === "working" && <Thinking />}
       <div ref={end} />
     </div>
   );

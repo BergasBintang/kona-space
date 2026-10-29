@@ -2,6 +2,13 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.20.3, 2026-10-30
+
+The design document is rewritten. Nothing in the app changed.
+
+- `docs/DESIGN.md` is now version 4: the paper look, the pixel frames and font, the office, the top bar and the welcome page, with the real colours and their measured contrast, the eleven roles and their cats, and a plain list of what has not been checked.
+- A note in the plan about the reference clones that were agreed to be removed.
+
 ## 0.20.2, 2026-10-30
 
 The old design files are gone. Nothing in the app changed.

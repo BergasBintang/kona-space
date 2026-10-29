@@ -10,9 +10,7 @@ Drafted on 2026-10-25 in FigCraft (0.7.0, early alpha) at the owner's request. T
 
 | What | Where |
 |---|---|
-| The design file (open it in FigCraft) | `docs/design/kona-design.figcraft`. Three pages: **Tokens**, **Parts** (four frames side by side: base parts, second batch, interactive parts, states and themes), **Screens** (six columns: first run, sessions, board and project, costs and upkeep, Brain, collapsed sidebar). It is the source of truth and also the clickable prototype |
-| Previews | `docs/design/previews/`: one PNG per screen (named after the screen, for example `1-sessions-chat.png`) and one per parts frame (`part-*.png`) |
-| The scripts that drew it | `docs/design/build/`. They talk to a running FigCraft through its MCP server (`figcraft --control 7979`, then `figcraft-cli mcp --attach 7979`). Screenshots they take go to `docs/design/build/build-output/` (ignored by Git); set `FIGCRAFT_CLI` if FigCraft's command line tool is not in its usual place. `run-all.sh` rebuilds the whole file in order (it needs FigCraft running with `--control 7979`). `build-previews.mjs` writes the PNGs. Shared code: `kona-lib.mjs` (tokens, role marks, the role list), `kona-parts.mjs`, `kona-parts2.mjs`, `kona-interactive.mjs` (hover sets and prototype links), `kona-shell.mjs`. Version 3 added `build-brain.mjs` (the six Brain screens; `INPLACE=1` redraws them in an open file) and `build-rail.mjs` (the collapsed sidebar and its twins; runs last). `run-all.sh` lists both, but a full run of it was **not** repeated after version 3: the two scripts were run on their own on the open file. `registry.json` is generated while building |
+| The design file, previews and the scripts that drew them | Removed on 2026-10-30 with the FigCraft design. They stay in git history (the commit of Kona 0.20.1 still has them). |
 | The owner's taste, read-only source | `C:\miralis-canon\DESIGN.md`. Kona takes its discipline, not its marks |
 
 ## Mood

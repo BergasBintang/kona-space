@@ -49,13 +49,12 @@ To make an installer instead: `npm run tauri build` in `app`. It writes `app/src
 |---|---|
 | The app (Rust core and React screen) | [app/](app/) |
 | The plan: decisions, features, research, progress | [kona-space-app.md](kona-space-app.md) |
-| The look: rules, colours, parts, screens | [docs/DESIGN.md](docs/DESIGN.md) and the previews in `docs/design/previews/` |
-| The design file and the scripts that draw it in FigCraft | `docs/design/` ([docs/FIGCRAFT.md](docs/FIGCRAFT.md)) |
+| The look: rules, colours, parts (partly out of date, see its first lines) | [docs/DESIGN.md](docs/DESIGN.md) |
+| The pixel art: cats, the office, frames, the logo, and the scripts that draw them | `art/` ([art/README.md](art/README.md)) |
 | What was checked, measured and left open | [docs/AUDIT.md](docs/AUDIT.md) |
 | Security reports | [SECURITY.md](SECURITY.md) |
 | How a version is published and how installed copies update | [docs/RELEASING.md](docs/RELEASING.md) |
 | How versions are numbered | [docs/VERSIONING.md](docs/VERSIONING.md), [CHANGELOG.md](CHANGELOG.md) |
-| Small throwaway tests of how Claude Code behaves | `spikes/` |
 | Rules for an AI agent working in this folder | [CLAUDE.md](CLAUDE.md), [AGENTS.md](AGENTS.md) |
 
 ## Your data

@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.20.1"
+version = "0.20.2"
 description = "Kona, a personal workspace for Claude Code"
 authors = []
 license = "MIT"

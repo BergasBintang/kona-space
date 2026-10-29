@@ -2,6 +2,14 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.20.2, 2026-10-30
+
+The old design files are gone. Nothing in the app changed.
+
+- Removed the FigCraft design (`docs/design`, `docs/FIGCRAFT.md`), the early test scripts (`spikes`), the notes and screenshots of the two trials (`docs/trials`, which was never in git) and the spare wood frame set. The design files and scripts stay in git history (the 0.20.1 commit still has them).
+- The README, `CLAUDE.md`, `docs/DESIGN.md` and the art notes no longer point at them.
+- The old `roles.json` in the data folder was deleted (it was not read any more). The old cost-ledger backup from 2026-10-28 was kept: it holds 56 cost records the live ledger no longer has.
+
 ## 0.20.1, 2026-10-30
 
 Cleanup of what the old look left behind. Nothing new to learn.

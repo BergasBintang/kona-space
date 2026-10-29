@@ -7,11 +7,6 @@ import { writeFileSync } from "node:fs";
 
 // palettes: O outline, H highlight, W body, S shade, D dark side, I inner line
 const SETS = {
-  wood: {
-    normal: { O: "#2a1d14", H: "#d9a566", W: "#b07d4f", S: "#8a5d36", D: "#6c4727", I: "#3d2a1b" },
-    hover: { O: "#2a1d14", H: "#f0c27a", W: "#c4915a", S: "#9c6a3f", D: "#7d5430", I: "#3d2a1b" },
-    pressed: { O: "#2a1d14", H: "#d9a566", W: "#a06f45", S: "#8a5d36", D: "#6c4727", I: "#3d2a1b" },
-  },
   // paper: cards, dialogs, inputs and quiet buttons on the cream ground. Hover turns the outline gold.
   paper: {
     normal: { O: "#6b5638", H: "#fffaf0", W: "#f6edd8", S: "#e2d3b0", D: "#cdbb92", I: "#c7b58b" },

@@ -36,7 +36,9 @@ if (!latest.platforms?.['windows-x86_64']?.url.endsWith(`/${tag}/${exe}`)) stop(
 const code = ['app/src', 'app/src-tauri'];
 if (out('git', ['status', '--porcelain', '--', ...code]).stdout.trim()) stop('The program\'s code has uncommitted changes. Commit them first, so the release matches the code.');
 const local = out('git', ['rev-list', '-n', '1', tag]).stdout.trim();
-const remote = out('git', ['ls-remote', 'origin', `refs/tags/${tag}`]).stdout.split(/\s/)[0];
+// an annotated tag (git tag -a, as docs/VERSIONING.md says) lists itself and, with ^{}, the commit it points to; a plain tag lists only the commit
+const refs = out('git', ['ls-remote', 'origin', `refs/tags/${tag}`, `refs/tags/${tag}^{}`]).stdout.trim().split('\n').filter(Boolean).map((l) => l.split(/\s+/));
+const remote = (refs.find((r) => r[1]?.endsWith('^{}')) ?? refs[0] ?? [])[0];
 if (!local) stop(`The tag ${tag} does not exist here. Run the release steps in docs/RELEASING.md first.`);
 if (local !== remote) stop(`The tag ${tag} is not on GitHub yet (or points elsewhere). Run: git push origin main ${tag}`);
 if (out('git', ['diff', '--name-only', tag, 'HEAD', '--', ...code]).stdout.trim()) stop(`The program's code has changed since ${tag}, so the installer would not match it. Make a new version.`);

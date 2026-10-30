@@ -28,7 +28,7 @@ function liveState(t: TicketView, state: State): "waiting" | "working" | null {
   return any;
 }
 
-function Card({ t, role, live, active, onOpen }: { t: TicketView; role?: Role; live: "waiting" | "working" | null; active: boolean; onOpen: () => void }) {
+function Card({ t, role, live, active, waits, onOpen }: { t: TicketView; role?: Role; live: "waiting" | "working" | null; active: boolean; waits: string[]; onOpen: () => void }) {
   return (
     <div role="button" tabIndex={0} draggable aria-label={`${t.id} ${t.title}`}
       onClick={onOpen} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } }}
@@ -43,6 +43,7 @@ function Card({ t, role, live, active, onOpen }: { t: TicketView; role?: Role; l
         )}
       </div>
       <span className="line-clamp-3 text-[15px] leading-5 font-bold">{t.title}</span>
+      {waits.length > 0 && <span className="flex items-center gap-1.5 text-[12px] leading-4 font-bold text-text-secondary" title="A step of a workflow that comes after these tickets"><Glyph state="idle" size={14} />Waits for {waits.join(", ")}</span>}
       {t.branch && <span className="truncate font-mono text-[12px] leading-4 text-text-tertiary" title={t.branch}>{t.branch}</span>}
       {t.next && <span className="line-clamp-2 text-[13px] leading-[18px] text-text-secondary">Next: {t.next}</span>}
       <div className="flex items-center justify-between gap-2 text-[13px] leading-5 text-text-tertiary">
@@ -256,7 +257,7 @@ export function Board({ project, roles, state, onStart, onOpenSession }: {
                 <span className="font-mono text-[13px] text-text-tertiary">{byColumn[c.id].length}</span>
               </div>
               <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto">
-                {byColumn[c.id].map((t) => <Card key={t.id} t={t} role={roles.find((r) => r.id === t.role)} live={liveState(t, state)} active={openId === t.id} onOpen={() => setOpenId(t.id)} />)}
+                {byColumn[c.id].map((t) => <Card key={t.id} t={t} role={roles.find((r) => r.id === t.role)} live={liveState(t, state)} active={openId === t.id} waits={t.status === "done" ? [] : t.blocked_by.filter((b) => (tickets ?? []).some((x) => x.id === b && x.status !== "done"))} onOpen={() => setOpenId(t.id)} />)}
                 {byColumn[c.id].length === 0 && <p className="m-0 px-1.5 text-[13px] leading-5 text-text-tertiary">{c.says}.</p>}
               </div>
             </section>

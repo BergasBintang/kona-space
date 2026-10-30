@@ -29,14 +29,21 @@ const CAT = [
   torso("ffffffffff"),
   "..oooooooooooo..",
 ];
-// The cat seen from four sides (dir): 0 faces the camera, 1 faces the camera turned to its left (the face sits to the right), 2 and 3 show its back (the tail on the right and on the left).
+// The cat seen from the four directions the building can turn it (dir): 0 looks down-left and 1 down-right, both a three-quarter view with the face turned
+// to that side; 2 looks up-left and 3 up-right, seen from behind with a cheek and an inner ear showing on the side the head is turned, and the tail on the other.
 const CAT_RIGHT = CAT.slice();
 CAT_RIGHT[4] = head("fffffffddfff"); CAT_RIGHT[5] = CAT_RIGHT[6] = head("fffffeffffef"); CAT_RIGHT[7] = head("fffflllnnllf"); CAT_RIGHT[8] = head("ffffllllllff");
-const CAT_BACK = [
-  "..oo........oo..", ".offo......offo.", CAT[2].replaceAll("p", "f"), head("ffffffffffff"), head("ffffffffffff"), head("ffffffffffff"), head("ffffffffffff"), head("ffffffffffff"), head("ffffffffffff"),
-  "..oooooooooooo..", "...o" + "tttttttt" + "o...", torso("ffffffffff"), torso("ffffffffff"), torso("ffffffffff"), torso("dffffffffd"), torso("ffffffffff"), torso("ffffffffff"), "..oooooooooooo..",
-];
-const LOOKS = [CAT, CAT_RIGHT, CAT_BACK, CAT_BACK];
+const flip = (row) => [...row].reverse().join(""); // a row of the picture seen in a mirror (the picture is as wide each side of its middle)
+const CAT_LEFT = CAT_RIGHT.map(flip);
+const BACK_FUR = [head("ffffffffffff"), head("ffffffffffff"), head("ffffffffffff"), head("lffffffffffff".slice(0, 12)), head("llffffffffff"), head("lllfffffffff")];
+const backOf = (turn) => {
+  const rows = [
+    "..oo........oo..", ".offo......offo.", turn === "L" ? CAT[2].replace(/p(?=o\.$)/, "f") : CAT[2].replace("p", "f"), ...BACK_FUR,
+    "..oooooooooooo..", "...o" + "tttttttt" + "o...", torso("ffffffffff"), torso("ffffffffff"), torso("ffffffffff"), torso("dffffffffd"), torso("ffffffffff"), torso("ffffffffff"), "..oooooooooooo..",
+  ];
+  return turn === "L" ? rows : rows.map((r, n) => (n >= 3 && n <= 8 ? flip(r) : n === 2 ? r : r));
+};
+const LOOKS = [CAT_LEFT, CAT_RIGHT, backOf("L"), backOf("R")];
 export const DIRS = 4;
 
 // Every role is its own cat: a coat, a collar, eye colour, and sometimes patches. Coordinates are inside the 16 x 18 cat.
@@ -128,7 +135,7 @@ export function cat(role, frame, dir = 0) {
   const img = new Img(FRAME_W, FRAME_H);
   const fur = SKINS[role].f, back = dir >= 2;
   img.blit(baseCat(role, dir), CX, CY);
-  const eyes = dir === 1 ? [7, 12] : [4, 11]; // the columns of the two eyes (rows 5 and 6)
+  const eyes = dir === 1 ? [7, 12] : [3, 8]; // the columns of the two eyes (rows 5 and 6) of a face turned to the right, and to the left
   const eye = (x, y, c) => img.set(CX + x, CY + y, c);
   const skin = (x, y) => img.get(CX + x + (x === eyes[0] ? 1 : -1), CY + y); // the fur beside an eye, on the side of the face
   if (!back && frame === "blink") eyes.forEach((x) => eye(x, 5, skin(x, 5)));

@@ -14,6 +14,7 @@ mod ledger;
 mod projects;
 mod roles;
 mod skills;
+mod workflows;
 mod session;
 mod ssh;
 mod summary;
@@ -546,6 +547,28 @@ fn role_kits(projects: State<'_, Projects>, folder: String) -> Result<std::colle
     Ok(skills::load_kits(&project_folder(&projects, &folder)?))
 }
 
+/// The workflows of a project (its own, then the starters it has not saved over).
+#[tauri::command]
+fn workflow_list(projects: State<'_, Projects>, folder: String) -> Result<Vec<workflows::Workflow>, String> {
+    Ok(workflows::list(&project_folder(&projects, &folder)?))
+}
+
+#[tauri::command]
+fn workflow_save(projects: State<'_, Projects>, folder: String, workflow: workflows::Workflow) -> Result<workflows::Workflow, String> {
+    workflows::save(&project_folder(&projects, &folder)?, workflow)
+}
+
+#[tauri::command]
+fn workflow_delete(projects: State<'_, Projects>, folder: String, id: String) -> Result<(), String> {
+    workflows::delete(&project_folder(&projects, &folder)?, &id)
+}
+
+/// Raise the Board tickets of a workflow, one per step.
+#[tauri::command]
+fn workflow_start(projects: State<'_, Projects>, folder: String, workflow: workflows::Workflow) -> Result<Vec<Ticket>, String> {
+    workflows::start(&project_folder(&projects, &folder)?, workflow, "the owner (from a workflow)")
+}
+
 #[tauri::command]
 fn save_role_kit(roles: State<'_, Roles>, projects: State<'_, Projects>, folder: String, role_id: String, kit: skills::RoleKit) -> Result<skills::RoleKit, String> {
     if roles.get(&role_id).is_none() { return Err("That role does not exist".into()); }
@@ -646,7 +669,7 @@ pub fn run() {
             app.manage(backup::SettingsStore::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, cost_rows, set_project_github, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
+        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, cost_rows, set_project_github, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, workflow_list, workflow_save, workflow_delete, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -62,7 +62,8 @@ fn role_id(ctx: &Ctx, given: &str) -> Result<Option<String>, String> {
 
 fn line(ctx: &Ctx, t: &Ticket) -> String {
     let role = t.role.as_ref().and_then(|r| ctx.roles.iter().find(|x| &x.0 == r)).map(|r| r.1.as_str()).unwrap_or("no role");
-    format!("{} [{}] {} ({}){}", t.id, t.status, t.title, role, if t.waiting { " - waiting on the owner" } else { "" })
+    let blocked = if t.blocked_by.is_empty() { String::new() } else { format!(" - waits for {}", t.blocked_by.join(", ")) }; // a step of a workflow that comes after other steps
+    format!("{} [{}] {} ({}){}{}", t.id, t.status, t.title, role, if t.waiting { " - waiting on the owner" } else { "" }, blocked)
 }
 
 fn full(ctx: &Ctx, t: &Ticket) -> String {
@@ -91,7 +92,7 @@ fn call(ctx: &Ctx, name: &str, a: &Value) -> Result<String, String> {
                 return Err("A new ticket can only start in backlog or ready".into());
             }
             let role = role_id(ctx, &text_of(a, "role").unwrap_or_default())?;
-            let t = tickets::create(&ctx.dir, NewTicket { title: text_of(a, "title").unwrap_or_default(), description: text_of(a, "description").unwrap_or_default(), acceptance: text_of(a, "done_when").unwrap_or_default(), role, status, next: String::new(), own_copy: None }, &ctx.who)?;
+            let t = tickets::create(&ctx.dir, NewTicket { title: text_of(a, "title").unwrap_or_default(), description: text_of(a, "description").unwrap_or_default(), acceptance: text_of(a, "done_when").unwrap_or_default(), role, status, next: String::new(), own_copy: None, ..Default::default() }, &ctx.who)?;
             Ok(format!("Raised {}: {}", t.id, t.title))
         }
         "update_ticket" => {
@@ -106,7 +107,7 @@ fn call(ctx: &Ctx, name: &str, a: &Value) -> Result<String, String> {
             let role = match text_of(a, "role") { Some(r) => Some(role_id(ctx, &r)?.unwrap_or_default()), None => None };
             let t = tickets::update(&ctx.dir, &id, Patch {
                 title: text_of(a, "title"), description: text_of(a, "description"), acceptance: text_of(a, "done_when"), status, role,
-                next: text_of(a, "next"), waiting: a.get("waiting").and_then(Value::as_bool), note: text_of(a, "note"), own_copy: None,
+                next: text_of(a, "next"), waiting: a.get("waiting").and_then(Value::as_bool), note: text_of(a, "note"), own_copy: None, blocked_by: None,
             }, &ctx.who)?;
             Ok(format!("Updated. {}", line(ctx, &t)))
         }

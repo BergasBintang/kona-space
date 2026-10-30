@@ -53,6 +53,7 @@ To make an installer instead: `npm run tauri build` in `app`. It writes `app/src
 | The pixel art: cats, the office, frames, the logo, and the scripts that draw them | `art/` ([art/README.md](art/README.md)) |
 | What was checked, measured and left open | [docs/AUDIT.md](docs/AUDIT.md) |
 | Security reports | [SECURITY.md](SECURITY.md) |
+| What was learned building the office, roles and workflows, and how to tackle it next time | [docs/LESSONS.md](docs/LESSONS.md) |
 | How a version is published and how installed copies update | [docs/RELEASING.md](docs/RELEASING.md) |
 | How versions are numbered | [docs/VERSIONING.md](docs/VERSIONING.md), [CHANGELOG.md](CHANGELOG.md) |
 | Rules for an AI agent working in this folder | [CLAUDE.md](CLAUDE.md), [AGENTS.md](AGENTS.md) |

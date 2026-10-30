@@ -21,6 +21,7 @@ import { Kit } from "./components/Kit";
 import { Costs } from "./components/Costs";
 import { Voice } from "./components/Voice";
 import { Board } from "./components/Board";
+import { Workflows } from "./components/Workflows";
 import { Worktrees } from "./components/Worktrees";
 import { Leftovers } from "./components/Leftovers";
 import { BrainPlace } from "./components/brain/Brain";
@@ -293,6 +294,8 @@ export default function App() {
     content = <Worktrees project={project} onChanged={() => {}} />;
   } else if (place === "board") {
     content = <Board project={project} roles={roles} state={state} onStart={startTicket} onOpenSession={(id) => { dispatch({ type: "select", id }); setCreating(false); setPlace("sessions"); }} />;
+  } else if (place === "workflows") {
+    content = <Workflows project={project} roles={roles} onOpenBoard={() => setPlace("board")} />;
   } else if (place === "voice") {
     content = <Voice persona={persona} onChanged={setPersona} />;
   } else if (place === "costs") {

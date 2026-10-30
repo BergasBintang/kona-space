@@ -36,6 +36,10 @@ pub struct Ticket {
     /// the branch and the folder of its own copy, once one was made
     pub branch: String,
     pub worktree: String,
+    /// the tickets that must be done before this one can start (a step of a workflow that comes after other steps)
+    pub blocked_by: Vec<String>,
+    /// the workflow this ticket is a step of, if any
+    pub workflow: String,
 }
 
 #[derive(Deserialize, Default)]
@@ -53,6 +57,10 @@ pub struct NewTicket {
     pub next: String,
     #[serde(default)]
     pub own_copy: Option<String>,
+    #[serde(default)]
+    pub blocked_by: Vec<String>,
+    #[serde(default)]
+    pub workflow: String,
 }
 
 /// What to change. Every field is optional; only the ones present are touched. `role: ""` clears the role.
@@ -68,6 +76,8 @@ pub struct Patch {
     /// a line added to the history
     pub note: Option<String>,
     pub own_copy: Option<String>,
+    /// the whole list of tickets this one waits for
+    pub blocked_by: Option<Vec<String>>,
 }
 
 /// Local date and time as `2026-10-27 21:40`, asked of the SQLite already bundled (no time library needed).
@@ -103,6 +113,8 @@ fn render(t: &Ticket) -> String {
     kv("own_copy", &t.own_copy);
     kv("branch", &t.branch);
     kv("worktree", &t.worktree);
+    kv("blocked_by", &t.blocked_by.join(", "));
+    kv("workflow", &t.workflow);
     kv("created", &t.created);
     kv("updated", &t.updated);
     s.push_str("---\n");
@@ -136,6 +148,8 @@ fn parse(text: &str) -> Option<Ticket> {
             "own_copy" => t.own_copy = v,
             "branch" => t.branch = v,
             "worktree" => t.worktree = v,
+            "blocked_by" => t.blocked_by = v.split(',').map(|x| x.trim().to_string()).filter(|x| valid_id(x)).collect(),
+            "workflow" => t.workflow = v,
             "created" => t.created = v,
             "updated" => t.updated = v,
             _ => {}
@@ -214,6 +228,9 @@ pub fn create(dir: &Path, n: NewTicket, who: &str) -> Result<Ticket, String> {
     if !COPY_CHOICES.contains(&own_copy.as_str()) {
         return Err("That is not a choice for where the ticket works".into());
     }
+    if !n.blocked_by.iter().all(|b| valid_id(b)) {
+        return Err("That is not a ticket number".into());
+    }
     let status = n.status.unwrap_or_else(|| "backlog".into());
     if !STATUSES.contains(&status.as_str()) {
         return Err("That is not a column on the board".into());
@@ -229,7 +246,7 @@ pub fn create(dir: &Path, n: NewTicket, who: &str) -> Result<Ticket, String> {
                 let t = Ticket {
                     id, title, status: status.clone(), role: n.role.filter(|r| !r.is_empty()), raised_by: who.to_string(), sessions: vec![], next: one_line(&n.next),
                     waiting: false, created: at.clone(), updated: at.clone(), description: n.description, acceptance: n.acceptance,
-                    history: vec![format!("{at} raised by {who}")], own_copy: own_copy.clone(), branch: String::new(), worktree: String::new(),
+                    history: vec![format!("{at} raised by {who}")], own_copy: own_copy.clone(), branch: String::new(), worktree: String::new(), blocked_by: n.blocked_by, workflow: n.workflow,
                 };
                 write(dir, &t)?;
                 return Ok(t);
@@ -272,6 +289,12 @@ pub fn update(dir: &Path, id: &str, p: Patch, who: &str) -> Result<Ticket, Strin
             return Err("That is not a choice for where the ticket works".into());
         }
         if c != t.own_copy { said.push(format!("where it works set to {c} by {who}")); t.own_copy = c; }
+    }
+    if let Some(b) = p.blocked_by {
+        if b.iter().any(|x| !valid_id(x) || x == &t.id) {
+            return Err("A ticket can only wait for other tickets".into());
+        }
+        if b != t.blocked_by { said.push(if b.is_empty() { format!("no longer waits for other tickets, said {who}") } else { format!("now waits for {} by {who}", b.join(", ")) }); t.blocked_by = b; }
     }
     if let Some(n) = p.note {
         let n = one_line(&n);

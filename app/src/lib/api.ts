@@ -24,6 +24,7 @@ export type Ticket = {
   id: string; title: string; status: string; role: string | null; raised_by: string; sessions: string[]; next: string; waiting: boolean;
   created: string; updated: string; description: string; acceptance: string; history: string[];
   own_copy: string; branch: string; worktree: string; // where its sessions work: auto, yes (own copy of the repo) or no (main folder)
+  blocked_by: string[]; workflow: string; // the tickets this one waits for, and the workflow it is a step of
 };
 export type WorktreeStatus = { exists: boolean; branch: string; ahead: number; behind: number; changed: number; base: string };
 export type TicketView = Ticket & { cost: number };
@@ -103,6 +104,12 @@ export const costRows = (sinceDay: string | null) => invoke<CostRow[]>("cost_row
 export const listRoles = () => invoke<Role[]>("list_roles");
 export const saveRole = (id: string, profile: RoleProfile) => invoke<Role>("save_role", { id, profile });
 export const resetRole = (id: string) => invoke<Role>("reset_role", { id });
+export type Step = { id: string; title: string; role: string; after: string[]; note: string };
+export type Workflow = { id: string; name: string; about: string; steps: Step[]; starter?: boolean };
+export const listWorkflows = (folder: string) => invoke<Workflow[]>("workflow_list", { folder });
+export const saveWorkflow = (folder: string, workflow: Workflow) => invoke<Workflow>("workflow_save", { folder, workflow });
+export const deleteWorkflow = (folder: string, id: string) => invoke<void>("workflow_delete", { folder, id });
+export const startWorkflow = (folder: string, workflow: Workflow) => invoke<Ticket[]>("workflow_start", { folder, workflow });
 export const skillCatalog = (folder: string) => invoke<SkillInfo[]>("skill_catalog", { folder });
 export const computerSkills = (accountId: string | null, folder: string) => invoke<SkillInfo[]>("computer_skills", { accountId, folder });
 export const importSkill = (accountId: string | null, folder: string, name: string) => invoke<SkillInfo>("import_skill", { accountId, folder, name });

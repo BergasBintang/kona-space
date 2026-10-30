@@ -2,14 +2,17 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
-## 0.21.1, 2026-10-30
+## 0.22.0, 2026-10-30
 
-The welcome page shows the version, bold and other marks are drawn instead of shown as stars, and room names sit in their rooms.
+Workflows: the usual steps of a kind of work, drawn as a flowchart and turned into Board tickets. Plus a tidier Set up window, formatted text and better cats.
 
-- The welcome page shows which version of Kona this is, with a Check for updates button, and the update card appears there too.
-- The update card's notes show **bold** and `code` as formatting, not as asterisks.
+- **Workflows.** A new place, next to the Board (the Board room's card, or the Go to list). Each workflow is a list of steps with a role on each, drawn as a flowchart you can edit: add, remove and move steps, choose the role, choose what a step comes after. Three suggestions come with every project (New feature, Bug fix, Launch). Saving writes a plain file in the project's `.kona` folder and a note in the Brain with the steps in words.
+- **Start** raises one ticket on the Board for each step. A step that comes after others waits in Backlog, and its card says "Waits for T-0003". The workflow itself holds no state: the Board stays the one place that shows where the work stands.
+- The Set up window uses short words; every longer explanation is behind a "?".
+- The welcome page shows the version and a Check for updates button, and the update card shows there too.
+- Bold, italics, code, lists, quotes, headings, code blocks and tables are drawn as formatting in the update notes and in what Claude writes in a session (a table is kept as written). A link is shown as text and never opens inside Kona.
 - Room names sit in the middle of each room, a little see-through, instead of on the hall floor.
-- What Claude writes in a session is drawn as formatted text too: bold, italics, `code`, lists, quotes, headings, code blocks, and tables (kept as written, in a fixed-width block). A link is shown as text and never opens inside Kona.
+- The cats look the right way from all four sides of the building: a face turned to the left or right, and two views from behind.
 
 ## 0.21.0, 2026-10-30
 

@@ -34,7 +34,7 @@ const DESKS: Record<string, string[]> = {
   plan: ["product", "design"], build: ["frontend", "backend", "qa", "security"], marketing: ["marketing"], content: ["content"], support: ["support"], git: ["devops"], secretary: ["secretary"],
 };
 const OPENS: Record<string, { label: string; place: Place }[]> = {
-  board: [{ label: "Open the Board", place: "board" }],
+  board: [{ label: "Open the Board", place: "board" }, { label: "Open Workflows", place: "workflows" }],
   library: [{ label: "Open the Brain", place: "brain" }],
   archive: [{ label: "Open Files", place: "files" }],
   servers: [{ label: "Open Servers", place: "servers" }],

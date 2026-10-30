@@ -4,17 +4,20 @@ import { useCallback, useEffect, useState } from "react";
 import { accountStatusCached, forgetAccountStatus, setProjectAccount, signInAccount, type Account, type AccountStatus, type Persona, type Project } from "../lib/api";
 import { Button, Glyph } from "./ui";
 import { Select } from "./pick";
+import { checkForUpdate, useUpdate } from "../lib/update";
 import { KonaMark } from "./KonaMark";
 
 type Status = AccountStatus | "asking";
 
-export function Hello({ projects, accounts, persona, note = null, onOpen, onAdd, onOpenAccounts, onProjects }: {
-  note?: string | null; projects: Project[]; accounts: Account[]; persona: Persona; onOpen: (id: string) => void; onAdd: () => void; onOpenAccounts: () => void; onProjects: (next: Project[]) => void;
+export function Hello({ projects, accounts, persona, version, note = null, onOpen, onAdd, onOpenAccounts, onProjects }: {
+  version: string; note?: string | null; projects: Project[]; accounts: Account[]; persona: Persona; onOpen: (id: string) => void; onAdd: () => void; onOpenAccounts: () => void; onProjects: (next: Project[]) => void;
 }) {
   const [status, setStatus] = useState<Record<string, Status>>({});
   const [swapping, setSwapping] = useState<string | null>(null); // the project whose account is being changed
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const update = useUpdate();
+  const busyUpdate = update.phase === "checking" || update.phase === "downloading" || update.phase === "installing";
 
   const look = useCallback((id: string) => {
     setStatus((s) => ({ ...s, [id]: "asking" }));
@@ -96,6 +99,13 @@ export function Hello({ projects, accounts, persona, note = null, onOpen, onAdd,
           </button>
         </div>
         {error && <div className="flex items-start justify-center gap-2.5 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
+        <div className="flex flex-wrap items-center justify-center gap-3 text-[13px] leading-5 text-text-tertiary">
+          <span className="font-mono">{version ? `Kona v${version}` : "Kona"}</span>
+          <Button variant="ghost" small disabled={busyUpdate} onClick={() => void checkForUpdate(true)}>{update.phase === "checking" ? "Checking…" : "Check for updates"}</Button>
+          {update.phase === "current" && <span className="flex items-center gap-1.5"><Glyph state="done" size={16} /> This is the newest version.</span>}
+          {update.phase === "available" && <span className="flex items-center gap-1.5 text-text-secondary"><Glyph state="waiting" size={16} /> Kona {update.version} is ready.</span>}
+          {update.phase === "error" && update.during === "check" && <span className="flex items-center gap-1.5 text-state-left"><Glyph state="left" size={16} /> {update.message}</span>}
+        </div>
       </div>
     </div>
   );

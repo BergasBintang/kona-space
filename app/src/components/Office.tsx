@@ -3,7 +3,7 @@
 // is drawn from four sides (a list of pieces for each); two buttons turn it a quarter. The pieces are drawn
 // on one canvas at the picture's own size, which is then shown at a whole-number scale so every pixel stays square. When the owner goes into a room, the
 // walls that stand in front of it are left out, like a dollhouse with its front open.
-// Every room wears its name plate; hover a room to light it, click to zoom in, then open what the room holds.
+// Every room wears its name plate in the middle of its floor, a little see-through; hover a room to light it, click to zoom in, then open what the room holds.
 // A cat's state is the real state of that role's session in this project: typing is "working", a raised paw is "waiting on you".
 import { memo, useEffect, useRef, useState } from "react";
 import v0 from "../office/views/v0.json";
@@ -15,7 +15,7 @@ import type { Place } from "../lib/places";
 import type { Project, Role } from "../lib/api";
 import { NO_LOOKS, type Look } from "../lib/office";
 
-type Room = { id: string; name: string; holds: string; polygon: number[][]; team: boolean; color: string | null; plate: number[]; plateMode: "below" | "above" | "centre" };
+type Room = { id: string; name: string; holds: string; polygon: number[][]; team: boolean; color: string | null; plate: number[] };
 type Part = { f?: string; cat?: string; dir?: number; x: number; y: number; d: number; hides?: string[]; room?: string }; // f: the file of a piece; cat: a cat in its place in the list; dir: which way it looks
 type CatSpot = { role: string; x: number; y: number; depth: number };
 /** One side of the building: the picture size, the part of it that is filled (it is fitted and centred, not the empty margin around it), its rooms, its cats and its pieces. */
@@ -210,8 +210,8 @@ export const Office = memo(function Office({ roles, looks = NO_LOOKS, onOpen, on
             })}
           </div>
           {!zoomed && ROOMS.map((r) => (
-            <span key={r.id} aria-hidden className={`font-pixel pointer-events-none absolute flex -translate-x-1/2 items-center gap-1.5 border-2 px-1.5 text-[12px] leading-[18px] font-bold whitespace-nowrap px-shadow ${r.plateMode === "above" ? "-translate-y-full" : r.plateMode === "centre" ? "-translate-y-1/2" : ""} ${hover === r.id ? "border-brand bg-surface-2 text-text" : r.team ? "border-line-strong bg-surface-2 text-text" : "border-line-subtle bg-surface-1 text-text-secondary"}`}
-              style={{ left: left + r.plate[0] * k, top: top + r.plate[1] * k + (r.plateMode === "above" ? -3 : r.plateMode === "below" ? 3 : 0) }}>
+            <span key={r.id} aria-hidden className={`font-pixel pointer-events-none absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 border-2 px-1.5 text-[12px] leading-[18px] font-bold whitespace-nowrap ${hover === r.id ? "border-brand bg-surface-2 text-text" : r.team ? "border-line-strong/50 bg-surface-2/70 text-text" : "border-line-subtle/60 bg-surface-1/65 text-text-secondary"}`}
+              style={{ left: left + r.plate[0] * k, top: top + r.plate[1] * k }}>
               {r.team && r.color && <i className="inline-block size-2.5 border border-line-strong" style={{ background: r.color }} />}{r.name}
             </span>
           ))}

@@ -2,6 +2,10 @@
 import { Button, Glyph } from "./ui";
 import { dismissUpdateError, installUpdate, postponeUpdate, useUpdate } from "../lib/update";
 import { KonaMark } from "./KonaMark";
+import { Inline } from "./brain/Markdown";
+
+/** The release notes are the first lines of the changelog, which is Markdown: on a few lines, with the bold and the code marks drawn. */
+const flatNotes = (t: string) => t.replace(/^\s*-\s+/gm, "").replace(/\s*\n+\s*/g, " ").trim();
 
 export function UpdateCard({ running }: { running: number }) {
   const u = useUpdate();
@@ -13,7 +17,7 @@ export function UpdateCard({ running }: { running: number }) {
       {u.phase === "available" && (
         <>
           <div className="flex items-center gap-2.5"><KonaMark size={22} /><span className="font-bold">Kona {u.version} is ready</span></div>
-          {u.notes && <p className="m-0 line-clamp-3 text-[13px] leading-5 text-text-secondary">{u.notes}</p>}
+          {u.notes && <p className="m-0 line-clamp-3 text-[13px] leading-5 text-text-secondary"><Inline text={flatNotes(u.notes)} /></p>}
           <p className="m-0 text-[14px] leading-5 text-text-secondary">
             {running > 0
               ? `${running} ${running === 1 ? "session is" : "sessions are"} running. Updating closes ${running === 1 ? "it" : "them"}, then Kona starts again by itself.`

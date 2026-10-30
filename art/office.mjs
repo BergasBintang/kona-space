@@ -546,26 +546,9 @@ export function drawOffice({ cats = true, parts = false } = {}) {
   return { img, cats: found.map(({ role, x, y, depth, dir }) => ({ role, x, y, depth, dir })) };
 }
 
-// The rooms as data, for the app, for the current view: what each is for, the floor outline on the 1x picture (for hover and click), and where the name plate goes.
-// The plate is a door sign: it lies on the hall floor in front of the room's door (the front desk, which has no door, wears it in front of its desk).
-// Signs would pile up where doors are close, so each one takes the nearest free spot of the hall, judged for a window that shows the picture at 1.5x.
+// The rooms as data, for the app, for the current view: what each is for, the floor outline on the 1x picture (for hover and click), and where the name plate goes:
+// the middle of the room's floor.
 export function roomList() {
-  const hallTiles = [];
-  for (let i = 0; i < COLS; i++) for (let j = 0; j < ROWS; j++) if (at(i, j)?.kind === "hall") hallTiles.push(P(i + 0.5, j + 0.5));
-  const signBase = (d) => {
-    if (d.open) return P(d.r[0] + d.r[2] / 2, d.r[1] + d.r[3] + 0.4);
-    const r = DOORS.get(d.id), mid = (r.d0 + r.d1) / 2, hall = r.hallIsA ? r.c - 0.5 : r.c + 0.5; // the hall lies on the other side of the wall
-    return r.o === "J" ? P(mid, hall) : P(hall, mid);
-  };
-  const SIGNS = new Map(), placed = [];
-  for (const d of DEFS.filter((x) => x.kind !== "hall")) {
-    const base = signBase(d), w = ((d.name.length * 7 + 28 + (d.kind === "team" ? 14 : 0)) / 1.5) + 4, h = 17;
-    const free = (x, y) => placed.every((q) => Math.abs(x - q.x) >= (w + q.w) / 2 || Math.abs(y - q.y) >= (h + q.h) / 2);
-    const near = hallTiles.map(([x, y]) => ({ x, y, d: Math.hypot(x - base[0], (y - base[1]) * 2) })).filter((c) => c.d < 200).sort((a, b) => a.d - b.d);
-    const spot = near.find((c) => free(c.x, c.y)) ?? { x: base[0], y: base[1] };
-    placed.push({ x: spot.x, y: spot.y, w, h });
-    SIGNS.set(d.id, [Math.round(spot.x), Math.round(spot.y)]);
-  }
   return DEFS.filter((d) => d.kind !== "hall").map((d) => {
     const [i0, j0, wi, dj] = d.r, pt = (i, j) => P(i, j).map(Math.round);
     const c = [pt(i0, j0), pt(i0 + wi, j0), pt(i0 + wi, j0 + dj), pt(i0, j0 + dj)]; // the four corners of the floor, in the camera's order: top, right, bottom, left
@@ -573,7 +556,7 @@ export function roomList() {
     const clockwise = ring[1][0] > ring[3][0] ? ring : [ring[0], ring[3], ring[2], ring[1]];
     return {
       id: d.id, name: d.name, kind: d.kind, team: d.kind === "team", color: d.color ?? null, holds: d.holds, rect: d.r,
-      polygon: clockwise, plate: SIGNS.get(d.id), plateMode: "centre",
+      polygon: clockwise, plate: P(i0 + wi / 2, j0 + dj / 2).map(Math.round),
     };
   });
 }

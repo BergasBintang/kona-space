@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Badge, Button, Glyph, RoleMark, type GlyphState } from "./ui";
+import { Markdown } from "./brain/Markdown";
 import type { Role } from "../lib/api";
 import { dollars, modeWord, permissionTitle, type Item, type Session } from "../lib/sessions";
 
@@ -126,7 +127,7 @@ function Transcript({ s, onAnswer }: { s: Session; onAnswer: (it: Extract<Item, 
               </div>
             </div>
           );
-        if (it.kind === "assistant") return <p key={it.id} className="m-0 max-w-[calc(980px*var(--k))] whitespace-pre-wrap">{it.text}</p>;
+        if (it.kind === "assistant") return <div key={it.id} className="max-w-[calc(980px*var(--k))]"><Markdown chat text={it.text} wiki={false} /></div>;
         if (it.kind === "tool") return <ToolLine key={it.id} it={it} />;
         if (it.kind === "permission") return <PermissionCard key={it.id} it={it} onAnswer={(a, r) => onAnswer(it, a, r)} />;
         return (
@@ -135,7 +136,7 @@ function Transcript({ s, onAnswer }: { s: Session; onAnswer: (it: Extract<Item, 
           </div>
         );
       })}
-      {s.draft && <p className="m-0 max-w-[calc(980px*var(--k))] whitespace-pre-wrap">{s.draft}</p>}
+      {s.draft && <div className="max-w-[calc(980px*var(--k))]"><Markdown chat text={s.draft} wiki={false} /></div>}
       {s.run === "working" && <Thinking />}
       <div ref={end} />
     </div>

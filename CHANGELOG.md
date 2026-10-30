@@ -2,6 +2,15 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.21.1, 2026-10-30
+
+The welcome page shows the version, bold and other marks are drawn instead of shown as stars, and room names sit in their rooms.
+
+- The welcome page shows which version of Kona this is, with a Check for updates button, and the update card appears there too.
+- The update card's notes show **bold** and `code` as formatting, not as asterisks.
+- Room names sit in the middle of each room, a little see-through, instead of on the hall floor.
+- What Claude writes in a session is drawn as formatted text too: bold, italics, `code`, lists, quotes, headings, code blocks, and tables (kept as written, in a fixed-width block). A link is shown as text and never opens inside Kona.
+
 ## 0.21.0, 2026-10-30
 
 Every role can be set up, skills belong to a project, and the office can be turned.

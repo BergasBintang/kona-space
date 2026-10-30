@@ -258,13 +258,14 @@ export default function App() {
 
   if (!greeted && projects.length > 0) {
     return (
-      <div className="flex h-full overflow-hidden">
-        <Hello projects={projects} accounts={accounts} persona={persona}
+      <div className="relative flex h-full overflow-hidden">
+        <Hello projects={projects} accounts={accounts} persona={persona} version={version}
           note={helloNote}
           onOpen={(id) => { pickProject(id); setHelloNote(null); setGreeted(true); setAdding(false); setPlace("office"); }}
           onAdd={() => { setGreeted(true); setAdding(true); }}
           onOpenAccounts={() => { setGreeted(true); setAdding(false); setPlace("accounts"); }}
           onProjects={setProjects} />
+        <UpdateCard running={state.order.filter((id) => state.sessions[id].run !== "ended").length} />
       </div>
     );
   }

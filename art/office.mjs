@@ -97,6 +97,45 @@ for (const [id, r] of DOORS) {
   r.d0 = want === undefined ? r.from + Math.floor((len - w) / 2) : Math.max(r.from, Math.min(want, r.to - w)); r.d1 = r.d0 + w; r.doorOf = id; r.hallIsA = group(r.A) === "hall";
 }
 for (const d of DEFS) if (d.kind !== "hall" && !d.open && !DOORS.has(d.id)) throw new Error(`${d.id} has no border with the hall, so it has no door`);
+// The street door: the way into the building, in the outer (south) wall of the Entrance, two tiles wide. It is the only door onto the outside.
+const EXIT = { room: "entrance", o: "I", c: 20, d0: 17, d1: 19 }; // a wall along j at i = 20, from j = 17 to 19 (the Entrance is 4 x 4 tiles, so the door must not meet the door onto the hall)
+for (let k = EXIT.d0; k < EXIT.d1; k++) {
+  const [inside, outside] = EXIT.o === "J" ? [at(k, EXIT.c - 1), at(k, EXIT.c)] : [at(EXIT.c - 1, k), at(EXIT.c, k)];
+  if (inside?.id !== EXIT.room || outside) throw new Error(`the street door at ${EXIT.o}${EXIT.c},${k} is not on the outer wall of ${EXIT.room}`);
+}
+const isExit = (o, c, k) => o === EXIT.o && c === EXIT.c && k >= EXIT.d0 && k < EXIT.d1;
+
+// Where walls really stand on the plan, for every view: a slab a quarter of a tile thick (WALL_HALF on each side of the tile edge) on every border between two rooms
+// (except a door), and on every edge of the building. A piece of furniture is cut back from these slabs (see clipToWalls), so nothing ends up half inside a wall.
+const WALL_HALF = 0.125;
+const SLABS = []; // [i0, j0, i1, j1]
+{
+  const doorKeys = new Set();
+  for (const r of DOORS.values()) for (let k = r.d0; k < r.d1; k++) doorKeys.add(`${r.o}|${r.c}|${k}`);
+  for (const [o, n, lines] of [["J", COLS, ROWS], ["I", ROWS, COLS]]) for (let c = 0; c <= lines; c++) for (let k = 0; k < n; k++) {
+    const A = o === "J" ? at(k, c - 1) : at(c - 1, k), B = o === "J" ? at(k, c) : at(c, k);
+    if (!A && !B) continue;
+    if (A && B && (group(A) === group(B) || doorKeys.has(`${o}|${c}|${k}`))) continue;
+    if (isExit(o, c, k)) continue;
+    SLABS.push(o === "J" ? [k, c - WALL_HALF, k + 1, c + WALL_HALF] : [c - WALL_HALF, k, c + WALL_HALF, k + 1]);
+  }
+}
+const EPS = 1e-6;
+// Cut a box of the plan, [i, j, width, depth], back so it does not overlap any wall slab: the side that lies inside the slab moves to the slab's face. Returns the cut box
+// (or null when nothing is left) and says in `info` what happened.
+function clipToWalls([i, j, wi, dj], info) {
+  let i0 = i, j0 = j, i1 = i + wi, j1 = j + dj;
+  for (const [a0, b0, a1, b1] of SLABS) {
+    if (!(i0 < a1 - EPS && a0 < i1 - EPS && j0 < b1 - EPS && b0 < j1 - EPS)) continue;
+    const thinJ = b1 - b0 < a1 - a0; // a wall along i is thin in j; a wall along j is thin in i
+    const [lo, hi, s0, s1] = thinJ ? [j0, j1, b0, b1] : [i0, i1, a0, a1];
+    let to;
+    if (lo > s0 + EPS) to = [s1, hi]; else if (hi < s1 - EPS) to = [lo, s0]; else { info.crosses = true; continue; } // starts inside the slab, ends inside it, or lies across it
+    if (thinJ) [j0, j1] = to; else [i0, i1] = to;
+    info.cut = true;
+  }
+  return i1 - i0 > EPS && j1 - j0 > EPS ? [i0, j0, i1 - i0, j1 - j0] : null;
+}
 
 // materials: [top, left face, right face]
 const M = {
@@ -137,6 +176,7 @@ function wallPlan() {
     } else if (!behind) {
       tall = true; // open ground behind the tile: a back wall of the building
     } else if (behind.kind !== "hall" && !behind.open) {
+      if (isExit(o, c, k)) continue; // the street door: no wall (on the tall back side the door is painted on the wall, see ENTRANCE_DOOR)
       room = behind; // open ground in front of a room: the room's outer wall
     } else continue;
     const [a, b] = ends(o, c, k).map(([i, j]) => rot(i, j));
@@ -152,6 +192,10 @@ function wallPlan() {
     const behind = bFrontOf(r.o, r.c, r.d0) ? at(...(r.o === "J" ? [r.d0, r.c - 1] : [r.c - 1, r.d0])) : at(...(r.o === "J" ? [r.d0, r.c] : [r.c, r.d0]));
     const hides = behind && behind.id === room.id ? [room.id] : [];
     for (const k of [r.d0, r.d1]) { const [u, v] = rot(...(r.o === "J" ? [k, r.c] : [r.c, k])); posts.push({ u, v, h: LOW + STEP, m: shade(accent), hides, label: `door post of ${room.id}` }); }
+  }
+  if (bFrontOf(EXIT.o, EXIT.c, EXIT.d0)) { // seen from outside the wall is low and the street door is an opening: a post on each side, in the colour of the Entrance
+    const room = DEFS.find((d) => d.id === EXIT.room), wc = room.wall ?? "#d8cdb6", accent = room.color ?? mix(wc, "#000000", 0.25);
+    for (const k of [EXIT.d0, EXIT.d1]) { const [u, v] = rot(...(EXIT.o === "J" ? [k, EXIT.c] : [EXIT.c, k])); posts.push({ u, v, h: LOW + STEP, m: shade(accent), hides: [room.id], label: `street door post of ${room.id}` }); }
   }
   return { edges, posts };
 }
@@ -176,6 +220,10 @@ function audit(feet, sorted, getImg, setImg, footprint = true) {
   for (let x = 0; x < feet.length; x++) for (let y = x + 1; y < feet.length; y++) {
     const a = feet[x], b = feet[y];
     if (hit(a, b) && !(a.owner && b.label.startsWith(`desk of ${a.owner}`)) && !(b.owner && a.label.startsWith(`desk of ${b.owner}`))) warn(`${a.label} overlaps ${b.label}`);
+  }
+  if (footprint) { // two tiles inside the street door stay clear too
+    const zone = EXIT.o === "J" ? { i0: EXIT.d0, wi: EXIT.d1 - EXIT.d0, j0: EXIT.c - 2, dj: 2 } : { j0: EXIT.d0, dj: EXIT.d1 - EXIT.d0, i0: EXIT.c - 2, wi: 2 };
+    for (const f of feet) if (hit(zone, f)) warn(`${f.label} blocks the street door`);
   }
   for (const [id, r] of DOORS) { // two tiles in front of every door stay clear
     const J = r.o === "J", roomIsB = r.hallIsA;
@@ -274,6 +322,7 @@ export function drawOffice({ cats = true, parts = false, probes = null } = {}) {
     return [Math.min(...c.map((p) => p[0])) + shrink, Math.max(...c.map((p) => p[0])) - shrink, Math.min(...c.map((p) => p[1])) + shrink, Math.max(...c.map((p) => p[1])) - shrink];
   };
   const GRID = new Set(); // what broke the whole-tile / whole-step rule, printed once at the end of the build
+  const CLIPPED = new Set(), CROSSES = new Set(); // pieces cut back from a wall (listed once, for information) and pieces lying across a wall (a CHECK)
   function frame(i0, j0, w, d, facing, label) {
     const toPlan = (x, y) => (facing === 0 ? [i0 + x, j0 + y] : facing === 1 ? [i0 + d - y, j0 + x] : facing === 2 ? [i0 + w - x, j0 + d - y] : [i0 + y, j0 + w - x]);
     const dir = (dx, dy) => { const a = toPlan(0, 0), b = toPlan(dx, dy); return [b[0] - a[0], b[1] - a[1]]; };
@@ -287,7 +336,10 @@ export function drawOffice({ cats = true, parts = false, probes = null } = {}) {
       at: toPlan,
       b(x, y, bw, bd, h, m, z0 = 0) { // a box
         if (h % STEP || z0 % STEP) GRID.add(`${label}: a box ${h} high from ${z0} is not whole steps`);
-        box(...rect(x, y, bw, bd), h, m, z0);
+        const info = {}, r = clipToWalls(rect(x, y, bw, bd), info); // a box never stands inside a wall: it is cut back to the wall's face
+        if (info.cut) CLIPPED.add(label);
+        if (info.crosses || !r) CROSSES.add(label);
+        if (r) box(...r, h, m, z0);
       },
       top(x, y, bw, bd, z, c) { const [a, b, w2, d2] = rect(x, y, bw, bd); poly([P(a, b, z), P(a + w2, b, z), P(a + w2, b + d2, z), P(a, b + d2, z)], c); }, // paint on a top
       fy: (y, xa, xb, za, zb, c, s = 1) => plane(toPlan(xa, y), toPlan(xb, y), dir(0, s), za, zb, c), // paint on the face at depth y, looking towards +y (s = 1) or -y
@@ -362,7 +414,7 @@ export function drawOffice({ cats = true, parts = false, probes = null } = {}) {
       L.b(0, 0.125, dw, 0.75, DESK, M.wood);
       for (const [y, s] of [[0.875, 1], [0.125, -1]]) { L.fy(y, 0.125, dw - 0.125, 1, 5, shade(M.wood[1])[1], s); L.fy(y, 0.375, 0.625, 3, 4, "#33241a", s); } // a drawer on each long side
       L.top(0.25, 0.25, 0.5, 0.125, DESK, M.white[0]); // the keyboard
-      L.b(0.25, 0.5, 0.5, 0.125, 8, M.black, DESK); L.fy(0.5, 0.25, 0.75, DESK + 2, DESK + 7, "#2e4a5c", -1); L.fy(0.5, 0.375, 0.625, DESK + 3, DESK + 5, "#8ed8c9", -1); // the screen, lit on the cat's side
+      L.b(0.25, 0.5, 0.5, 0.125, 8, M.black, DESK); L.fy(0.5, 0.375, 0.625, DESK + 2, DESK + 7, "#2e4a5c", -1); L.fy(0.5, 0.375, 0.5, DESK + 3, DESK + 6, "#8ed8c9", -1); // the screen, lit on the cat's side, with a bezel of 1/8 tile left and right
       PROPS[role]?.(L, wide ? 1.25 : 0.75, 0.5);
     });
     const c = W.at(0.5, 0.5), [sx, sy] = P(c[0], c[1], 4), cx = Math.round(sx) - 14, cy = Math.round(sy) - FRAME_H + 1;
@@ -402,7 +454,7 @@ export function drawOffice({ cats = true, parts = false, probes = null } = {}) {
   // ===== the hall =====
   block(13, 6, 2, 1, 4, M.wood, "bench"); plant(12, 5); plant(15, 5); // the bench niche
   piece(26, 5, 1, 1, 0, "water cooler", 20, (L) => { L.b(0.25, 0.25, 0.5, 0.5, 12, M.white); L.b(0.375, 0.375, 0.25, 0.25, 8, M.blue, 12); }); plant(28, 5); // the water cooler niche
-  plant(29, 4); plant(31, 6); plant(0, 7); plant(10, 14); plant(11, 14);
+  plant(29, 4); plant(31, 6); plant(0, 7);
   rug(3, 7, 6, 1, "#d5c9b2", "#bfb298"); rug(17, 7, 6, 1, "#d5c9b2", "#bfb298");
 
   // ===== the west wing =====
@@ -440,12 +492,12 @@ export function drawOffice({ cats = true, parts = false, probes = null } = {}) {
   workstation(11, 16, "secretary", "idle", true);
   sofa(9, 17, 1, 0, M.blue, "bench"); plant(6, 15); plant(14, 15); plant(6, 18);
   // --- Entrance (16,15): the key desk, a board of hooks, a visitor bench
-  rug(16, 15, 3, 2, "#7f9a8e", "#5e7a6e");
+  rug(16, 15, 3, 2, "#7f9a8e", "#5e7a6e"); rug(EXIT.c - 1, EXIT.d0, 1, EXIT.d1 - EXIT.d0, "#8b5e3c", "#5e3f27"); // the doormat, inside the street door (in the east wall)
   piece(18, 16, 1, 1, 0, "key desk", 12, (L) => { L.b(0.125, 0.125, 0.75, 0.75, 8, M.wood); [0, 1, 2].forEach((k) => L.b(0.25 + k * 0.25, 0.375, 0.125, 0.125, 4, M.gold, 8)); });
   standing(18, 15, 1, 0, (L, y) => [0, 1, 2, 3].forEach((k) => L.fy(y, 0.125 + k * 0.25, 0.25 + k * 0.25, 8 + (k % 2) * 3, 12 + (k % 2) * 3, "#f3c978")));
   sofa(17, 17, 1, 0, M.blue, "bench");
   // --- Back office (0,15): a control panel, a voice booth, a desk
-  piece(0, 15, 2, 1, 3, "control panel", 16, (L) => { L.b(0, 0, 2, 0.5, 16, M.metal); [0, 1, 2, 3].forEach((k) => L.fy(0.5, 0.25 + k * 0.375, 0.5 + k * 0.375, 6, 9 + (k % 2) * 2, ["#8ed8c9", "#f3c978", "#d9786a", "#7fb1e0"][k])); });
+  piece(0, 15, 2, 1, 3, "control panel", 16, (L) => { L.b(0.125, 0.125, 1.75, 0.5, 16, M.metal); [0, 1, 2, 3].forEach((k) => L.fy(0.625,0.25 + k * 0.375, 0.5 + k * 0.375, 6, 9 + (k % 2) * 2, ["#8ed8c9", "#f3c978", "#d9786a", "#7fb1e0"][k])); });
   piece(2, 15, 1, 1, 0, "voice booth", 28, (L) => { L.b(0.125, 0.125, 0.75, 0.75, 20, M.teal); L.b(0.125, 0.125, 0.75, 0.75, 4, M.white, 20); L.b(0.375, 0.375, 0.125, 0.125, 4, M.black, 24); });
   block(1, 17, 2, 1, 8, M.wood, "desk"); plant(4, 17);
 
@@ -467,7 +519,13 @@ export function drawOffice({ cats = true, parts = false, probes = null } = {}) {
     w.rect(t0 - 0.125, t1 + 0.125, 9, 29, "#efe3c8"); w.rect(t0, t1, 11, 27, "#9fd0e8"); w.rect(t0, t1, 11, 19, "#b8dff0");
     w.line((t0 + t1) / 2, 11, (t0 + t1) / 2, 27, "#efe3c8"); w.line(t0, 19, t1, 19, "#efe3c8"); w.rect(t0 - 0.125, t1 + 0.125, 8, 10, "#d9c39a");
   };
-  const ART = [ // rooms that hang their own art: [axis of the wall, its plane, from, to, what]
+  const STREET_DOOR = (w) => { // the street door on the tall brick wall (seen from outside it is an opening, see wallPlan): a frame, two leaves with glass, handles
+    const t0 = EXIT.d0, t1 = EXIT.d1, mid = (t0 + t1) / 2;
+    w.rect(t0 - 0.125, t1 + 0.125, 0, 28, "#6c4727"); w.rect(t0, t1, 0, 26, "#b07d4f"); w.line(mid, 0, mid, 26, "#6c4727");
+    for (const [a, b] of [[t0 + 0.125, mid - 0.125], [mid + 0.125, t1 - 0.125]]) { w.rect(a, b, 14, 23, "#9fd0e8"); w.rect(a, b, 14, 18, "#b8dff0"); w.rect(a, b, 3, 11, "#946236"); }
+    w.dot(mid - 0.25, 8, "#f3c978"); w.dot(mid + 0.25, 8, "#f3c978");
+  };
+  const ART = [ // rooms that hang their own art: [axis of the wall, its plane, from, to, what, which way the wall's inner face looks (1: towards +, -1: towards -; default 1)]
     ["j", 0, 0.5, 4.6, (w) => { // Board room: a cork board with six columns of notes
       w.rect(0.5, 4.625, 8, 29, "#7a5530"); w.rect(0.625, 4.5, 9.5, 27.5, "#c89b63");
       const noteC = ["#f3c978", "#8ed8c9", "#d9786a", "#7fb1e0", "#f7e1b0"];
@@ -482,8 +540,9 @@ export function drawOffice({ cats = true, parts = false, probes = null } = {}) {
       w.rect(9.375, 13, 12, 27, "#7a5530"); w.rect(9.5, 12.875, 13.2, 25.8, "#e9dfc8");
       for (let k = 0; k < 5; k++) { const a = w.pt(9.875 + k * 0.5625, 22), b = w.pt(9.875 + k * 0.5625, 17); img.rect(Math.round(a[0]) - 1, Math.round(a[1]), 3, 2, "#e8b25a"); img.rect(Math.round(b[0]) - 1, Math.round(b[1]), 3, 2, k % 2 ? "#8ed8c9" : "#d9786a"); }
     }],
+    [EXIT.o.toLowerCase(), EXIT.c, EXIT.d0 - 0.125, EXIT.d1 + 0.125, STREET_DOOR, -1],
   ];
-  for (const [axis, k, t0, t1, draw] of ART) wall(axis, k, 1, -70, `art on the wall ${axis}${k}`, draw);
+  for (const [axis, k, t0, t1, draw, n = 1] of ART) wall(axis, k, n, -70, `art on the wall ${axis}${k}`, draw);
   // the outer walls: runs of tiles of one room with open ground behind them
   const tall = feet.filter((f) => f.h >= 24);
   const blocked = (axis, k, n, t0, t1) => tall.some((f) => {
@@ -556,6 +615,7 @@ export function drawOffice({ cats = true, parts = false, probes = null } = {}) {
   if (cats) audit(feet, sorted, () => img, (x) => { img = x; }, VIEW === 0);
   sorted.forEach((t) => { if (t.meta && !cats) return; t.draw(); });
   if (cats && VIEW === 0) for (const m of GRID) console.warn("CHECK: " + m);
+  if (cats && VIEW === 0) { for (const m of CROSSES) console.warn(`CHECK: ${m} lies across a wall`); console.log(`${CLIPPED.size} pieces were cut back from a wall: ${[...CLIPPED].join("; ")}`); }
   if (cats) return { img, cats: [] };
   const found = sorted.filter((t) => t.meta).map((t) => ({ ...t.meta, depth: t.depth }));
   return { img, cats: found.map(({ role, x, y, depth, dir }) => ({ role, x, y, depth, dir })) };

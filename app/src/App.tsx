@@ -324,7 +324,7 @@ export default function App() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <TopBar projects={projects} project={project} onProject={(id) => { pickProject(id); setAdding(false); const p = projects.find((x) => x.id === id); if (!accountOf(p)) { setHelloNote(`${p?.name ?? "That project"} has no account yet. Choose one on its card.`); setGreeted(false); } }} onHome={() => { setAdding(false); setGreeted(false); }} place={place}
+      <TopBar project={project} onHome={() => { setAdding(false); setGreeted(false); }} place={place}
         onPlace={(p) => { setAdding(false); setPlace(p); }} attention={attention} leftBehind={leftTotal} plan={state.plans[current?.accountId ?? accountOf(project) ?? lastAccount]}
         limitLine={persona.enabled ? persona.lines.limit : PLAIN_LINES.limit} accountLabel={project ? accounts.find((a) => a.id === (current?.accountId ?? accountOf(project)))?.label ?? null : null} version={version} />
       <div className="relative flex min-h-0 min-w-0 flex-1">

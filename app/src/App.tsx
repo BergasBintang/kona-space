@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { initialState, loadPlans, reducer, savePlans } from "./lib/sessions";
-import { PLAIN_LINES, leftoverOverview, listAccounts, listProjects, accountStatus, getPersona, listRoles, listTools, samePlace, type Account, type AddResult, type Project, type Persona, type LeftoverOverview, type Role, type TicketView, type ToolInfo } from "./lib/api";
+import { PLAIN_LINES, leftoverOverview, listAccounts, listProjects, accountStatus, getPersona, listRoles, listTools, roleKits, samePlace, type Account, type AddResult, type Project, type Persona, type LeftoverOverview, type Role, type RoleKit, type TicketView, type ToolInfo } from "./lib/api";
 import { TopBar } from "./components/TopBar";
 import type { Place } from "./lib/places";
 import { Office } from "./components/Office";
@@ -15,6 +15,7 @@ import { AddProject } from "./components/AddProject";
 import { Chat } from "./components/Chat";
 import { Files } from "./components/Files";
 import { Roles } from "./components/Roles";
+import { RoleSetup } from "./components/RoleSetup";
 import { Accounts } from "./components/Accounts";
 import { Kit } from "./components/Kit";
 import { Costs } from "./components/Costs";
@@ -54,6 +55,8 @@ export default function App() {
   const accountOf = (p: Project | null | undefined) => (p?.account && accounts.some((a) => a.id === p.account) ? p.account : null);
   const NO_ACCOUNT = "This project has no account yet. Click the Kona mark and choose one.";
   const [presetRole, setPresetRole] = useState<string | null>(null); // a role chosen in the office, for the start screen
+  const [settingUp, setSettingUp] = useState<string | null>(null); // the role whose setup dialog is open
+  const [kits, setKits] = useState<Record<string, RoleKit>>({}); // what each role may use in the open project (its skills and connectors)
   const [adding, setAdding] = useState(false); // the Add a project screen
   const [creating, setCreating] = useState(false); // the Start a session screen
   const [notice, setNotice] = useState<string | null>(null);
@@ -125,6 +128,13 @@ export default function App() {
   };
 
   const project = useMemo(() => projects?.find((p) => p.id === projectId) ?? projects?.[0] ?? null, [projects, projectId]);
+  // what each role may use in this project (its skills and connectors) is kept in the project, so it is read again whenever the project changes
+  useEffect(() => {
+    if (!project) { setKits({}); return; }
+    let live = true;
+    roleKits(project.folder).then((k) => { if (live) setKits(k); }).catch(() => { if (live) setKits({}); });
+    return () => { live = false; };
+  }, [project?.folder]); // eslint-disable-line react-hooks/exhaustive-deps
   const mine = useMemo(() => (project ? state.order.filter((id) => samePlace(state.sessions[id].folder, project.folder)) : []), [state, project]);
   const looksSig = looksSignature(state);
   const looks = useMemo(() => officeLooks(project, state), [project, looksSig]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -265,11 +275,11 @@ export default function App() {
   } else if (adding || !project) {
     content = <AddProject first={!project} accounts={accounts} onDone={added} onCancel={() => setAdding(false)} onOpenAccounts={() => { setAdding(false); setPlace("accounts"); }} />;
   } else if (place === "office") {
-    content = <Office project={project} roles={roles} looks={looks} onOpen={openPlace} onStartRole={startRoleHere} onOpenSession={openSessionHere} />;
+    content = <Office project={project} roles={roles} looks={looks} onOpen={openPlace} onStartRole={startRoleHere} onOpenSession={openSessionHere} onSetup={setSettingUp} />;
   } else if (place === "files") {
     content = <Files project={project} />;
   } else if (place === "roles") {
-    content = <Roles roles={roles} tools={tools} />;
+    content = <Roles roles={roles} tools={tools} kits={kits} onSetup={setSettingUp} />;
   } else if (place === "settings") {
     content = <Settings projects={projects} version={version} onProjects={(next) => { setProjects(next); if (projectId && !next.some((p) => p.id === projectId)) { setProjectId(next[0]?.id ?? null); remember("kona.project", next[0]?.id ?? ""); } }} />;
   } else if (place === "servers") {
@@ -305,6 +315,10 @@ export default function App() {
         limitLine={persona.enabled ? persona.lines.limit : PLAIN_LINES.limit} accountLabel={project ? accounts.find((a) => a.id === (current?.accountId ?? accountOf(project)))?.label ?? null : null} version={version} />
       <div className="relative flex min-h-0 min-w-0 flex-1">
         {content}
+        {settingUp && project && roles.some((r) => r.id === settingUp) && (
+          <RoleSetup key={`${project.id}-${settingUp}`} role={roles.find((r) => r.id === settingUp)!} project={project} accountId={accountOf(project)} kit={kits[settingUp] ?? { skills: [], mcp: [] }}
+            onSaved={(saved) => setRoles((all) => all.map((r) => (r.id === saved.id ? saved : r)))} onKitSaved={(id, kit) => setKits((all) => ({ ...all, [id]: kit }))} onClose={() => setSettingUp(null)} />
+        )}
         <UpdateCard running={state.order.filter((id) => state.sessions[id].run !== "ended").length} />
         {notice && (
           <div role="status" className="absolute right-6 bottom-6 flex max-w-[440px] items-start gap-3 px-card px-shadow p-2">

@@ -3,7 +3,11 @@ import { invoke } from "@tauri-apps/api/core";
 
 export type Project = { id: string; name: string; folder: string; github?: string | null; account?: string | null };
 export type AddResult = { project: Project; hidden_folder: boolean; git_ignored: boolean };
-export type Role = { id: string; name: string; group: string; model: string; mode: string; brief: string; needs: string[]; own_copy?: boolean };
+export type Role = { id: string; name: string; group: string; model: string; mode: string; brief: string; persona?: string; needs: string[]; own_copy?: boolean };
+export type RoleProfile = { persona: string; brief: string; model: string; mode: string };
+export type RoleKit = { skills: string[]; mcp: string[] };
+export type SkillInfo = { name: string; description: string; source: "project" | "computer"; tokens: number };
+export type McpInfo = { name: string; source: string; kind: string };
 export type ToolInfo = { id: string; name: string; install: string };
 export type ToolStatus = { id: string; name: string; installed: boolean; version?: string | null; install: string };
 export type Hint = { id: string; because: string };
@@ -97,6 +101,15 @@ export const setProjectGithub = (id: string, github: string) => invoke<Project>(
 export const earlierSessions = (projectId: string) => invoke<Earlier[]>("earlier_sessions", { projectId });
 export const costRows = (sinceDay: string | null) => invoke<CostRow[]>("cost_rows", { sinceDay });
 export const listRoles = () => invoke<Role[]>("list_roles");
+export const saveRole = (id: string, profile: RoleProfile) => invoke<Role>("save_role", { id, profile });
+export const resetRole = (id: string) => invoke<Role>("reset_role", { id });
+export const skillCatalog = (folder: string) => invoke<SkillInfo[]>("skill_catalog", { folder });
+export const computerSkills = (accountId: string | null, folder: string) => invoke<SkillInfo[]>("computer_skills", { accountId, folder });
+export const importSkill = (accountId: string | null, folder: string, name: string) => invoke<SkillInfo>("import_skill", { accountId, folder, name });
+export const skillFolder = (folder: string) => invoke<string>("skill_folder", { folder });
+export const roleKits = (folder: string) => invoke<Record<string, RoleKit>>("role_kits", { folder });
+export const saveRoleKit = (folder: string, roleId: string, kit: RoleKit) => invoke<RoleKit>("save_role_kit", { folder, roleId, kit });
+export const mcpCatalog = (accountId: string | null, folder: string) => invoke<McpInfo[]>("mcp_catalog", { accountId, folder });
 export const listAccounts = () => invoke<Account[]>("list_accounts");
 export const addAccount = async (label: string) => { try { return await invoke<Account>("add_account", { label }); } finally { statusCache.clear(); } };
 export const renameAccount = (id: string, label: string) => invoke<Account>("rename_account", { id, label });

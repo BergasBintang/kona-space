@@ -13,6 +13,7 @@ mod persona;
 mod ledger;
 mod projects;
 mod roles;
+mod skills;
 mod session;
 mod ssh;
 mod summary;
@@ -113,7 +114,12 @@ async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: Sta
         }
         None => None,
     };
-    let id = session::start(app, &sessions, folder.clone(), role, account, persona, project_name, ticket, work_dir, brain_digest, ssh_hosts, model, mode, resume).await?;
+    // what this role may load in this project: only the skills and connectors chosen for it here (decisions 50 and 51)
+    let kit = match &role {
+        Some(r) => skills::kit_for(r, account.as_ref().and_then(|a| a.config_dir.as_deref()), std::path::Path::new(&folder))?,
+        None => skills::Kit::default(),
+    };
+    let id = session::start(app, &sessions, folder.clone(), role, account, persona, project_name, ticket, work_dir, brain_digest, ssh_hosts, kit, model, mode, resume).await?;
     if let Some(t) = ticket_id {
         let _ = tickets::link_session(&tickets::dir(std::path::Path::new(&folder)), &t, &id, &who);
     }
@@ -489,6 +495,73 @@ fn list_roles(roles: State<'_, Roles>) -> Vec<Role> {
     roles.all()
 }
 
+/// Keep the owner's setup of one role: personality, brief, model, permission mode, skills and connectors.
+#[tauri::command]
+fn save_role(roles: State<'_, Roles>, id: String, profile: roles::Profile) -> Result<Role, String> {
+    roles.save(&id, profile)
+}
+
+#[tauri::command]
+fn reset_role(roles: State<'_, Roles>, id: String) -> Result<Role, String> {
+    roles.reset(&id)
+}
+
+/// A folder the screen names must be inside a project (the same rule as starting a session).
+fn project_folder(projects: &Projects, folder: &str) -> Result<std::path::PathBuf, String> {
+    if !projects.allows(std::path::Path::new(folder)) {
+        return Err("That folder is not inside a project".into());
+    }
+    Ok(std::path::PathBuf::from(folder))
+}
+
+/// The skills of one project: the only ones a role of that project can be given, with what each costs at the start of a session.
+#[tauri::command]
+fn skill_catalog(projects: State<'_, Projects>, folder: String) -> Result<Vec<skills::SkillInfo>, String> {
+    Ok(skills::catalog(&project_folder(&projects, &folder)?))
+}
+
+/// The skills on this PC that could be copied into the project (not used by any session until they are).
+#[tauri::command]
+fn computer_skills(app: AppHandle, accounts: State<'_, Accounts>, projects: State<'_, Projects>, folder: String, account_id: Option<String>) -> Result<Vec<skills::SkillInfo>, String> {
+    let dir = account_id.and_then(|id| accounts.get(&id)).and_then(|a| a.config_dir);
+    Ok(skills::computer_catalog(&kona_base(&app)?, dir.as_deref(), &project_folder(&projects, &folder)?))
+}
+
+/// Copy one skill from this PC into the project.
+#[tauri::command]
+fn import_skill(app: AppHandle, accounts: State<'_, Accounts>, projects: State<'_, Projects>, folder: String, account_id: Option<String>, name: String) -> Result<skills::SkillInfo, String> {
+    let dir = account_id.and_then(|id| accounts.get(&id)).and_then(|a| a.config_dir);
+    skills::import_skill(&kona_base(&app)?, dir.as_deref(), &project_folder(&projects, &folder)?, &name)
+}
+
+/// The folder where a project's own skills live (it may not exist yet).
+#[tauri::command]
+fn skill_folder(projects: State<'_, Projects>, folder: String) -> Result<String, String> {
+    Ok(skills::project_skills_dir(&project_folder(&projects, &folder)?).to_string_lossy().into_owned())
+}
+
+/// What every role may use in this project.
+#[tauri::command]
+fn role_kits(projects: State<'_, Projects>, folder: String) -> Result<std::collections::HashMap<String, skills::RoleKit>, String> {
+    Ok(skills::load_kits(&project_folder(&projects, &folder)?))
+}
+
+#[tauri::command]
+fn save_role_kit(roles: State<'_, Roles>, projects: State<'_, Projects>, folder: String, role_id: String, kit: skills::RoleKit) -> Result<skills::RoleKit, String> {
+    if roles.get(&role_id).is_none() { return Err("That role does not exist".into()); }
+    skills::save_kit(&project_folder(&projects, &folder)?, &role_id, kit)
+}
+
+/// The tool connectors (MCP servers) a role could be given for a project.
+#[tauri::command]
+fn mcp_catalog(accounts: State<'_, Accounts>, projects: State<'_, Projects>, account_id: Option<String>, folder: String) -> Result<Vec<skills::McpInfo>, String> {
+    if !projects.allows(std::path::Path::new(&folder)) {
+        return Err("That folder is not inside a project".into());
+    }
+    let dir = account_id.and_then(|id| accounts.get(&id)).and_then(|a| a.config_dir);
+    Ok(skills::mcp_catalog(dir.as_deref(), std::path::Path::new(&folder)))
+}
+
 #[tauri::command]
 fn list_accounts(accounts: State<'_, Accounts>) -> Vec<Account> {
     accounts.all()
@@ -566,14 +639,14 @@ pub fn run() {
                 }
             });
             app.manage(Projects::load(&base));
-            app.manage(Roles::load());
+            app.manage(Roles::load(&base));
             app.manage(Accounts::load(&base));
             app.manage(Voice::load(&base));
             app.manage(ssh::Servers::load(&base));
             app.manage(backup::SettingsStore::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, cost_rows, set_project_github, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
+        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, cost_rows, set_project_github, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -121,9 +121,10 @@ export function ago(t: number): string {
 
 const ROW = new Map<string, number>(cats.rows.map((r, i) => [r.id, i]));
 export const FRAME_NAMES = cats.frames as string[];
-export const CAT_W = cats.frameWidth, CAT_H = cats.frameHeight, CAT_FRAMES = cats.frames.length, CAT_ROWS = cats.rows.length;
+export const CAT_W = cats.frameWidth, CAT_H = cats.frameHeight, CAT_FRAMES = cats.frames.length, CAT_ROWS = cats.rows.length * cats.dirs; // the sheet holds the four sides of every cat, one block of rows per side
 export const CAT_SHEET = catSheet;
-export const catRow = (roleId: string) => ROW.get(roleId) ?? 0; // only called with the roles of the office
+/** The row of a role's cat on the sheet. dir: 0 faces down-left (the front), 1 down-right, 2 up-left, 3 up-right. Only called with the roles of the office. */
+export const catRow = (roleId: string, dir = 0) => dir * cats.rows.length + (ROW.get(roleId) ?? 0);
 
 /** A role is its own cat: the face of that cat from the sprite sheet, drawn at 1x or 2x so the pixels stay square. */
 export function RoleMark({ roleId, size = 28 }: { roleId: string; size?: number }) {

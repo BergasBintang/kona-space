@@ -114,7 +114,7 @@ pub fn claude_version(exe: &PathBuf) -> Option<String> {
     Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Option<Role>, account: Option<Account>, persona: Persona, project_name: String, ticket: Option<Ticket>, work_dir: String, digest: Option<String>, ssh_hosts: Vec<crate::ssh::Host>, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
+pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Option<Role>, account: Option<Account>, persona: Persona, project_name: String, ticket: Option<Ticket>, work_dir: String, digest: Option<String>, ssh_hosts: Vec<crate::ssh::Host>, kit: crate::skills::Kit, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
     let exe = find_claude().ok_or("Claude Code was not found on this PC")?;
     // each `claude` program takes about 400 MB; on this PC two at once is the limit (a setting)
     let cap = app.try_state::<crate::backup::SettingsStore>().map(|s| s.get().max_sessions).unwrap_or(2) as usize;
@@ -129,16 +129,25 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     ]);
     // the role's brief is added to Claude's own instructions; the mode and model come from the role unless the owner changed them
     // and the voice, when it is on for this session (it changes wording only; see persona.rs for the scope clause)
-    let extra: Vec<String> = role.as_ref().map(|r| r.brief.trim().to_string()).filter(|b| !b.is_empty()).into_iter().chain(ticket.as_ref().map(tickets::prompt_for)).chain(digest.filter(|d| !d.trim().is_empty())).chain(persona.prompt()).collect();
+    let persona_line = role.as_ref().map(|r| r.persona.trim().to_string()).filter(|p| !p.is_empty()).map(|p| format!("Your personality in this role: {p}"));
+    let extra: Vec<String> = role.as_ref().map(|r| r.brief.trim().to_string()).filter(|b| !b.is_empty()).into_iter().chain(persona_line).chain(ticket.as_ref().map(tickets::prompt_for)).chain(digest.filter(|d| !d.trim().is_empty())).chain(persona.prompt()).collect();
     if !extra.is_empty() {
         cmd.args(["--append-system-prompt", &extra.join("\n\n")]);
     }
     // the board's tool server: Kona's own program, started by Claude Code for this one session (see mcp.rs)
+    let mut servers = serde_json::Map::new();
     if let Ok(me) = std::env::current_exe() {
-        let config = json!({"mcpServers": {"kona-board": {"command": me.to_string_lossy(), "args": [
+        servers.insert("kona-board".into(), json!({"command": me.to_string_lossy(), "args": [
             "--mcp-board", "--folder", folder, "--session", id, "--role", role.as_ref().map(|r| r.id.as_str()).unwrap_or("")
-        ]}}});
-        cmd.args(["--mcp-config", &config.to_string(), "--allowedTools", "mcp__kona-board"]);
+        ]}));
+    }
+    // a session as a role gets only what that role was given (see skills.rs): its connectors, its skills, and none of the user-level ones
+    for (name, def) in &kit.mcp { servers.insert(name.clone(), def.clone()); }
+    if !servers.is_empty() { cmd.args(["--mcp-config", &json!({"mcpServers": servers}).to_string()]); }
+    if servers.contains_key("kona-board") { cmd.args(["--allowedTools", "mcp__kona-board"]); }
+    if role.is_some() {
+        cmd.args(["--strict-mcp-config", "--setting-sources", "project,local"]);
+        if let Some(dir) = &kit.plugin_dir { cmd.arg("--plugin-dir").arg(dir); }
     }
     // a role that may use none of the project's servers cannot run ssh, scp or sftp at all (and a role that may is checked per command below)
     let denied = crate::ssh::deny_rules(&ssh_hosts, role.as_ref().map(|r| r.id.as_str()));

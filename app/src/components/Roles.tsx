@@ -1,15 +1,15 @@
-// The Roles place: the team. The roles are fixed (decision 43): each is a cat with a name, a model, a permission mode and a short brief.
-// Nothing here can be changed; the list comes with Kona. In the office the same roles sit at their desks.
+// The Roles place: the team. The list of roles is fixed (decision 43); each role can be set up (decision 50): personality, job, model, permissions,
+// and the only skills and connectors its sessions get. In the office the same roles sit at their desks.
 import { useMemo } from "react";
-import type { Role, ToolInfo } from "../lib/api";
-import { RoleMark } from "./ui";
+import type { Role, RoleKit, ToolInfo } from "../lib/api";
 import { Help } from "./Help";
+import { Button, RoleMark } from "./ui";
 import { modeWord } from "../lib/sessions";
 
 const GROUPS = ["Plan", "Build", "Ship", "Grow", "Office"];
 const MODEL_WORD: Record<string, string> = { sonnet: "Sonnet", opus: "Opus", haiku: "Haiku" };
 
-export function Roles({ roles, tools }: { roles: Role[]; tools: ToolInfo[] }) {
+export function Roles({ roles, tools, kits, onSetup }: { roles: Role[]; tools: ToolInfo[]; kits: Record<string, RoleKit>; onSetup: (roleId: string) => void }) {
   const groups = useMemo(() => GROUPS.map((g) => ({ name: g, roles: roles.filter((r) => r.group === g) })).filter((g) => g.roles.length > 0), [roles]);
   const toolName = (id: string) => tools.find((t) => t.id === id)?.name ?? id;
   return (
@@ -17,7 +17,7 @@ export function Roles({ roles, tools }: { roles: Role[]; tools: ToolInfo[] }) {
       <div className="mx-auto flex w-full max-w-[920px] flex-col gap-6">
         <div className="flex items-center gap-3">
           <h1 className="m-0 text-[30px] leading-[38px] font-bold">Roles</h1>
-          <Help title="Roles"><p className="m-0">Each role is a cat with a job. Start a session as a role and Claude is told what that job is. The roles come with Kona and cannot be changed. All of them use the account of the project.</p></Help>
+          <Help title="Roles"><p className="m-0">Each role is a cat with a job. Start a session as a role and Claude is told what that job is, how to behave, and gets only the skills and connectors you chose for it in this project, nothing else. Press Set up on a role to change them. The list of roles is fixed. All of them use the account of the project.</p></Help>
         </div>
         {groups.map((g) => (
           <section key={g.name} className="flex flex-col gap-3" aria-label={g.name}>
@@ -33,8 +33,11 @@ export function Roles({ roles, tools }: { roles: Role[]; tools: ToolInfo[] }) {
                     </div>
                   </div>
                   <p className="m-0 text-[14px] leading-5 text-text-secondary">{r.brief}</p>
+                  {r.persona && <p className="m-0 text-[14px] leading-5 text-text-secondary"><span className="font-bold">Personality:</span> {r.persona}</p>}
+                  <span className="text-[13px] leading-5 text-text-tertiary">In this project, skills: {(kits[r.id]?.skills ?? []).length > 0 ? kits[r.id].skills.join(", ") : "none"} · connectors: {(kits[r.id]?.mcp ?? []).length > 0 ? kits[r.id].mcp.join(", ") : "none"}</span>
                   {r.needs.length > 0 && <span className="text-[13px] leading-5 text-text-tertiary">Needs: {r.needs.map(toolName).join(", ")}</span>}
                   {r.own_copy && <span className="text-[13px] leading-5 text-text-tertiary">Tickets run in their own copy of the project.</span>}
+                  <div><Button variant="quiet" small onClick={() => onSetup(r.id)}>Set up {r.name}</Button></div>
                 </article>
               ))}
             </div>

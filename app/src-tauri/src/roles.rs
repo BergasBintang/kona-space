@@ -1,8 +1,12 @@
-// Roles: the setup of a session (decision 9, feature F5), and since 0.20.0 a fixed list (decision 43): the owner cannot add, edit or remove one.
-// A role is a name, a group, a model, a permission mode and a short brief that Claude is told at the start.
-// Before 0.20.0 the list lived in %APPDATA%\Kona\roles.json and could be edited. That file is no longer read or written; it is left where it is
-// (the cleanup ticket T-0003 decides about it).
+// Roles: the setup of a session (decision 9, feature F5). The list of roles is fixed (decision 43): the owner cannot add or remove one.
+// Since decision 50 each role can be set up: its personality, its brief, its model and permission mode. These are the same in every project and are
+// kept in %APPDATA%\Kona\role-profiles.json; a role that was never set up simply has the starting values below. The skills and tool connectors a role
+// may use belong to a project, not to the role (decision 51, see skills.rs). (The old %APPDATA%\Kona\roles.json is not read; ticket T-0003 decides about it.)
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Role {
@@ -12,6 +16,9 @@ pub struct Role {
     pub model: String,
     pub mode: String,
     pub brief: String,
+    /// how this role behaves and sounds, in the owner's words; added after the brief
+    #[serde(default)]
+    pub persona: String,
     /// local tools this role needs, by id from needs.rs (the needs check looks for them)
     #[serde(default)]
     pub needs: Vec<String>,
@@ -20,15 +27,60 @@ pub struct Role {
     pub own_copy: bool,
 }
 
-pub struct Roles {
+/// What the owner may set on a role.
+#[derive(Serialize, Deserialize, Clone, Default)]
+pub struct Profile {
+    pub persona: String,
+    pub brief: String,
+    pub model: String,
+    pub mode: String,
+}
+
+/// A skill or connector name that is safe to use as a folder name and as a word on a command line.
+pub fn clean_name(s: &str) -> bool {
+    !s.is_empty() && s.len() <= 80 && !s.starts_with('.') && s.chars().all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c))
+}
+
+fn check(p: &Profile) -> Result<Profile, String> {
+    if !["sonnet", "opus", "haiku"].contains(&p.model.as_str()) {
+        return Err("Choose Sonnet, Opus or Haiku".into());
+    }
+    if !["plan", "default", "acceptEdits"].contains(&p.mode.as_str()) {
+        return Err("That permission mode is not one Kona offers".into());
+    }
+    if p.brief.trim().is_empty() || p.brief.chars().count() > 3000 {
+        return Err("The brief must be there and no longer than 3000 letters".into());
+    }
+    if p.persona.chars().count() > 1500 {
+        return Err("The personality may be at most 1500 letters".into());
+    }
+    Ok(Profile { persona: p.persona.trim().to_string(), brief: p.brief.trim().to_string(), model: p.model.clone(), mode: p.mode.clone() })
+}
+
+fn apply(r: &mut Role, p: &Profile) {
+    if !p.brief.is_empty() { r.brief = p.brief.clone(); } // an empty brief in the file means "still the starting one"
+    r.persona = p.persona.clone(); r.model = p.model.clone(); r.mode = p.mode.clone();
+}
+
+struct Inner {
     list: Vec<Role>,
+    saved: HashMap<String, Profile>,
+}
+
+pub struct Roles {
+    file: PathBuf,
+    inner: Mutex<Inner>,
 }
 
 fn starting(id: &str, name: &str, group: &str, mode: &str, needs: &[&str], brief: &str) -> Role {
-    Role { id: id.into(), name: name.into(), group: group.into(), model: "sonnet".into(), mode: mode.into(), brief: brief.into(), needs: needs.iter().map(|s| s.to_string()).collect(), own_copy: id == "frontend" || id == "backend" }
+    Role {
+        id: id.into(), name: name.into(), group: group.into(), model: "sonnet".into(), mode: mode.into(), brief: brief.into(), persona: String::new(),
+        needs: needs.iter().map(|s| s.to_string()).collect(), own_copy: id == "frontend" || id == "backend",
+    }
 }
 
 /// The roles: the ten starting roles and the secretary. The modes are the safe default (ask every time); only the two that edit files are loosened.
+/// No role starts with any skill or connector: the owner picks them for each project, so a session carries nothing it was not given.
 pub fn starting_roles() -> Vec<Role> {
     vec![
         starting("product", "Product", "Plan", "plan", &[], "You are working as the Product role. Turn what the owner wants into small, clear tickets, each with how to tell it is done. Do not change any file; plan only."),
@@ -46,15 +98,53 @@ pub fn starting_roles() -> Vec<Role> {
 }
 
 impl Roles {
-    pub fn load() -> Self {
-        Self { list: starting_roles() }
+    pub fn load(base: &Path) -> Self {
+        let file = base.join("role-profiles.json");
+        let saved: HashMap<String, Profile> = fs::read_to_string(&file).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+        let list = starting_roles().into_iter().map(|mut r| { if let Some(p) = saved.get(&r.id) { apply(&mut r, p); } r }).collect();
+        Self { file, inner: Mutex::new(Inner { list, saved }) }
     }
 
     pub fn all(&self) -> Vec<Role> {
-        self.list.clone()
+        self.inner.lock().unwrap().list.clone()
     }
 
     pub fn get(&self, id: &str) -> Option<Role> {
-        self.list.iter().find(|r| r.id == id).cloned()
+        self.inner.lock().unwrap().list.iter().find(|r| r.id == id).cloned()
+    }
+
+    fn write(&self, saved: &HashMap<String, Profile>) -> Result<(), String> {
+        if let Some(d) = self.file.parent() { fs::create_dir_all(d).map_err(|e| e.to_string())?; }
+        let tmp = self.file.with_extension("json.tmp");
+        fs::write(&tmp, serde_json::to_string_pretty(saved).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        fs::rename(&tmp, &self.file).map_err(|e| e.to_string())
+    }
+
+    /// Keep the owner's setup for one role.
+    pub fn save(&self, id: &str, profile: Profile) -> Result<Role, String> {
+        let p = check(&profile)?;
+        let mut g = self.inner.lock().unwrap();
+        let i = g.list.iter().position(|r| r.id == id).ok_or("That role does not exist")?;
+        let mut saved = g.saved.clone();
+        let mut stored = p.clone();
+        if starting_roles().iter().any(|r| r.id == id && r.brief == p.brief) { stored.brief = String::new(); } // unchanged: a later Kona update of the brief still reaches this role
+        saved.insert(id.to_string(), stored);
+        self.write(&saved)?;
+        g.saved = saved;
+        apply(&mut g.list[i], &p);
+        Ok(g.list[i].clone())
+    }
+
+    /// Back to the starting setup of one role.
+    pub fn reset(&self, id: &str) -> Result<Role, String> {
+        let start = starting_roles().into_iter().find(|r| r.id == id).ok_or("That role does not exist")?;
+        let mut g = self.inner.lock().unwrap();
+        let mut saved = g.saved.clone();
+        saved.remove(id);
+        self.write(&saved)?;
+        g.saved = saved;
+        let i = g.list.iter().position(|r| r.id == id).ok_or("That role does not exist")?;
+        g.list[i] = start.clone();
+        Ok(start)
     }
 }

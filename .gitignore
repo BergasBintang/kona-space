@@ -34,3 +34,7 @@ docs/trials/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# art kit: what the build makes again each time (the app keeps its own copy in app/src/office)
+art/out/parts/
+art/out/views/

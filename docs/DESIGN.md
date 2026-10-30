@@ -134,7 +134,7 @@ The secretary sits at the front desk, answers general questions and turns what t
 
 - **The welcome page** opens on every launch: the Kona mark, a greeting, one card per project with its account and whether it is signed in. A signed-out account offers Sign in and Use another account; a project without an account asks "Which account does this project use?" once; Open is enabled only when the account is signed in. "Add another project" is the last card. The Kona mark in the top bar goes back to it.
 - **The top bar** is always in view: the mark, the project, a Go to list of every place, a way back to the office, what waits on you and what was left behind, the account of the project, the two plan bars and the version. There is no sidebar.
-- **The office** is one isometric pixel-art building with a room for every place. Hover lights a room and shows its name; click zooms in (twice the scale, the rest fogged); Esc or "Back to the office" returns. A room's panel lists its cats with their state and a button to start or open a session as that role, and the places the room opens. A room is also reachable by keyboard (Tab, then Enter).
+- **The office** is one isometric pixel-art building with a room for every place. Every room wears its name plate; hover lights a room; click zooms in (twice the scale, the rest fogged); Esc or "Back to the office" returns. A room's panel lists its cats with their state and a button to start or open a session as that role, and the places the room opens. A room is also reachable by keyboard (Tab, then Enter).
 
 | Room | Holds |
 |---|---|
@@ -142,16 +142,19 @@ The secretary sits at the front desk, answers general questions and turns what t
 | Library | Brain |
 | Archive | Files |
 | Server room | Servers |
-| Git room | Worktrees and the DevOps desk |
-| Plan | Product and Design desks, the staff board |
-| Build | Frontend, Backend, QA and Security desks |
-| Grow | Marketing, Content and SEO, Support desks |
-| Front desk | The secretary and the session list |
+| DevOps and Git | Worktrees, the GitHub address and the DevOps desk |
 | Accounting | Costs |
-| Back office | Voice and Settings |
-| Storage closet | Leftovers |
+| Front desk | The secretary and the session list |
+| Product and design | Product and Design desks, the staff board |
 | Entrance | Accounts |
-| Lounge, Garden | Nothing yet |
+| Marketing | The Marketing desk |
+| Content and SEO | The Content and SEO desk |
+| Support | The Support desk |
+| Storage closet | Leftovers |
+| Engineering | Frontend, Backend, QA and Security desks |
+| Back office | Voice and Settings |
+
+The office is planned like a real one: a main hall with a branch to the lobby at the front, and rooms of different sizes off it (Marketing and Engineering are the big ones). Rooms have solid walls and one door each, always onto the hall; they never open into each other. Every room has its own floor pattern, floor colour, wall colour and furniture; a team room also has door posts in its colour and a colour chip on its plate. Plates are drawn by the app (in the pixel font, always visible) on the hall floor in front of each door. In a zoomed team room every cat wears a name tag. The office is made of parts (each piece of floor, wall and furniture is its own small picture, and the cats are drawn between them by their place from front to back); every room is closed all round except its door, and when you go into a room the walls in front of it are left out so you see all of it.
 
 - **Sessions** is a place with a list of sessions on the left and a start screen or a chat on the right. A session has the pixel working word while Claude works.
 

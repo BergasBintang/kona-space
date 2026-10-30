@@ -29,6 +29,15 @@ const CAT = [
   torso("ffffffffff"),
   "..oooooooooooo..",
 ];
+// The cat seen from four sides (dir): 0 faces the camera, 1 faces the camera turned to its left (the face sits to the right), 2 and 3 show its back (the tail on the right and on the left).
+const CAT_RIGHT = CAT.slice();
+CAT_RIGHT[4] = head("fffffffddfff"); CAT_RIGHT[5] = CAT_RIGHT[6] = head("fffffeffffef"); CAT_RIGHT[7] = head("fffflllnnllf"); CAT_RIGHT[8] = head("ffffllllllff");
+const CAT_BACK = [
+  "..oo........oo..", ".offo......offo.", CAT[2].replaceAll("p", "f"), head("ffffffffffff"), head("ffffffffffff"), head("ffffffffffff"), head("ffffffffffff"), head("ffffffffffff"), head("ffffffffffff"),
+  "..oooooooooooo..", "...o" + "tttttttt" + "o...", torso("ffffffffff"), torso("ffffffffff"), torso("ffffffffff"), torso("dffffffffd"), torso("ffffffffff"), torso("ffffffffff"), "..oooooooooooo..",
+];
+const LOOKS = [CAT, CAT_RIGHT, CAT_BACK, CAT_BACK];
+export const DIRS = 4;
 
 // Every role is its own cat: a coat, a collar, eye colour, and sometimes patches. Coordinates are inside the 16 x 18 cat.
 // f fur, d stripes, l belly and muzzle, ear = the inside of the ears, paint = [x0, y0, x1, y1, from, to] swaps a colour inside a box
@@ -49,10 +58,11 @@ export const SKINS = {
   secretary: { name: "white cat", f: "#f4efe5", d: "#cfc6b4", l: "#ffffff", collar: "#d9604f", eye: "#5aa7e0", ear: "#f0a8a0" },
 };
 const baseCache = {};
-function baseCat(role) {
-  if (baseCache[role]) return baseCache[role];
+function baseCat(role, dir = 0) {
+  const key = role + dir;
+  if (baseCache[key]) return baseCache[key];
   const s = SKINS[role];
-  const img = fromRows(CAT, { ...PAL, f: s.f, d: s.d, l: s.l, t: s.collar, e: s.eye, p: s.ear ?? PAL.p });
+  const img = fromRows(LOOKS[dir], { ...PAL, f: s.f, d: s.d, l: s.l, t: s.collar, e: s.eye, p: s.ear ?? PAL.p });
   (s.paint ?? []).forEach(([x0, y0, x1, y1, from, to]) => {
     const fromC = from === "f" ? s.f : from === "l" ? s.l : from === "d" ? s.d : from;
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
@@ -61,7 +71,7 @@ function baseCat(role) {
       if (px[3] && px[0] === want[0] && px[1] === want[1] && px[2] === want[2]) img.set(x, y, to);
     }
   });
-  return (baseCache[role] = img);
+  return (baseCache[key] = img);
 }
 const rgbaOf = (c) => { const h = c.replace("#", ""); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; };
 
@@ -114,27 +124,32 @@ function card(role) {
 }
 const hand = (x, y, c) => { const l = new Img(FRAME_W, FRAME_H); l.rect(x, y, 2, 1, c); l.rect(x, y + 1, 2, 1, PAL.o); return l; };
 
-export function cat(role, frame) {
+export function cat(role, frame, dir = 0) {
   const img = new Img(FRAME_W, FRAME_H);
-  const fur = SKINS[role].f;
-  img.blit(baseCat(role), CX, CY);
+  const fur = SKINS[role].f, back = dir >= 2;
+  img.blit(baseCat(role, dir), CX, CY);
+  const eyes = dir === 1 ? [7, 12] : [4, 11]; // the columns of the two eyes (rows 5 and 6)
   const eye = (x, y, c) => img.set(CX + x, CY + y, c);
-  const skin = (x, y) => img.get(CX + x + 1, CY + y); // the fur beside an eye
-  if (frame === "blink") { eye(4, 5, skin(4, 5)); eye(11, 5, skin(10, 5)); }
-  if (frame === "happy") { eye(4, 6, skin(4, 6)); eye(11, 6, skin(10, 6)); [[4, 5], [11, 5], [3, 6], [5, 6], [10, 6], [12, 6]].forEach(([x, y]) => eye(x, y, PAL.o)); }
-  if (frame === "typeA") { img.blit(hand(CX + 5, CY + 12, fur), 0, 0); img.blit(hand(CX + 9, CY + 13, fur), 0, 0); }
-  if (frame === "typeB") { img.blit(hand(CX + 5, CY + 13, fur), 0, 0); img.blit(hand(CX + 9, CY + 12, fur), 0, 0); }
+  const skin = (x, y) => img.get(CX + x + (x === eyes[0] ? 1 : -1), CY + y); // the fur beside an eye, on the side of the face
+  if (!back && frame === "blink") eyes.forEach((x) => eye(x, 5, skin(x, 5)));
+  if (!back && frame === "happy") { eyes.forEach((x) => eye(x, 6, skin(x, 6))); eyes.forEach((x) => { eye(x, 5, PAL.o); eye(x - 1, 6, PAL.o); eye(x + 1, 6, PAL.o); }); }
+  if (!back && frame === "typeA") { img.blit(hand(CX + 5, CY + 12, fur), 0, 0); img.blit(hand(CX + 9, CY + 13, fur), 0, 0); }
+  if (!back && frame === "typeB") { img.blit(hand(CX + 5, CY + 13, fur), 0, 0); img.blit(hand(CX + 9, CY + 12, fur), 0, 0); }
   if (frame === "waitA") img.blit(layer([[CX + 14, 9], [CX + 15, 9], [CX + 14, 10], [CX + 15, 10], [CX + 14, 11], [CX + 15, 11], [CX + 14, 12], [CX + 14, 13]], fur), 0, 0);
   if (frame === "waitB") img.blit(layer([[CX + 15, 8], [CX + 16, 8], [CX + 15, 9], [CX + 16, 9], [CX + 15, 10], [CX + 16, 10], [CX + 15, 11], [CX + 14, 12], [CX + 14, 13]], fur), 0, 0);
+  if (back) { // from behind: no card, a tail on one side
+    img.blit(layer(dir === 2 ? [[CX + 15, 17], [CX + 16, 17], [CX + 16, 16]] : [[CX, 17], [CX - 1, 17], [CX - 1, 16]], fur), 0, 0);
+    return img;
+  }
   img.blit(card(role), 0, 9);
   img.blit(layer([[7, 13], [7, 14]], fur), 0, 0);
   return img;
 }
 
-// all roles and frames in one sheet: a row per role, a column per frame
+// all roles, frames and sides in one sheet: a row per role and side (the four sides one after the other), a column per frame
 export function sheet() {
-  const s = new Img(FRAME_W * FRAMES.length, FRAME_H * ROLES.length);
-  ROLES.forEach((r, row) => FRAMES.forEach((f, col) => s.blit(cat(r.id, f), col * FRAME_W, row * FRAME_H)));
+  const s = new Img(FRAME_W * FRAMES.length, FRAME_H * ROLES.length * DIRS);
+  for (let dir = 0; dir < DIRS; dir++) ROLES.forEach((r, row) => FRAMES.forEach((f, col) => s.blit(cat(r.id, f, dir), col * FRAME_W, (dir * ROLES.length + row) * FRAME_H)));
   return s;
 }
 

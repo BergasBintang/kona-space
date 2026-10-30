@@ -36,8 +36,8 @@ export class Img {
       if (e2 <= dx) { err += dx; y0 += sy; }
     }
   }
-  // filled polygon, even-odd, tested at pixel centres
-  poly(pts, c) {
+  // filled polygon, even-odd, tested at pixel centres. keep(x, y) can skip pixels (a checker makes see-through glass)
+  poly(pts, c, keep) {
     const ys = pts.map((p) => p[1]);
     const y0 = Math.max(0, Math.floor(Math.min(...ys))), y1 = Math.min(this.h - 1, Math.ceil(Math.max(...ys)));
     for (let y = y0; y <= y1; y++) {
@@ -47,7 +47,7 @@ export class Img {
         if ((ay <= yc && by > yc) || (by <= yc && ay > yc)) xs.push(ax + ((yc - ay) / (by - ay)) * (bx - ax));
       }
       xs.sort((a, b) => a - b);
-      for (let k = 0; k + 1 < xs.length; k += 2) for (let x = Math.ceil(xs[k] - 0.5); x <= Math.ceil(xs[k + 1] - 0.5) - 1; x++) this.set(x, y, c);
+      for (let k = 0; k + 1 < xs.length; k += 2) for (let x = Math.ceil(xs[k] - 0.5); x <= Math.ceil(xs[k + 1] - 0.5) - 1; x++) if (!keep || keep(x, y)) this.set(x, y, c);
     }
   }
   polyLine(pts, c, close = true) { for (let k = 0; k < pts.length - (close ? 0 : 1); k++) { const a = pts[k], b = pts[(k + 1) % pts.length]; this.line(a[0], a[1], b[0], b[1], c); } }

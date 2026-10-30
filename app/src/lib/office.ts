@@ -3,10 +3,10 @@
 import { samePlace, type Project } from "./api";
 import type { GlyphState } from "../components/ui";
 import type { RunState, State } from "./sessions";
-import layout from "../office/cats-layout.json";
+import first from "../office/views/v0.json";
 
 export type Look = { mode: "idle" | "typing" | "waiting" | "done"; word: string | null; glyph: GlyphState | null; sessionId: string | null };
-export const OFFICE_ROLES: string[] = layout.cats.map((c) => c.role);
+export const OFFICE_ROLES: string[] = first.cats.map((c) => c.role);
 export const NO_LOOKS: Record<string, Look> = {};
 
 const RANK: Record<RunState, number> = { waiting: 4, working: 3, starting: 2, ready: 1, ended: 0 };

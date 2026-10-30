@@ -2,6 +2,17 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.21.0, 2026-10-30
+
+Every role can be set up, skills belong to a project, and the office can be turned.
+
+- **Set up a role.** Each cat in a room has a Set up button: a personality line, the job, the model, how much it may do on its own, the skills it may use and the connectors it may reach. A role loads only what you chose, nothing else, so a session starts with fewer tokens (measured on this PC: about 41,200 before, about 33,100 with one skill).
+- **Skills belong to a project.** They live in the project's own `.kona` folder, not on the computer. You can bring one in from the computer's skill shelf. The personality, job and model are shared by all projects; the skills and connectors are per project.
+- **Turn the building.** Two buttons turn the office a quarter at a time, so you see it from all four sides. Windows hang on every outer wall, and the cats look the right way from each side.
+- **A new office, built from parts.** Every desk, chair, shelf, wall and plant is its own small picture on whole tiles. The walls are drawn as one structure, so corners, runs and doorways have no seams. The rooms are laid out like a real office: a hall, rooms of different sizes, one door each, onto the hall.
+- Chairs, sofas and armchairs are plain seats. A piece next to a wall is ordered correctly against it, and the building has no short stubs of brick wall.
+- Behind the scenes: the old flat office picture and its leftovers are gone, and the art build checks every side of the building.
+
 ## 0.20.3, 2026-10-30
 
 The first release with the office: a welcome page, one account per project, a pixel-art office with a cat for every role instead of the sidebar, a light paper look and a pixel font. This release holds everything from 0.20.0 to 0.20.3; their entries are below.

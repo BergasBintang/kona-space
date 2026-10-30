@@ -119,7 +119,7 @@ pub async fn run_haiku(system: &str, prompt: &str, account_dir: Option<&str>) ->
     let out = match tokio::time::timeout(std::time::Duration::from_secs(150), child.wait_with_output()).await {
         Ok(Ok(o)) => o,
         Ok(Err(e)) => return Err(e.to_string()),
-        Err(_) => return Err("Claude took too long to write the note and was stopped".into()),
+        Err(_) => return Err("Claude took too long to answer and was stopped".into()),
     };
     let text = String::from_utf8_lossy(&out.stdout);
     let v: Value = serde_json::from_str(text.trim()).map_err(|_| {

@@ -6,6 +6,7 @@ mod brain;
 mod brain_search;
 mod files;
 mod job;
+mod kibby;
 mod leftovers;
 mod mcp;
 mod needs;
@@ -408,6 +409,22 @@ async fn write_note_with_haiku(
     Ok(text)
 }
 
+/// One reply from Kibby, the office boy: one cheap Haiku call with no tools, his character as the system prompt and the last turns of the talk in the prompt.
+/// The talk is kept on the screen only. The call's dollars go in the ledger under the kind `kibby`.
+#[tauri::command]
+async fn kibby_say(
+    sessions: State<'_, Sessions>, accounts: State<'_, Accounts>, projects: State<'_, Projects>,
+    project_id: String, account_id: Option<String>, history: Vec<kibby::Turn>, message: String,
+) -> Result<String, String> {
+    let prompt = kibby::prompt(&history, &message)?;
+    let folder = projects.all().into_iter().find(|p| p.id == project_id).map(|p| p.folder).ok_or("That project does not exist any more")?;
+    let dir = account_id.as_ref().and_then(|id| accounts.get(id)).and_then(|a| a.config_dir);
+    let (text, record) = summary::run_haiku(kibby::PERSONA, &prompt, dir.as_deref()).await?;
+    sessions.ledger.record_oneshot("kibby", &folder, None, account_id.as_deref(), "kibby", &record);
+    let reply = kibby::tidy(&text);
+    if reply.is_empty() { Err("Kibby had nothing to say".into()) } else { Ok(reply) }
+}
+
 /// A project's servers (references: host, user, key file path, fingerprint, roles; never a key).
 #[tauri::command]
 fn ssh_list(servers: State<'_, ssh::Servers>, project_id: String) -> Vec<ssh::Host> {
@@ -669,7 +686,7 @@ pub fn run() {
             app.manage(backup::SettingsStore::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, cost_rows, set_project_github, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, workflow_list, workflow_save, workflow_delete, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
+        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, cost_rows, set_project_github, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, kibby_say, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, workflow_list, workflow_save, workflow_delete, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

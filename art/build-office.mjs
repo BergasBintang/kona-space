@@ -5,7 +5,7 @@
 //     the rooms with their outlines and name plates for that view, and where the cats sit.
 // to-app.mjs then copies these to the app.
 // And for every view the proof: the parts, put back in order, are exactly the picture, pixel for pixel.
-import { drawOffice, setView, SIZE, roomList, TILE_W, TILE_H, COLS, ROWS, WALL } from "./office.mjs";
+import { drawOffice, setView, SIZE, roomList, TILE_W, TILE_H, COLS, ROWS, WALL, WALK, WALK_STEP } from "./office.mjs";
 import { writeFileSync, mkdirSync, rmSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { inflateSync } from "node:zlib";
@@ -39,7 +39,25 @@ for (const view of [0, 1, 2, 3]) {
   const rooms = roomList();
 
   // ---- the parts. The list is in drawing order and holds the cats too.
-  const { parts } = drawOffice({ parts: true });
+  // Kibby's walk: for every eighth of a tile along every stretch, where his picture goes and where in the list he is drawn (the build checks each step)
+  const stretches = WALK.edges.map(([a, b]) => {
+    const A = WALK.nodes[a], B = WALK.nodes[b], n = Math.round(Math.hypot(B[0] - A[0], B[1] - A[1]) / WALK_STEP);
+    return Array.from({ length: n + 1 }, (_, s) => [A[0] + ((B[0] - A[0]) * s) / n, A[1] + ((B[1] - A[1]) * s) / n]);
+  });
+  const { parts, walk: placed } = drawOffice({ parts: true, probes: stretches.flat() });
+  let at0 = 0;
+  const walkDoc = { nodes: {}, edges: [] };
+  WALK.edges.forEach(([a, b], e) => {
+    const here = placed.slice(at0, at0 + stretches[e].length); at0 += stretches[e].length;
+    const s = here.map((p, n) => {
+      const q = here[Math.min(n + 1, here.length - 1)], r = here[Math.max(n - 1, 0)], dx = n < here.length - 1 ? q.x - p.x : p.x - r.x, dy = n < here.length - 1 ? q.y - p.y : p.y - r.y;
+      return [p.x, p.y, p.k, dy > 0 ? (dx < 0 ? 0 : 1) : dx < 0 ? 2 : 3]; // the look: 0 down-left, 1 down-right, 2 up-left, 3 up-right
+    });
+    walkDoc.nodes[a] ??= [s[0][0], s[0][1], s[0][2]]; walkDoc.nodes[b] ??= [s[s.length - 1][0], s[s.length - 1][1], s[s.length - 1][2]];
+    walkDoc.edges.push({ a, b, s });
+    const bad = here.map((p, n) => ({ p, n })).filter(({ p }) => p.why.length);
+    if (bad.length) console.warn(`CHECK: Kibby on ${a}-${b}, view ${view}: ${bad.length} of ${here.length} steps are wrong, the first at step ${bad[0].n}: ${bad[0].p.why.join("; ")}`);
+  });
   const layout = [];
   for (const p of parts) {
     if (p.cat) { layout.push({ cat: p.cat, x: p.x, y: p.y, d: p.d, dir: p.dir ?? 0 }); continue; }
@@ -48,7 +66,7 @@ for (const view of [0, 1, 2, 3]) {
     layout.push({ f: id, x: p.x, y: p.y, d: p.d, ...(p.hides ? { hides: p.hides } : {}), ...(p.room ? { room: p.room } : {}) });
   }
   const roomsDoc = { view, width: SIZE.w, height: SIZE.h, tile: [TILE_W, TILE_H], tiles: [COLS, ROWS], wallHeight: WALL, content: [x0, y0, x1, y1], rooms };
-  writeFileSync(`out/views/v${view}.json`, JSON.stringify({ ...roomsDoc, cats: cats, parts: layout }));
+  writeFileSync(`out/views/v${view}.json`, JSON.stringify({ ...roomsDoc, cats: cats, walk: walkDoc, parts: layout }));
   // ---- the proof: the parts, put back in order, are exactly the picture (every pixel)
   const again = new Img(SIZE.w, SIZE.h), shown = new Map();
   for (const p of layout) {

@@ -194,9 +194,21 @@ function audit(feet, sorted, getImg, setImg, footprint = true) {
   }
 }
 
+// With parts: true the result is the list of pieces, each as a small picture with its place and depth, the cats among them. With probes (a list of [i, j] on the floor)
+// the result also says, for a walker standing at each, where its picture goes and where in the list it is drawn.
+// Where Kibby, the office boy, walks: a few places on the hall (in tiles: i, j; the middle of the two-tile corridor is the line between its tiles) and the straight
+// stretches between them. The build works out, for every eighth of a tile along a stretch and for every side of the building, where his picture goes and between which
+// pieces of the list it is drawn, and it checks that he never walks through a piece, off the hall, or behind something that should not hide him.
+export const WALK = {
+  nodes: { A: [2, 8], B: [11, 8], C: [21, 8], D: [30, 8], E: [11, 13] },
+  edges: [["A", "B"], ["B", "C"], ["C", "D"], ["B", "E"]],
+};
+export const WALK_STEP = 1 / 8; // a tile is eight steps
+// the feet of Kibby's picture: the picture is 28 x 20, its body 16 x 18 at (6, 2); the bottom row of the body stands on the floor point
+const KIB = { w: 28, h: 20, bx: 6, by: 2, bw: 16, bh: 18, footX: 14, footY: 19, half: 0.3 };
+
 // With cats: true the picture has the cats in it (and the checks run). With cats: false it has none, and the result lists where each cat sits.
-// With parts: true the result is the list of pieces, each as a small picture with its place and depth, the cats among them.
-export function drawOffice({ cats = true, parts = false } = {}) {
+export function drawOffice({ cats = true, parts = false, probes = null } = {}) {
   let img = new Img(SIZE.w, SIZE.h); // transparent: the ground behind it is whatever colour the app uses
   const poly = (pts, c) => img.poly(pts, c);
   const ln = (a, b, c) => img.line(a[0], a[1], b[0], b[1], c);
@@ -390,7 +402,7 @@ export function drawOffice({ cats = true, parts = false } = {}) {
   // ===== the hall =====
   block(13, 6, 2, 1, 4, M.wood, "bench"); plant(12, 5); plant(15, 5); // the bench niche
   piece(26, 5, 1, 1, 0, "water cooler", 20, (L) => { L.b(0.25, 0.25, 0.5, 0.5, 12, M.white); L.b(0.375, 0.375, 0.25, 0.25, 8, M.blue, 12); }); plant(28, 5); // the water cooler niche
-  plant(29, 4); plant(31, 6); plant(0, 7); plant(10, 9); plant(11, 14);
+  plant(29, 4); plant(31, 6); plant(0, 7); plant(10, 14); plant(11, 14);
   rug(3, 7, 6, 1, "#d5c9b2", "#bfb298"); rug(17, 7, 6, 1, "#d5c9b2", "#bfb298");
 
   // ===== the west wing =====
@@ -409,18 +421,18 @@ export function drawOffice({ cats = true, parts = false } = {}) {
   workstation(13, 10, "marketing", "typeA", true);
   piece(15, 12, 2, 1, 0, "meeting table", 8, (L) => L.b(0.125, 0.125, 1.75, 0.75, 8, M.wood));
   [15, 16].forEach((i) => chair(i, 11, 0)); [15, 16].forEach((i) => chair(i, 13, 2));
-  chart(17, 9, 2, 0, [["#d9786a", 7], ["#f3c978", 12], ["#d9786a", 16], ["#f7e1b0", 10]]);
+  chart(17, 10, 2, 0, [["#d9786a", 7], ["#f3c978", 12], ["#d9786a", 16], ["#f7e1b0", 10]]);
   sofa(17, 11, 2, 0, M.rose); block(18, 13, 1, 1, 4, M.wood, "coffee table"); plant(19, 13);
   // --- Content and SEO (20,9): the writing desk, stacks of paper, two shelves
   rug(21, 10, 3, 3, "#f7e9b8", "#b8922a");
   workstation(21, 11, "content", "typeB");
-  [20, 21].forEach((i, n) => shelf(i, 9, 0, n + 1));
+  [20, 21].forEach((i, n) => shelf(i, 13, 2, n + 1)); // against the far wall, so a tall shelf does not hide the hall behind the room
   block(23, 12, 1, 1, 8, M.gold, "paper stack"); block(22, 12, 1, 1, 8, M.wood, "table"); plant(24, 12);
   // --- Support (25,9): the headset desk, a queue desk and a board of tickets
   rug(27, 10, 3, 2, "#c6ece2", "#2f8f7c");
   workstation(27, 10, "support");
   piece(29, 10, 1, 1, 0, "queue desk", 12, (L) => { L.b(0.125, 0.125, 0.75, 0.75, 8, M.wood); L.b(0.25, 0.25, 0.5, 0.25, 4, M.blue, 8); });
-  chart(29, 9, 2, 0, [["#f3c978", 6], ["#8ed8c9", 10], ["#d9786a", 4], ["#7fb1e0", 8]]);
+  chart(30, 10, 2, 0, [["#f3c978", 6], ["#8ed8c9", 10], ["#d9786a", 4], ["#7fb1e0", 8]]);
 
   // ===== the front =====
   // --- Front desk (8,15): the lobby: the desk with a bell, a visitor bench, a rug
@@ -525,18 +537,21 @@ export function drawOffice({ cats = true, parts = false } = {}) {
     order.forEach((n, k) => { sorted[slots[k]] = solids[n]; });
   }
   if (parts) { // every piece on its own: a small picture with its place, in order from back to front. The cats sit in the same list, so the app can draw them between the pieces.
-    const out = [], scratch = new Img(SIZE.w, SIZE.h), keep = img;
-    for (const t of sorted) {
-      if (t.meta) { out.push({ cat: t.meta.role, d: t.depth, x: t.meta.x, y: t.meta.y, dir: t.meta.dir }); continue; }
+    const out = [], scratch = new Img(SIZE.w, SIZE.h), keep = img, outAt = [], boxes = []; // outAt[n]: the place in the list where the n-th of the sorted things starts
+    for (const [n, t] of sorted.entries()) {
+      outAt[n] = out.length;
+      if (t.meta) { out.push({ cat: t.meta.role, d: t.depth, x: t.meta.x, y: t.meta.y, dir: t.meta.dir }); boxes[n] = [t.meta.x, t.meta.y, t.meta.x + FRAME_W, t.meta.y + FRAME_H]; continue; }
       scratch.d.fill(0); img = scratch; t.draw(); img = keep;
       let x0 = SIZE.w, y0 = SIZE.h, x1 = -1, y1 = -1;
       for (let y = 0; y < SIZE.h; y++) for (let x = 0; x < SIZE.w; x++) if (scratch.d[(y * SIZE.w + x) * 4 + 3]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
       if (x1 < 0) continue;
       const crop = new Img(x1 - x0 + 1, y1 - y0 + 1);
       for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const p = scratch.get(x, y); if (p[3]) crop.set(x - x0, y - y0, p); }
+      boxes[n] = [x0, y0, x1 + 1, y1 + 1];
       out.push({ sprite: crop, x: x0, y: y0, d: t.depth, label: t.label, room: t.room, hides: t.hides && t.hides.length ? t.hides : undefined });
     }
-    return { parts: out };
+    outAt[sorted.length] = out.length;
+    return { parts: out, walk: (probes ?? []).map(([i, j]) => placeWalker(i, j, { sorted, out, outAt, boxes, feet })) };
   }
   if (cats) audit(feet, sorted, () => img, (x) => { img = x; }, VIEW === 0);
   sorted.forEach((t) => { if (t.meta && !cats) return; t.draw(); });
@@ -544,6 +559,38 @@ export function drawOffice({ cats = true, parts = false } = {}) {
   if (cats) return { img, cats: [] };
   const found = sorted.filter((t) => t.meta).map((t) => ({ ...t.meta, depth: t.depth }));
   return { img, cats: found.map(({ role, x, y, depth, dir }) => ({ role, x, y, depth, dir })) };
+}
+
+// Kibby standing at (i, j) in the current view: where his picture goes, the place in the list of pieces where he is drawn (between the pieces that lie behind him and the
+// pieces that lie in front of him, as for a cat), how many pixels of his body something drawn after him would cover, and everything that is wrong there.
+function placeWalker(i, j, { sorted, out, outAt, boxes, feet }) {
+  const [px, py] = P(i, j), x = Math.round(px) - KIB.footX, y = Math.round(py) - KIB.footY;
+  const rect = [x + KIB.bx, y + KIB.by, x + KIB.bx + KIB.bw, y + KIB.by + KIB.bh];
+  const [u, v] = rot(i, j), h = KIB.half, K = [u - h, u + h, v - h, v + h], kd = u + v, why = [];
+  const behind = (a, b) => a[1] <= b[0] + 1e-6 || a[3] <= b[2] + 1e-6;
+  let lo = 0, hi = sorted.length;
+  sorted.forEach((t, n) => { // only what overlaps his picture on the screen decides where he goes in the list
+    const b = boxes[n];
+    if (!b || !(b[0] < rect[2] && rect[0] < b[2] && b[1] < rect[3] && rect[1] < b[3])) return;
+    if (t.fp) {
+      const tb = behind(t.fp, K), kb = behind(K, t.fp);
+      if (tb && !kb) lo = Math.max(lo, n + 1); else if (kb && !tb) hi = Math.min(hi, n);
+    } else if (t.depth <= kd) lo = Math.max(lo, n + 1); else hi = Math.min(hi, n);
+  });
+  if (lo > hi) why.push(`no place in the drawing order (after ${sorted[lo - 1].label ?? "a cat"}, before ${sorted[hi].label ?? "a cat"})`);
+  const k = outAt[Math.min(lo, sorted.length)];
+  let covered = 0, coveredBy = "";
+  for (let m = k; m < out.length; m++) { // what is drawn after him and lies over his body
+    const s = out[m].sprite;
+    if (!s) continue;
+    let n = 0;
+    for (let yy = Math.max(rect[1], out[m].y); yy < Math.min(rect[3], out[m].y + s.h); yy++) for (let xx = Math.max(rect[0], out[m].x); xx < Math.min(rect[2], out[m].x + s.w); xx++) if (s.get(xx - out[m].x, yy - out[m].y)[3]) n++;
+    if (n) { covered += n; if (n > 0 && !coveredBy) coveredBy = out[m].label ?? "a piece"; }
+  }
+  if (covered > 20) why.push(`${coveredBy} covers ${covered} pixels of him`);
+  if (![[i - h, j - h], [i + h, j - h], [i - h, j + h], [i + h, j + h], [i, j]].every(([a, b]) => { const d = at(Math.floor(a), Math.floor(b)); return d && group(d) === "hall"; })) why.push("off the hall floor");
+  for (const f of feet) if (i - h < f.i0 + f.wi && f.i0 < i + h && j - h < f.j0 + f.dj && f.j0 < j + h) why.push(`walks through ${f.label}`);
+  return { x, y, k, covered, why };
 }
 
 // The rooms as data, for the app, for the current view: what each is for, the floor outline on the 1x picture (for hover and click), and where the name plate goes:

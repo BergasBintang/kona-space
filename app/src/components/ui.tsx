@@ -4,6 +4,8 @@
 import type { ButtonHTMLAttributes } from "react";
 import catSheet from "../office/cats.png";
 import cats from "../office/cats.json";
+import kibbySheet from "../office/kibby.png";
+import kibby from "../office/kibby.json";
 
 export type GlyphState = "live" | "waiting" | "idle" | "done" | "stopped" | "left";
 
@@ -125,6 +127,20 @@ export const CAT_W = cats.frameWidth, CAT_H = cats.frameHeight, CAT_FRAMES = cat
 export const CAT_SHEET = catSheet;
 /** The row of a role's cat on the sheet. dir: 0 faces down-left (the front), 1 down-right, 2 up-left, 3 up-right. Only called with the roles of the office. */
 export const catRow = (roleId: string, dir = 0) => dir * cats.rows.length + (ROW.get(roleId) ?? 0);
+
+/** Kibby, the office boy, has a sheet of his own: a row for each of his four looks, a column for each frame. */
+export const KIB_SHEET = kibbySheet;
+export const KIB_FRAMES = kibby.frames as string[];
+export const KIB_W = kibby.frameWidth, KIB_H = kibby.frameHeight, KIB_LOOKS = kibby.looks;
+/** His head and shoulders, looking at you, for the dialog. `scale` is a whole number so the pixels stay square. */
+export function KibbyFace({ scale = 5 }: { scale?: number }) {
+  return (
+    <span aria-hidden="true" className="pixel inline-block" style={{
+      width: 16 * scale, height: 14 * scale, backgroundImage: `url(${KIB_SHEET})`, backgroundRepeat: "no-repeat",
+      backgroundSize: `${KIB_W * KIB_FRAMES.length * scale}px ${KIB_H * KIB_LOOKS * scale}px`, backgroundPosition: `${-6 * scale}px ${-2 * scale}px`,
+    }} />
+  );
+}
 
 /** A role is its own cat: the face of that cat from the sprite sheet, drawn at 1x or 2x so the pixels stay square. */
 export function RoleMark({ roleId, size = 28 }: { roleId: string; size?: number }) {

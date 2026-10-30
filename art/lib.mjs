@@ -71,6 +71,12 @@ export class Img {
     for (let y = 0; y < o.h; y++) for (let x = 0; x < o.w; x++) { const s = ((Math.floor(y / n) * this.w) + Math.floor(x / n)) * 4; o.d.set(this.d.subarray(s, s + 4), (y * o.w + x) * 4); }
     return o;
   }
+  // the same picture seen in a mirror
+  flipX() {
+    const o = new Img(this.w, this.h);
+    for (let y = 0; y < this.h; y++) for (let x = 0; x < this.w; x++) { const s = (y * this.w + x) * 4; o.d.set(this.d.subarray(s, s + 4), (y * this.w + (this.w - 1 - x)) * 4); }
+    return o;
+  }
   png() {
     const raw = Buffer.alloc((this.w * 4 + 1) * this.h);
     for (let y = 0; y < this.h; y++) { raw[y * (this.w * 4 + 1)] = 0; Buffer.from(this.d.buffer, y * this.w * 4, this.w * 4).copy(raw, y * (this.w * 4 + 1) + 1); }

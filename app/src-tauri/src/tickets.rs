@@ -262,6 +262,7 @@ pub fn update(dir: &Path, id: &str, p: Patch, who: &str) -> Result<Ticket, Strin
     let mut t = get(dir, id)?;
     let at = now();
     let mut said: Vec<String> = vec![];
+    let mut finished = false;
     if let Some(title) = p.title {
         let title = one_line(&title);
         if title.is_empty() {
@@ -276,7 +277,7 @@ pub fn update(dir: &Path, id: &str, p: Patch, who: &str) -> Result<Ticket, Strin
         if !STATUSES.contains(&s.as_str()) {
             return Err("That is not a column on the board".into());
         }
-        if s != t.status { said.push(format!("moved from {} to {s} by {who}", t.status)); t.status = s; }
+        if s != t.status { finished = s == "done"; said.push(format!("moved from {} to {s} by {who}", t.status)); t.status = s; }
     }
     if let Some(r) = p.role {
         let r = if r.is_empty() { None } else { Some(r) };
@@ -306,7 +307,30 @@ pub fn update(dir: &Path, id: &str, p: Patch, who: &str) -> Result<Ticket, Strin
     t.updated = at.clone();
     for s in said { t.history.push(format!("{at} {s}")); }
     write(dir, &t)?;
+    if finished {
+        release_waiting(dir);
+    }
     Ok(t)
+}
+
+/// The steps of a workflow wait in Backlog for the tickets before them. When a ticket is done (or removed), move the waiting ones that no longer wait for anything
+/// open to Ready, and say so in their history. Only a ticket still in Backlog moves: one the owner already put elsewhere stays where it is.
+pub fn release_waiting(dir: &Path) -> Vec<Ticket> {
+    let all = list(dir);
+    let mut freed = vec![];
+    for t in all.iter().filter(|t| t.status == "backlog" && !t.blocked_by.is_empty()) {
+        if t.blocked_by.iter().all(|b| all.iter().find(|x| &x.id == b).is_none_or(|x| x.status == "done")) {
+            let at = now();
+            let mut t = t.clone();
+            t.status = "ready".into();
+            t.updated = at.clone();
+            t.history.push(format!("{at} moved from backlog to ready: everything it waited for is done"));
+            if write(dir, &t).is_ok() {
+                freed.push(t);
+            }
+        }
+    }
+    freed
 }
 
 /// Record the ticket's own copy of the repo (branch and folder).
@@ -355,7 +379,9 @@ pub fn remove(dir: &Path, id: &str) -> Result<(), String> {
     if !valid_id(id) {
         return Err("That is not a ticket number".into());
     }
-    fs::remove_file(path_of(dir, id)).map_err(|e| format!("Could not remove the ticket: {e}"))
+    fs::remove_file(path_of(dir, id)).map_err(|e| format!("Could not remove the ticket: {e}"))?;
+    release_waiting(dir);
+    Ok(())
 }
 
 /// The paragraph that tells a session which ticket it works on.

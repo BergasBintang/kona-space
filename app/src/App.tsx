@@ -33,7 +33,7 @@ import { localDate, redact } from "./lib/brain/text.ts";
 import { loadZoom, stepZoom } from "./lib/zoom";
 import { checkForUpdate } from "./lib/update";
 import { UpdateCard } from "./components/UpdateCard";
-import { getSettings, earlierSessions, saveNote, wantedRemove, type Earlier } from "./lib/api";
+import { getSettings, earlierSessions, saveNote, wantedRemove, kibbySay, type Earlier } from "./lib/api";
 
 const remembered = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const remember = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* the choice is just not kept */ } };
@@ -221,6 +221,16 @@ export default function App() {
     setCreating(false); setPlace("sessions");
   };
 
+  // Kibby, the office boy, answers through the project's account (a cheap one-shot Haiku call; the talk is not kept).
+  const sayToKibby = async (history: { who: string; text: string }[], message: string) => {
+    if (!project) throw new Error("Open a project first");
+    const accountId = accountOf(project);
+    if (!accountId) throw new Error(NO_ACCOUNT);
+    const status = await accountStatus(accountId);
+    if (!status.logged_in) throw new Error("That account is not signed in. Open Accounts to sign in.");
+    return kibbySay(project.id, accountId, history, message);
+  };
+
   // Ask Claude a question from the Brain: a new session in plan-only mode (it can read, not change), with the question sent at once.
   const askClaude = async (question: string) => {
     if (!project) return;
@@ -277,7 +287,7 @@ export default function App() {
   } else if (adding || !project) {
     content = <AddProject first={!project} accounts={accounts} onDone={added} onCancel={() => setAdding(false)} onOpenAccounts={() => { setAdding(false); setPlace("accounts"); }} />;
   } else if (place === "office") {
-    content = <Office project={project} roles={roles} looks={looks} onOpen={openPlace} onStartRole={startRoleHere} onOpenSession={openSessionHere} onSetup={setSettingUp} />;
+    content = <Office project={project} roles={roles} looks={looks} onOpen={openPlace} onStartRole={startRoleHere} onOpenSession={openSessionHere} onSetup={setSettingUp} onKibbySay={sayToKibby} />;
   } else if (place === "files") {
     content = <Files project={project} />;
   } else if (place === "roles") {
@@ -295,7 +305,7 @@ export default function App() {
   } else if (place === "board") {
     content = <Board project={project} roles={roles} state={state} onStart={startTicket} onOpenSession={(id) => { dispatch({ type: "select", id }); setCreating(false); setPlace("sessions"); }} />;
   } else if (place === "workflows") {
-    content = <Workflows project={project} roles={roles} onOpenBoard={() => setPlace("board")} />;
+    content = <Workflows project={project} roles={roles} onOpenBoard={() => setPlace("board")} onStart={startTicket} />;
   } else if (place === "voice") {
     content = <Voice persona={persona} onChanged={setPersona} />;
   } else if (place === "costs") {

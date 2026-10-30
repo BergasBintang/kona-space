@@ -29,21 +29,29 @@ const CAT = [
   torso("ffffffffff"),
   "..oooooooooooo..",
 ];
-// The cat seen from the four directions the building can turn it (dir): 0 looks down-left and 1 down-right, both a three-quarter view with the face turned
-// to that side; 2 looks up-left and 3 up-right, seen from behind with a cheek and an inner ear showing on the side the head is turned, and the tail on the other.
-const CAT_RIGHT = CAT.slice();
-CAT_RIGHT[4] = head("fffffffddfff"); CAT_RIGHT[5] = CAT_RIGHT[6] = head("fffffeffffef"); CAT_RIGHT[7] = head("fffflllnnllf"); CAT_RIGHT[8] = head("ffffllllllff");
+// The logo keeps the first turned cat: nearly the front, with the face a little to one side.
+const LOGO_RIGHT = CAT.slice();
+LOGO_RIGHT[4] = head("fffffffddfff"); LOGO_RIGHT[5] = LOGO_RIGHT[6] = head("fffffeffffef"); LOGO_RIGHT[7] = head("fffflllnnllf"); LOGO_RIGHT[8] = head("ffffllllllff");
 const flip = (row) => [...row].reverse().join(""); // a row of the picture seen in a mirror (the picture is as wide each side of its middle)
-const CAT_LEFT = CAT_RIGHT.map(flip);
-const BACK_FUR = [head("ffffffffffff"), head("ffffffffffff"), head("ffffffffffff"), head("lffffffffffff".slice(0, 12)), head("llffffffffff"), head("lllfffffffff")];
-const backOf = (turn) => {
-  const rows = [
-    "..oo........oo..", ".offo......offo.", turn === "L" ? CAT[2].replace(/p(?=o\.$)/, "f") : CAT[2].replace("p", "f"), ...BACK_FUR,
-    "..oooooooooooo..", "...o" + "tttttttt" + "o...", torso("ffffffffff"), torso("ffffffffff"), torso("ffffffffff"), torso("dffffffffd"), torso("ffffffffff"), torso("ffffffffff"), "..oooooooooooo..",
-  ];
-  return turn === "L" ? rows : rows.map((r, n) => (n >= 3 && n <= 8 ? flip(r) : n === 2 ? r : r));
-};
-const LOOKS = [CAT_LEFT, CAT_RIGHT, backOf("L"), backOf("R")];
+const LOGO_LOOK = LOGO_RIGHT.map(flip);
+
+// The cat seen from the four directions the building can turn it (dir). Two looks are drawn, the other two are their mirror images (the whole frame is mirrored,
+// so the card and the raised paw change sides too). 0 looks down-left: a three-quarter view with the eyes, the muzzle and the belly turned to the left, light from
+// the left so the right cheek and flank are in shade. 2 looks up-left: seen from behind, with the left cheek and the inside of the left ear showing. 1 and 3 are 0 and 2 mirrored.
+export const TURNED = [
+  "..oo........oo..", ".offo......ofdo.", ".opffoooooopfdo.",
+  head("fffffffffffd"), head("fffddfffffdd"), head("feffffefffdd"), head("feffffefffdd"), head("fllnnllfffdd"), head("fflllllfffdd"),
+  "..oooooooooooo..", "...o" + "tttttttt" + "o...",
+  torso("fllllllfdd"), torso("fllllllfdd"), torso("fllllllfdd"), torso("dllllllfdd"), torso("fllllllfdd"), torso("ffffffffdd"), "..oooooooooooo..",
+];
+export const BEHIND = [
+  "..oo........oo..", ".offo......ofdo.", ".opffooooooffdo.",
+  head("fffffffffffd"), head("ffffffffffdd"), head("ffffffffffdd"), head("lfffffffffdd"), head("llffffffffdd"), head("lllfffffffdd"),
+  "..oooooooooooo..", "...o" + "tttttttt" + "o...",
+  torso("ffffffffdd"), torso("ffffffffdd"), torso("ffffffffdd"), torso("dfffffffdd"), torso("ffffffffdd"), torso("ffffffffdd"), "..oooooooooooo..",
+];
+const LOOKS = { 0: TURNED, 2: BEHIND, logo: LOGO_LOOK };
+export const TAIL = [[14, 17], [15, 17], [15, 16], [15, 15], [15, 14], [14, 14]]; // up behind the body on the right, inside the cat's 16 x 18 (x counted from CX)
 export const DIRS = 4;
 
 // Every role is its own cat: a coat, a collar, eye colour, and sometimes patches. Coordinates are inside the 16 x 18 cat.
@@ -65,7 +73,7 @@ export const SKINS = {
   secretary: { name: "white cat", f: "#f4efe5", d: "#cfc6b4", l: "#ffffff", collar: "#d9604f", eye: "#5aa7e0", ear: "#f0a8a0" },
 };
 const baseCache = {};
-function baseCat(role, dir = 0) {
+function baseCat(role, dir = 0) { // dir is 0, 2 or "logo"
   const key = role + dir;
   if (baseCache[key]) return baseCache[key];
   const s = SKINS[role];
@@ -110,9 +118,9 @@ export const ROLES = [
 
 export const FRAMES = ["idle", "blink", "typeA", "typeB", "waitA", "waitB", "happy"];
 export const FRAME_W = 28, FRAME_H = 20;
-const CX = 6, CY = 2;
+export const CX = 6, CY = 2;
 
-function layer(fur, c = PAL.f) {
+export function layer(fur, c = PAL.f) {
   const l = new Img(FRAME_W, FRAME_H);
   fur.forEach(([x, y]) => l.set(x, y, c));
   l.outline(PAL.o);
@@ -129,13 +137,14 @@ function card(role) {
   c.blit(icon(role), 1, 1);
   return (cardCache[role] = c);
 }
-const hand = (x, y, c) => { const l = new Img(FRAME_W, FRAME_H); l.rect(x, y, 2, 1, c); l.rect(x, y + 1, 2, 1, PAL.o); return l; };
+export const hand = (x, y, c) => { const l = new Img(FRAME_W, FRAME_H); l.rect(x, y, 2, 1, c); l.rect(x, y + 1, 2, 1, PAL.o); return l; };
 
 export function cat(role, frame, dir = 0) {
+  if (dir % 2 === 1) return cat(role, frame, dir - 1).flipX();
   const img = new Img(FRAME_W, FRAME_H);
-  const fur = SKINS[role].f, back = dir >= 2;
+  const fur = SKINS[role].f, back = dir === 2;
   img.blit(baseCat(role, dir), CX, CY);
-  const eyes = dir === 1 ? [7, 12] : [3, 8]; // the columns of the two eyes (rows 5 and 6) of a face turned to the right, and to the left
+  const eyes = [3, 8]; // the columns of the two eyes (rows 5 and 6), the near one first
   const eye = (x, y, c) => img.set(CX + x, CY + y, c);
   const skin = (x, y) => img.get(CX + x + (x === eyes[0] ? 1 : -1), CY + y); // the fur beside an eye, on the side of the face
   if (!back && frame === "blink") eyes.forEach((x) => eye(x, 5, skin(x, 5)));
@@ -144,10 +153,8 @@ export function cat(role, frame, dir = 0) {
   if (!back && frame === "typeB") { img.blit(hand(CX + 5, CY + 13, fur), 0, 0); img.blit(hand(CX + 9, CY + 12, fur), 0, 0); }
   if (frame === "waitA") img.blit(layer([[CX + 14, 9], [CX + 15, 9], [CX + 14, 10], [CX + 15, 10], [CX + 14, 11], [CX + 15, 11], [CX + 14, 12], [CX + 14, 13]], fur), 0, 0);
   if (frame === "waitB") img.blit(layer([[CX + 15, 8], [CX + 16, 8], [CX + 15, 9], [CX + 16, 9], [CX + 15, 10], [CX + 16, 10], [CX + 15, 11], [CX + 14, 12], [CX + 14, 13]], fur), 0, 0);
-  if (back) { // from behind: no card, a tail on one side
-    img.blit(layer(dir === 2 ? [[CX + 15, 17], [CX + 16, 17], [CX + 16, 16]] : [[CX, 17], [CX - 1, 17], [CX - 1, 16]], fur), 0, 0);
-    return img;
-  }
+  img.blit(layer(TAIL.map(([x, y]) => [CX + x, CY + y]), fur), 0, 0);
+  if (back) return img; // from behind: no card
   img.blit(card(role), 0, 9);
   img.blit(layer([[7, 13], [7, 14]], fur), 0, 0);
   return img;
@@ -161,4 +168,4 @@ export function sheet() {
 }
 
 // the cat alone, 16 x 18, without the card or the paw: for the logo and the small faces
-export const catBody = (role) => baseCat(role);
+export const catBody = (role) => baseCat(role, "logo");

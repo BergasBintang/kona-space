@@ -110,6 +110,8 @@ export const listWorkflows = (folder: string) => invoke<Workflow[]>("workflow_li
 export const saveWorkflow = (folder: string, workflow: Workflow) => invoke<Workflow>("workflow_save", { folder, workflow });
 export const deleteWorkflow = (folder: string, id: string) => invoke<void>("workflow_delete", { folder, id });
 export const startWorkflow = (folder: string, workflow: Workflow) => invoke<Ticket[]>("workflow_start", { folder, workflow });
+/** One reply from Kibby, the office boy (a cheap Haiku call with no tools). `history` is what was said before; the new `message` is not in it. */
+export const kibbySay = (projectId: string, accountId: string, history: { who: string; text: string }[], message: string) => invoke<string>("kibby_say", { projectId, accountId, history, message });
 export const skillCatalog = (folder: string) => invoke<SkillInfo[]>("skill_catalog", { folder });
 export const computerSkills = (accountId: string | null, folder: string) => invoke<SkillInfo[]>("computer_skills", { accountId, folder });
 export const importSkill = (accountId: string | null, folder: string, name: string) => invoke<SkillInfo>("import_skill", { accountId, folder, name });

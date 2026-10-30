@@ -1,0 +1,14 @@
+{
+  "frameWidth": 28,
+  "frameHeight": 20,
+  "frames": [
+    "idle",
+    "blink",
+    "walkA",
+    "walkB",
+    "walkC",
+    "walkD",
+    "happy"
+  ],
+  "looks": 4
+}

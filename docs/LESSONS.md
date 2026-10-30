@@ -14,6 +14,7 @@ Plain words are used on purpose. Terms are explained the first time.
 | The office plan (rooms, doors, furniture, windows) | `art/office.mjs` (`DEFS` at the top is the floor plan) |
 | The walls, drawn as one structure | `art/walls.mjs` |
 | The cat in four looks | `art/cat.mjs` |
+| Kibby, the office boy (his art, his route, his talk) | `art/kibby.mjs`, `WALK` in `art/office.mjs`, `app/src/lib/kibby.ts`, `app/src/components/KibbyChat.tsx`, `app/src-tauri/src/kibby.rs` |
 | Build the pictures | `cd art`, then `node build-cats.mjs`, `node build-office.mjs`, `node to-app.mjs` |
 | What the app reads | `app/src/office/` (`views/v0..v3.json`, `parts/*.png`, `cats.png`, `cats.json`) |
 | The office on screen | `app/src/components/Office.tsx` |
@@ -86,11 +87,23 @@ A `CHECK:` line is a problem to fix, not noise. A clean build prints none. They 
 
 - 28 x 20 frame, a 16 x 18 body, seven frames (idle, blink, typeA, typeB, waitA, waitB, happy), eleven roles, four looks.
 - The sheet has a block of rows per look: row = `dir * 11 + roleIndex`. In the app: `catRow(role, dir)`. `cats.json` has `dirs: 4`.
-- Looks: 0 down-left (face turned left), 1 down-right (face turned right), 2 up-left and 3 up-right (from behind, with a cheek and an inner ear showing on the side the head turns, the tail on the other side). From behind there is no card and no typing hands.
+- Looks: 0 down-left, 1 down-right, 2 up-left, 3 up-right. **Only two are drawn** (`TURNED` and `BEHIND` in `cat.mjs`); 1 and 3 are the whole frame mirrored (`Img.flipX()`), so the card and the raised paw swap sides with them. Look 0 is a three-quarter view: eyes, muzzle and belly turned left, light from the left so the right cheek and flank are in shade (`d`), a tail curling up on the right. Look 2 is from behind, the left cheek and the inside of the left ear showing. From behind there is no card and no typing hands. Draw a change once, in one of the two, never in a mirrored one.
+- The logo keeps its own look (`LOGO_LOOK`, the older nearly-front cat) so a change to the cats does not move the logo and the app icon. `catBody()` returns that one.
 - The look a cat gets comes from its workstation's facing and the camera side (`workstation()` in `office.mjs`).
-- A latent bug fixed on the way: the right eye never blinked. The cat sprite is still a first version drawn by script. When you want it nicer, redraw it in LibreSprite and keep the sheet layout above.
+- A latent bug fixed on the way: the right eye never blinked. The cat is drawn by script (letters in rows, one letter per pixel). A hand-drawn version in LibreSprite would be nicer; keep the sheet layout above (frame size, frame order, `row = dir * 11 + roleIndex`). Checking a change: `node build-cats.mjs`, then look at the sheet at 7x on the floor colour, all frames (idle, blink, typing, waving, happy), all four looks, not only idle.
 
-### 2.9 How to handle a glitch you send me
+### 2.9 Kibby, the office boy (added after 0.22.0)
+
+- **What he is:** a cat in an apron who walks the hall and talks about anything. He is **not a role** (no desk, no session, no tools, no project knowledge). His sheet is `out/kibby.png` (28 x 20 frames like the cats; a row per look, a column per frame: idle, blink, walkA, walkB, walkC, walkD, happy). Like the cats, only looks 0 and 2 are drawn; 1 and 3 are mirrors. The walk is a **hop of 2 px and a lean of 1 px of the top 12 rows**, one way, then the other (walkA hop + lean left, walkB landing, walkC hop + lean right, walkD landing). To change it, change `WALK` (hop, lean) in `kibby.mjs`.
+- **His route** is `WALK` in `art/office.mjs`: places (nodes) on the hall and straight stretches (edges) between them, in tiles; the corridor's middle is the line between its two tile rows (j = 8). The build turns every eighth of a tile of every stretch, for every side, into a step `[x, y, k, look]` in `views/vN.json` under `walk`. `k` is the place in the list of pieces where he is drawn.
+- **Depth, the part that must not go wrong:** `placeWalker()` in `office.mjs` finds `k` the way the cats are ordered. Among the pieces whose picture overlaps his, a piece wholly behind him must be drawn before him and a piece wholly in front of him after him; if both hold at once there is no place, which is a CHECK line. It also counts the pixels of his body that anything drawn after him would cover (more than 20 is a CHECK line, the cats' rule), refuses a step off the hall floor and one that walks through a piece. Read the `CHECK: Kibby on ...` lines after every build, like the others. Zero lines today.
+- **What was fixed to make his route clean:** the plant at (10, 9) moved to (10, 14), the two shelves of Content and SEO moved from the wall next to the hall to the far wall, the two standing boards of Marketing and Support moved one tile into their rooms (they hid the hall behind them from two sides). A tall piece standing against the wall next to the hall hides the corridor from the sides where the room is in front: keep such pieces away from the hall wall, or move the route.
+- **On screen** (`Office.tsx`, component `Living`): his own clock, 8 steps a second (`TICK_MS` in `lib/kibby.ts`); at a place he stands 2 to 6 seconds, then picks a stretch that starts there (not straight back unless it is the only way). He stops while a room is zoomed (and is hidden), while you talk to him, and with Windows "reduce motion" (he then stands at one place). A click box over him opens the dialog; hover shows his name. The walking logic is plain functions in `lib/kibby.ts`, tested in `lib/kibby.test.ts`.
+- **His talk** (`KibbyChat.tsx`, `kibby.rs`): a dialog like an old role-playing game (a name tab, his face, text typed letter by letter, a click or "reduce motion" shows it at once). He starts with a plain "Hi!". Each message is **one one-shot Haiku call** with no tools (`summary::run_haiku`), his character as the system prompt (`PERSONA` in `kibby.rs`: kind, a little shy, quirks, kind gossip about the eleven role cats, cannot read or change anything, short plain replies, no markdown) and the last 12 turns in the prompt. The talk is on screen only. The call uses the project's account, and its dollars go in the ledger under the kind `kibby`. **Not measured yet:** the cost and the delay of one message on this PC.
+- **To change his character:** edit `PERSONA` in `kibby.rs` (the test `the_character_says_what_he_cannot_do` checks two promises in it). **To give him a longer memory or save the talk:** the history is passed from the screen; keep 12 turns unless the cost is measured.
+- **Turning the building is locked while a room is zoomed** (the two buttons are disabled with a short hint); go back first.
+
+### 2.10 How to handle a glitch you send me
 
 1. A crop of the picture is enough, but **say which side** (first, or after pressing a turn button). Most glitches are in the rotated sides.
 2. I rebuild, then look at the same place in all four views at 4x to 8x (a crop with a few features: a rug colour, a plant, a wall end, a chair, is enough to find the place).
@@ -136,9 +149,9 @@ Keep the page to short words; put every full explanation behind a "?" (`Help`). 
 - **Rules:** a step may only come after steps listed before it (so no loops); up to 20 steps; ids are small letters, digits and dashes.
 - **Start:** raises one Board ticket per step. A step with something before it is Backlog and has `blocked_by` (the earlier tickets); the card says "Waits for ...". We chose `blocked_by` over a second "waiting" state so the Board keeps one meaning of "waiting" (waiting on the owner).
 - **Starters:** New feature, Bug fix and Launch are suggestions until you save your own.
+- **A waiting step becomes Ready by itself (added after 0.22.0).** `tickets::release_waiting` runs when a ticket is moved to Done and when one is removed: every ticket still in Backlog whose `blocked_by` tickets are all done (or no longer exist) moves to Ready, with a line in its history. A ticket the owner already moved elsewhere is left alone. Agents still cannot move a ticket to Done, so only the owner starts a chain going. Tests are in `workflows.rs`.
+- **"Running now" on the Workflows screen:** lists the open tickets of the opened workflow (status in words, what each waits for) and gives every Ready step a "Start as <role>" button that starts the role session on that ticket, the same code as the Board's button. **It does not start a session on its own, by choice:** a session spends the owner's plan and can change files, so the owner presses the button. If you later want auto-start, make it a per-workflow switch that is off by default.
 - **Not done yet, and how to tackle it:**
-  - *A step starts a role session by itself.* Decide first whether it may start alone or only suggest (decision 54 asked this). Safest: a "Start this step" button on the ticket that opens the role session with the ticket text.
-  - *A ticket moves by itself when what it waits for is done.* Do it in the Board: when a ticket is moved to Done, for each ticket blocked by it that has nothing else open, move Backlog to Ready (and say so in its history). Keep the agent rule that an agent can never move a ticket to Done.
   - *Roles read only the steps they are part of.* Add the steps of a ticket's workflow to the ticket prompt (`tickets::prompt_for`).
   - *Chart lines that skip a column pass behind a box.* Route them around (add a lane) if it starts to confuse.
 
@@ -185,8 +198,10 @@ Keep the page to short words; put every full explanation behind a "?" (`Help`). 
 | Open | How to tackle it |
 |---|---|
 | Room layout on whole tiles | You said you will report what looks wrong. When you do: say the side and send a crop; I fix the rule, then check all four sides. Growing a room means editing `DEFS`; then rerun the build, read every `CHECK:`, check there is no short tall-wall stub, and look at all four sides. |
-| Cat looks | Good enough as a first version. For a nicer cat, redraw in LibreSprite and keep the sheet layout (section 2.8). |
+| Cat looks | Redrawn after 0.22.0 as a true three-quarter view with shading and a tail (section 2.8); still drawn by script. A hand-drawn LibreSprite cat can replace it, keeping the sheet layout. |
 | Real window | Done once for 0.22.0 on 2026-10-30, with your Kona closed: all 19 smoke checks passed (welcome page, office, every place including Workflows, no content-policy blocks), and a short extra check showed the turn buttons change and remember the side, the Workflows screen has its three suggestions and its chart, and the top bar shows v0.22.0. Run it again after each release (section 6.3). |
-| Workflow follow-ups | Section 4. |
+| Workflow follow-ups | Left: roles reading only their own steps, chart lines that skip a column, an optional auto-start. Section 4. |
+| Kibby inside the rooms | He walks the hall only. Rooms need their own ordering checks (furniture, desks); extend `WALK` with a door and a few steps inside, then read the CHECK lines. |
+| Kibby's talk, measured | Measure the cost and the delay of a message, then decide on a longer memory or a saved talk. |
 | Decor on every wall | Windows are on all outer walls; art boards only on three. Add more through the `ART` list in `office.mjs`. |
 | Workflows and the Board in the office | A room may later show a "Workflows" tag of its own; today the Board room opens both. |

@@ -2,6 +2,16 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.23.0, 2026-10-30
+
+Kibby, the office boy, walks the hall and talks. Plus workflows that move on by themselves, better cats, and a turn lock while a room is zoomed.
+
+- **Kibby, the office boy.** A new character: a caramel cat in a blue apron who walks the hall with a small hop and a small lean. Click him to talk about anything. He is not a role: no desk, no session, no tools and no knowledge of your project. Each message is one cheap Haiku call on the project's account, and what it costs goes in the Costs list. He starts with "Hi!", and what he says types out letter by letter. He stands still while a room is zoomed or while you talk, and when Windows "reduce motion" is on.
+- While a room is zoomed in, the building cannot be turned (the two buttons are off until you go back to the office).
+- Two standing boards, two shelves and a plant moved a little so nothing hides the hall.
+- **Workflows move on.** When a ticket is moved to Done (or removed), the steps of a workflow that waited only for it move from Backlog to Ready by themselves, and the ticket history says so. The Workflows screen shows "Running now": the open tickets of the workflow, what each waits for, and a "Start as <role>" button on each Ready step. Kona still never starts a session unasked.
+- **Better cats.** Look 0 is a true three-quarter view (eyes, muzzle and belly turned, shaded on the far side, a tail), look 2 is from behind, and the two right-hand looks are their mirror images.
+
 ## 0.22.0, 2026-10-30
 
 Workflows: the usual steps of a kind of work, drawn as a flowchart and turned into Board tickets. Plus a tidier Set up window, formatted text and better cats.

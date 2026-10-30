@@ -1,7 +1,7 @@
 // Roles: the setup of a session (decision 9, feature F5). The list of roles is fixed (decision 43): the owner cannot add or remove one.
 // Since decision 50 each role can be set up: its personality, its brief, its model and permission mode. These are the same in every project and are
 // kept in %APPDATA%\Kona\role-profiles.json; a role that was never set up simply has the starting values below. The skills and tool connectors a role
-// may use belong to a project, not to the role (decision 51, see skills.rs). (The old %APPDATA%\Kona\roles.json is not read; ticket T-0003 decides about it.)
+// may use belong to a project, not to the role (decision 51, see skills.rs). (The old %APPDATA%\Kona\roles.json is not read or written; an old copy of it can be deleted.)
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;

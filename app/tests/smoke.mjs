@@ -22,6 +22,7 @@ ok('the welcome page is drawn', await c.waitFor(`document.body.innerText.include
 ok('a project card opens', await c.waitFor(`[...document.querySelectorAll('button')].some((x) => x.textContent.trim() === 'Open' && !x.disabled)`, 15000, 200) && await click('Open'));
 ok('the top bar is drawn', await c.waitFor(`!!document.querySelector('header')`, 15000, 200));
 ok('the office is drawn with its rooms', await c.waitFor(`document.querySelectorAll('svg polygon[role=button]').length >= 15`, 15000, 200));
+ok('Kibby, the office boy, is in the office', await c.waitFor(`!!document.querySelector('button[aria-label^="Talk to Kibby"]')`, 10000, 200));
 for (const place of ['Sessions', 'Board', 'Workflows', 'Worktrees', 'Brain', 'Files', 'Leftovers', 'Costs', 'Roles', 'Voice', 'Servers', 'Accounts', 'Settings', 'Office']) {
   const went = await goTo(place);
   await c.sleep(900);

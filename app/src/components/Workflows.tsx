@@ -1,8 +1,10 @@
 // Workflows: the usual steps of one kind of work (a feature, a fix, a launch), each step owned by a role, drawn as a flowchart and editable.
 // The chart is the plan, never the state: "Start" raises one Board ticket per step (a step that comes after another waits for its ticket), and the Board
 // stays the one place that shows where the work stands. Saving also writes a Brain note with the steps in words. Files: `.kona/workflows/<id>.json`.
+// Under the chart, "Running now" lists the open tickets of the workflow: the core moves a waiting step to Ready by itself when what it waits for is done,
+// and a Ready step has a button that starts its role's session (the owner presses it; Kona never starts a session unasked, it costs plan and can change files).
 import { useEffect, useMemo, useState } from "react";
-import { deleteWorkflow, listWorkflows, saveWorkflow, startWorkflow, type Project, type Role, type Step, type Workflow } from "../lib/api";
+import { deleteWorkflow, listTickets, listWorkflows, saveWorkflow, startWorkflow, type Project, type Role, type Step, type TicketView, type Workflow } from "../lib/api";
 import { Button, Glyph, RoleMark } from "./ui";
 import { Help } from "./Help";
 
@@ -55,10 +57,59 @@ function Chart({ steps, roles, pick, onPick }: { steps: Step[]; roles: Role[]; p
   );
 }
 
+const WORDS: Record<string, string> = { backlog: "Waiting", ready: "Ready", "in-progress": "In progress", review: "In review" };
+
+/** The open tickets of one workflow, with a button for each step that is ready. */
+function Running({ project, workflowId, roles, onStart, onOpenBoard }: { project: Project; workflowId: string; roles: Role[]; onStart: (t: TicketView) => Promise<void>; onOpenBoard: () => void }) {
+  const [tickets, setTickets] = useState<TicketView[]>([]);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    const load = () => listTickets(project.id).then((t) => { if (live) setTickets(t); }).catch(() => {});
+    setTickets([]); setError(null); load();
+    const timer = setInterval(load, 2000);
+    return () => { live = false; clearInterval(timer); };
+  }, [project.id, workflowId]);
+  const mine = tickets.filter((t) => t.workflow === workflowId);
+  const open = mine.filter((t) => t.status !== "done");
+  if (mine.length === 0) return null;
+  const go = async (t: TicketView) => { setBusyId(t.id); setError(null); try { await onStart(t); } catch (e) { setError(String(e)); } setBusyId(null); };
+  return (
+    <section className="flex flex-col gap-2 border border-line-subtle bg-surface-1 p-3" aria-label="Running now">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="m-0 text-[15px] leading-6 font-bold">Running now</h2>
+        <Help title="Running now">
+          <p className="m-0">These are the open tickets of this workflow. When you move a ticket to Done on the Board, the steps that were waiting only for it move to Ready by themselves.</p>
+          <p className="m-0">Kona does not start a session by itself: a session uses your plan and can change files. A Ready step has a button, and you press it when you want that role to begin.</p>
+        </Help>
+        <span className="text-[13px] leading-5 text-text-tertiary">{mine.length - open.length} of {mine.length} done</span>
+        <span className="flex-1" />
+        <Button variant="quiet" small onClick={onOpenBoard}>Open the Board</Button>
+      </div>
+      {open.length === 0 && <p className="m-0 text-[14px] leading-5 text-text-secondary">Everything is done.</p>}
+      {open.map((t) => {
+        const role = roles.find((r) => r.id === t.role);
+        const waits = t.blocked_by.filter((b) => mine.some((x) => x.id === b && x.status !== "done"));
+        return (
+          <div key={t.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line-subtle pt-2 first:border-t-0 first:pt-0">
+            {t.role && <RoleMark roleId={t.role} size={20} />}
+            <span className="font-mono text-[13px] text-text-tertiary">{t.id}</span>
+            <span className="min-w-0 flex-1 text-[14px] leading-5 font-bold">{t.title.includes(": ") ? t.title.slice(t.title.indexOf(": ") + 2) : t.title}</span>
+            <span className="text-[13px] leading-5 text-text-secondary">{WORDS[t.status] ?? t.status}{waits.length > 0 ? `, waits for ${waits.join(", ")}` : ""}</span>
+            {t.status === "ready" && role && <Button small onClick={() => void go(t)} disabled={busyId !== null}>{busyId === t.id ? "Starting…" : `Start as ${role.name}`}</Button>}
+          </div>
+        );
+      })}
+      {error && <p role="alert" className="m-0 flex items-start gap-2 text-[14px] leading-5 font-bold text-state-left"><Glyph state="left" size={16} />{error}</p>}
+    </section>
+  );
+}
+
 const slug = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 36);
 const fresh = (steps: Step[]) => { let n = steps.length + 1; while (steps.some((s) => s.id === `step-${n}`)) n++; return `step-${n}`; };
 
-export function Workflows({ project, roles, onOpenBoard }: { project: Project | null; roles: Role[]; onOpenBoard: () => void }) {
+export function Workflows({ project, roles, onOpenBoard, onStart }: { project: Project | null; roles: Role[]; onOpenBoard: () => void; onStart: (t: TicketView) => Promise<void> }) {
   const [list, setList] = useState<Workflow[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Workflow | null>(null);
@@ -128,6 +179,7 @@ export function Workflows({ project, roles, onOpenBoard }: { project: Project | 
         <Help title="Workflows">
           <p className="m-0">A workflow is the usual list of steps for one kind of work, with a role on each step. A step that comes after another waits for it.</p>
           <p className="m-0">It is a plan, not a status. Press Start and Kona raises one ticket on the Board for each step; the Board then shows where each piece stands.</p>
+          <p className="m-0">When a ticket is done, the steps that waited for it become Ready by themselves, and "Running now" gives each one a button to start its role.</p>
           <p className="m-0">Saving also writes a note in the Brain, so the steps can be found by asking. The file lives in this project's .kona folder.</p>
         </Help>
         <span className="flex-1" />
@@ -158,6 +210,8 @@ export function Workflows({ project, roles, onOpenBoard }: { project: Project | 
               </div>
 
               <Chart steps={draft.steps} roles={roles} pick={pick} onPick={setPick} />
+
+              <Running project={project} workflowId={draft.id} roles={roles} onStart={onStart} onOpenBoard={onOpenBoard} />
 
               <div className="flex flex-wrap items-center gap-2">
                 <Button variant="quiet" small onClick={addStep} disabled={draft.steps.length >= 20}>+ Add a step</Button>

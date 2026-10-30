@@ -299,4 +299,47 @@ mod tests {
         assert_eq!(ship.workflow, "new-feature");
         let _ = fs::remove_dir_all(&p);
     }
+
+    fn done(dir: &Path, id: &str) {
+        tickets::update(dir, id, tickets::Patch { status: Some("done".into()), ..Default::default() }, "the owner").unwrap();
+    }
+
+    #[test]
+    fn a_step_moves_to_ready_when_everything_it_waits_for_is_done() {
+        let p = temp("release");
+        let made = start(&p, starters().remove(0), "the owner").unwrap();
+        let dir = tickets::dir(&p);
+        let status = |id: &str| tickets::get(&dir, id).unwrap().status;
+        done(&dir, &made[0].id);
+        assert_eq!(status(&made[1].id), "ready");
+        assert_eq!(status(&made[2].id), "ready"); // both wait only for the brief
+        assert_eq!(status(&made[3].id), "backlog"); // still waits for the design
+        assert!(tickets::get(&dir, &made[1].id).unwrap().history.last().unwrap().contains("everything it waited for is done"));
+        done(&dir, &made[1].id);
+        assert_eq!(status(&made[3].id), "ready");
+        // a step that waits for two tickets moves only when both are done
+        done(&dir, &made[3].id);
+        assert_eq!(status(&made[4].id), "backlog"); // the tests wait for the screens and the back end
+        done(&dir, &made[2].id);
+        assert_eq!(status(&made[4].id), "ready");
+        assert_eq!(status(&made[5].id), "ready");
+        done(&dir, &made[4].id);
+        assert_eq!(status(&made[6].id), "backlog");
+        done(&dir, &made[5].id);
+        assert_eq!(status(&made[6].id), "ready");
+        let _ = fs::remove_dir_all(&p);
+    }
+
+    #[test]
+    fn a_step_the_owner_moved_on_is_left_where_it_is_and_a_removed_ticket_holds_nothing_up() {
+        let p = temp("release2");
+        let made = start(&p, starters().remove(0), "the owner").unwrap();
+        let dir = tickets::dir(&p);
+        tickets::update(&dir, &made[1].id, tickets::Patch { status: Some("review".into()), ..Default::default() }, "the owner").unwrap();
+        done(&dir, &made[0].id);
+        assert_eq!(tickets::get(&dir, &made[1].id).unwrap().status, "review");
+        tickets::remove(&dir, &made[1].id).unwrap();
+        assert_eq!(tickets::get(&dir, &made[3].id).unwrap().status, "ready"); // the screens waited only for the design, which is removed
+        let _ = fs::remove_dir_all(&p);
+    }
 }

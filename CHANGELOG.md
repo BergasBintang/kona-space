@@ -2,6 +2,13 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.24.1, 2026-10-31
+
+Two fixes for the sheet of 0.24.0.
+
+- **No jump when a page slides in.** The whole app jumped up for a moment while the sheet slid up (the top bar vanished), because the sheet took the keyboard focus while still below the screen. It no longer scrolls the page, and its holder clips what sticks out.
+- **Wider space between letters in the pixel font**, so "Launch" reads as "Launch" and not "Launoh" ("Bug Fix" stays clear). It is a little wider than in 0.24.0, so a tight label may now be cut off; tell me where.
+
 ## 0.24.0, 2026-10-31
 
 Pages open in a sheet that slides up over the office. Plus a plainer top bar, a grey Kibby, a street door and cleaner furniture.

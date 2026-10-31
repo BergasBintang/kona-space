@@ -343,7 +343,7 @@ export default function App() {
       <TopBar project={project} onHome={() => leave(() => { setAdding(false); setGreeted(false); })} place={place}
         onPlace={(p) => leave(() => { setAdding(false); setPlace(p); })} attention={attention} leftBehind={leftTotal} plan={state.plans[current?.accountId ?? accountOf(project) ?? lastAccount]}
         limitLine={persona.enabled ? persona.lines.limit : PLAIN_LINES.limit} accountLabel={project ? accounts.find((a) => a.id === (current?.accountId ?? accountOf(project)))?.label ?? null : null} version={version} />
-      <div className="relative flex min-h-0 min-w-0 flex-1">
+      <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
         {content}
         {sheet}
         {settingUp && project && roles.some((r) => r.id === settingUp) && (

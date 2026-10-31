@@ -36,8 +36,8 @@ export function Sheet({ title, subtitle, tabs, active, onTab, onClose, guard, ch
   }, []);
   useEffect(() => { // the keyboard starts inside the sheet, and goes back to the room it came from
     const was = document.activeElement as HTMLElement | SVGElement | null;
-    root.current?.focus();
-    return () => { if (was && document.contains(was)) was.focus?.(); };
+    root.current?.focus({ preventScroll: true }); // without this the browser scrolls the whole app up to show the sheet while it is still sliding in from below
+    return () => { if (was && document.contains(was)) was.focus?.({ preventScroll: true }); };
   }, []);
 
   const tab = (id: string) => { if (id !== active) leave(() => onTab?.(id)); };

@@ -47,8 +47,8 @@ html, body, #root { height: 100%; }
 html, body { overflow: hidden; }
 #root { overflow: clip; }
 /* The pixel font is drawn on a tight grid: at small sizes neighbouring letters touch and read as one ("Bug Fix" as "Bug Ax", "Launch" as "Launoh").
-   A little extra space between letters (about 1 px at 16 px) keeps each one apart; it is inherited by what sits inside a button. */
-h1, h2, h3, h4, button, summary, legend, .font-pixel { font-family: var(--font-pixel); letter-spacing: 0.06em; }
+   A little extra space between letters (about 1.6 px at 16 px) keeps each one apart; it is inherited by what sits inside a button. */
+h1, h2, h3, h4, button, summary, legend, .font-pixel { font-family: var(--font-pixel); letter-spacing: 0.1em; }
 .font-mono { letter-spacing: normal; } /* code and paths keep their own spacing, even inside a button */
 body {
   margin: 0;

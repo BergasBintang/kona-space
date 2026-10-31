@@ -1,0 +1,187 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { STANDARD, CAT_ROLES, checkMap, parseMap } from "./map.ts";
+import { buildScene } from "./engine/scene.ts";
+import { KINDS, footprintOf } from "./engine/furniture.ts";
+import { Iso } from "./engine/iso.ts";
+import { addAttach, faceAt, growMap, moveObject, newObject, objectAt, paintFloor, placeObject, removeAttach, setParam, setWall, trimMap, turnObject, deleteObject } from "./edit.ts";
+import type { OfficeMap } from "./engine/types.ts";
+
+const text = (m: OfficeMap) => JSON.stringify(m);
+
+test("the standard office is a good map and says nothing is wrong with it", () => {
+  const r = parseMap(text(STANDARD));
+  assert.ok("map" in r, "error" in r ? r.error : "");
+  assert.deepEqual((r as { map: OfficeMap }).map, JSON.parse(text(STANDARD)));
+  assert.deepEqual(checkMap(STANDARD), []);
+  assert.equal(CAT_ROLES.length, 11);
+});
+
+test("a map that is not right is refused with a reason, never half read", () => {
+  const bad = (f: (m: OfficeMap) => void) => { const m = structuredClone(STANDARD); f(m); return parseMap(text(m)); };
+  assert.ok("error" in parseMap("nope"));
+  assert.ok("error" in parseMap('{"version":2}'));
+  assert.ok("error" in bad((m) => { m.floor.pop(); }));
+  assert.ok("error" in bad((m) => { m.floor[0][0] = "nowhere"; }));
+  assert.ok("error" in bad((m) => { m.rooms[0].wall = "red"; }));
+  assert.ok("error" in bad((m) => { m.attach.push({ i: 999, j: 0, face: "i+", kind: "window" }); }));
+  assert.ok("error" in bad((m) => { (m.objects as unknown[]).push({ kind: 5 }); }));
+  assert.ok("error" in bad((m) => { m.cols = 9999; }));
+});
+
+test("every side of the standard office is drawn, with all eleven cats and every room clickable", () => {
+  const names = STANDARD.rooms.filter((r) => r.kind !== "hall").map((r) => r.id).sort();
+  for (let view = 0; view < 4; view++) {
+    const s = buildScene(STANDARD, view);
+    assert.equal(s.cats.length, 11, `view ${view}: cats`);
+    assert.deepEqual(new Set(s.cats.map((c) => c.role)).size, 11);
+    assert.deepEqual(s.rooms.map((r) => r.id).sort(), names, `view ${view}: rooms`);
+    const [x0, y0, x1, y1] = s.content;
+    assert.ok(x0 >= 0 && y0 >= 0 && x1 <= s.width && y1 <= s.height && x1 > x0 && y1 > y0, `view ${view}: the filled part lies inside the picture`);
+    assert.ok(s.items.length > 300 && s.ground.trim() !== null);
+    assert.ok(s.rooms.every((r) => r.path.startsWith("M") && r.plate[0] > 0));
+    assert.ok(s.tall.size > 0 && [...s.tall].every((k) => { const [i, j] = k.split(",").map(Number); return STANDARD.walls[j][i]; }), `view ${view}: tall walls are walls`);
+  }
+});
+
+test("what lies behind something is drawn before it, tall walls included, on every side of the building", () => {
+  const behind = (x: number[], y: number[]) => x[1] <= y[0] + 1e-6 || x[3] <= y[2] + 1e-6;
+  for (let view = 0; view < 4; view++) {
+    const s = buildScene(STANDARD, view), solids = s.items.map((t, n) => ({ t, n })).filter(({ t }) => t.fp);
+    assert.equal(solids.length, s.items.length, "everything has a footprint, so nothing keeps a fixed place that could be wrong at a joint");
+    let wrong = 0;
+    for (const x of solids) for (const y of solids) if (x.n > y.n && behind(x.t.fp!, y.t.fp!) && !behind(y.t.fp!, x.t.fp!)) wrong++;
+    assert.ok(wrong <= 2, `view ${view}: ${wrong} pairs are drawn the wrong way round (only a loop may be)`);
+    // a low wall that lies behind a tall one is drawn before it
+    for (const x of solids) for (const y of solids) if (x.t.kind === "wall" && y.t.kind === "wall" && x.t.label.startsWith("wall") && y.t.label.startsWith("back wall") && behind(x.t.fp!, y.t.fp!) && !behind(y.t.fp!, x.t.fp!)) assert.ok(x.n < y.n, `view ${view}: ${x.t.label} must come before ${y.t.label}`);
+  }
+  // a cat is drawn after its chair, whichever way the building is turned
+  for (let view = 0; view < 4; view++) {
+    const sc = buildScene(STANDARD, view);
+    for (const c of sc.cats) {
+      const at = sc.items.findIndex((t) => t.role === c.role);
+      const chair = sc.items.findIndex((t) => t.kind === "obj" && t.label === "chair" && t.ref === sc.items[at].ref);
+      assert.ok(chair >= 0 && chair < at, `view ${view}: the chair of ${c.role} is drawn before the cat`);
+    }
+  }
+});
+
+test("a window, a door and a board are painted into the wall tile they hang on, so they go with it", () => {
+  const m = structuredClone(STANDARD);
+  const noDecor = structuredClone(m); noDecor.attach = noDecor.attach.filter((a) => a.kind === "doorway");
+  for (let view = 0; view < 4; view++) {
+    const withIt = buildScene(m, view), without = buildScene(noDecor, view);
+    assert.equal(withIt.items.length, without.items.length, `view ${view}: nothing extra is drawn on its own`);
+    assert.ok(withIt.items.filter((t) => t.kind === "deco").length === 0);
+    const differs = withIt.items.filter((t, n) => t.img && without.items[n].img && Buffer.compare(Buffer.from(t.img.d), Buffer.from(without.items[n].img.d)) !== 0).length;
+    assert.ok(differs > 0, `view ${view}: the walls carry their windows`);
+  }
+});
+
+test("a map with something unknown or out of place still draws, and the checks name it", () => {
+  let m = placeObject(STANDARD, { kind: "ghost", i: 1, j: 1 });
+  assert.equal(m, STANDARD, "an unknown kind is not placed");
+  m = structuredClone(STANDARD); m.objects.push({ kind: "ghost", i: 1, j: 1 }); // a saved map may still have one
+  assert.doesNotThrow(() => buildScene(m, 0));
+  assert.ok(checkMap(m).some((w) => w.includes("ghost")));
+  const stool = newObject("block", 0, 0)!, bad = placeObject(STANDARD, stool); // tile 0,0 is the corner of a wall
+  assert.ok(checkMap(bad).some((w) => w.includes("stands")));
+  const twice = placeObject(STANDARD, newObject("workstation", 3, 3)!);
+  assert.ok(checkMap(twice).length > 0);
+});
+
+test("editing returns a new map and never changes the old one", () => {
+  const before = text(STANDARD);
+  const a = paintFloor(STANDARD, 12, 12, "board"), b = setWall(a, 12, 12, true), c = addAttach(b, { i: 12, j: 12, face: "j+", kind: "window" });
+  assert.notEqual(a, STANDARD); assert.equal(a.floor[12][12], "board");
+  assert.equal(b.walls[12][12], true); assert.equal(c.attach.length, STANDARD.attach.length + 1);
+  assert.equal(text(STANDARD), before, "the standard office is untouched");
+  assert.equal(paintFloor(STANDARD, 12, 12, STANDARD.floor[12][12]), STANDARD, "nothing to change: the same map comes back");
+  // taking a wall away takes what hung on it, but not a doorway
+  const d = setWall(c, 12, 12, false);
+  assert.equal(d.attach.length, STANDARD.attach.length);
+});
+
+test("a doorway and a window on the same tile do not replace each other, two windows on one face do", () => {
+  let m = addAttach(STANDARD, { i: 5, j: 5, face: "j+", kind: "window" });
+  m = addAttach(m, { i: 5, j: 5, face: "j+", kind: "doorway" });
+  assert.equal(m.attach.filter((a) => a.i === 5 && a.j === 5).length, 2);
+  m = addAttach(m, { i: 5, j: 5, face: "j+", kind: "art", art: "cork", span: 3 });
+  assert.equal(m.attach.filter((a) => a.i === 5 && a.j === 5 && a.kind !== "doorway").length, 1, "the art took the place of the window");
+  m = removeAttach(m, 5, 5);
+  assert.equal(m.attach.filter((a) => a.i === 5 && a.j === 5).length, 0);
+});
+
+test("objects: find, move, turn, change and delete", () => {
+  let m = STANDARD;
+  const k = m.objects.findIndex((o) => o.kind === "workstation" && o.role === "secretary");
+  const f = footprintOf(m.objects[k])!;
+  assert.deepEqual([f[2], f[3]], [2, 2], "a wide desk with its chair is a block of 2 by 2");
+  assert.equal(objectAt(m, f[0], f[1]), k);
+  m = turnObject(m, k);
+  assert.equal(m.objects[k].facing, 1);
+  assert.deepEqual(footprintOf(m.objects[k])!.slice(2), [2, 2]);
+  m = turnObject(turnObject(turnObject(m, k), k), k);
+  assert.equal(m.objects[k].facing, 0, "four turns come back");
+  m = moveObject(m, k, 20, 20);
+  assert.deepEqual([m.objects[k].i, m.objects[k].j], [20, 20]);
+  assert.equal(moveObject(m, k, -1, 0), m, "it cannot leave the map");
+  m = setParam(m, k, "role", "support");
+  assert.equal(m.objects[k].role, "support");
+  assert.equal(setParam(m, k, "kind", "bin"), m, "the kind and the place are not parameters");
+  const n = m.objects.length;
+  assert.equal(deleteObject(m, k).objects.length, n - 1);
+  const rug = m.objects.findIndex((o) => o.kind === "rug");
+  const r = m.objects[rug], rf = footprintOf(r)!;
+  assert.equal(objectAt(m, rf[0], rf[1]) === rug || objectAt(m, rf[0], rf[1]) >= 0, true);
+});
+
+test("growing the map and trimming it again gives the same map; trimming never cuts what is used", () => {
+  for (const side of ["left", "right", "top", "bottom"] as const) {
+    const g = growMap(STANDARD, side);
+    assert.equal(g.cols * g.rows > STANDARD.cols * STANDARD.rows, true);
+    assert.equal(text(trimMap(g)), text(STANDARD), side);
+  }
+  const left = growMap(STANDARD, "left");
+  assert.equal(left.objects[0].i, STANDARD.objects[0].i + 1, "everything moves one tile when a column is added on the left");
+  assert.equal(trimMap(STANDARD), STANDARD, "nothing to trim");
+  assert.ok(checkMap(growMap(growMap(STANDARD, "top"), "left")).length === 0, "the checks still pass after the shift");
+});
+
+test("a click is on the face of the wall tile it is nearest to", () => {
+  assert.equal(faceAt(0.9, 0.5), "i+"); assert.equal(faceAt(0.1, 0.5), "i-"); assert.equal(faceAt(0.5, 0.9), "j+"); assert.equal(faceAt(0.5, 0.1), "j-");
+});
+
+test("the camera turns a tile of the plan into a tile of its grid and back, on every side", () => {
+  const iso = (v: number) => new Iso(45, 27, v);
+  for (let v = 0; v < 4; v++) for (const [i, j] of [[0, 0], [44, 26], [10, 3], [3, 20]]) {
+    const [u, w] = iso(v).cell(i, j);
+    assert.deepEqual(iso(v).unCell(u, w), [i, j], `side ${v}`);
+    assert.ok(u >= 0 && w >= 0 && u < iso(v).U && w < iso(v).V);
+  }
+});
+
+test("every kind of the catalog draws on its own and says how big it is", () => {
+  const m = structuredClone(STANDARD);
+  for (const [kind, k] of Object.entries(KINDS)) {
+    const o = newObject(kind, 22, 12)!;
+    assert.ok(o, kind);
+    const [w, d] = k.size(o);
+    assert.ok(w >= 1 && d >= 1, `${kind} has a size`);
+    for (const facing of [0, 1, 2, 3] as const) { m.objects.push({ ...o, facing }); }
+  }
+  for (let view = 0; view < 4; view++) assert.doesNotThrow(() => buildScene(m, view));
+});
+
+test("a saved map that is hand-edited into nonsense cannot crash or freeze the drawing", () => {
+  const m = structuredClone(STANDARD);
+  m.objects.push({ kind: "constructor", i: 3, j: 3 }, { kind: "toString", i: 4, j: 4 }, { kind: "block", i: 3, j: 8, w: 1e9, d: -5, h: 1e9, m: "constructor", label: "x" } as never,
+    { kind: "rug", i: 2, j: 2, w: 1e12, d: 1e12 } as never, { kind: "chart", i: 5, j: 5, w: 1e9, bars: [null, 5, ["x"]] } as never, { kind: "workstation", i: 9, j: 9, role: "constructor" } as never);
+  m.attach.push({ i: 1, j: 0, face: "j+", kind: "art", art: "__proto__" }, { i: 2, j: 0, face: "j+", kind: "art", art: "constructor", span: 12 });
+  const r = parseMap(text(m));
+  assert.ok("map" in r, "error" in r ? r.error : "");
+  const t0 = Date.now();
+  for (let v = 0; v < 4; v++) assert.doesNotThrow(() => buildScene((r as { map: OfficeMap }).map, v));
+  assert.doesNotThrow(() => checkMap((r as { map: OfficeMap }).map));
+  assert.ok(Date.now() - t0 < 10000, "it did not freeze");
+});

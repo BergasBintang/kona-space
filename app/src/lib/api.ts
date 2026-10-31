@@ -109,6 +109,10 @@ export type Workflow = { id: string; name: string; about: string; steps: Step[];
 export const listWorkflows = (folder: string) => invoke<Workflow[]>("workflow_list", { folder });
 export const saveWorkflow = (folder: string, workflow: Workflow) => invoke<Workflow>("workflow_save", { folder, workflow });
 export const deleteWorkflow = (folder: string, id: string) => invoke<void>("workflow_delete", { folder, id });
+/** The text of the project's own office map, or null when it has none (the standard office is shown). */
+export const officeMapLoad = (folder: string) => invoke<string | null>("office_map_load", { folder });
+export const officeMapSave = (folder: string, map: string) => invoke<void>("office_map_save", { folder, map });
+export const officeMapReset = (folder: string) => invoke<void>("office_map_reset", { folder });
 export const startWorkflow = (folder: string, workflow: Workflow) => invoke<Ticket[]>("workflow_start", { folder, workflow });
 /** One reply from Kibby, the office boy (a cheap Haiku call with no tools). `history` is what was said before; the new `message` is not in it. */
 export const kibbySay = (projectId: string, accountId: string, history: { who: string; text: string }[], message: string) => invoke<string>("kibby_say", { projectId, accountId, history, message });

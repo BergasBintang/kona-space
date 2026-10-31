@@ -11,11 +11,11 @@ Plain words are used on purpose. Terms are explained the first time.
 | What | Where |
 |---|---|
 | The art scripts (cat, office, walls) | `art/` (read `art/README.md` first) |
-| The office plan (rooms, doors, furniture, windows) | `art/office.mjs` (`DEFS` at the top is the floor plan) |
-| The walls, drawn as one structure | `art/walls.mjs` |
+| The office plan (rooms, doors, furniture, windows) | `app/src/office/standard.json` (the map), `docs/EDITOR.md` |
+| The walls, drawn as one structure | `app/src/office/engine/walls.ts` |
 | The cat in four looks | `art/cat.mjs` |
-| Kibby, the office boy (his art, his route, his talk) | `art/kibby.mjs`, `WALK` in `art/office.mjs`, `app/src/lib/kibby.ts`, `app/src/components/KibbyChat.tsx`, `app/src-tauri/src/kibby.rs` |
-| Build the pictures | `cd art`, then `node build-cats.mjs`, `node build-office.mjs`, `node to-app.mjs` |
+| Kibby, the office boy (his art, his route, his talk) | `art/kibby.mjs`, `app/src/lib/kibby.ts` (his route is the hall tiles of the map), `app/src/components/KibbyChat.tsx`, `app/src-tauri/src/kibby.rs` |
+| Build the pictures | `cd art`, then `node build-cats.mjs`, `node to-app.mjs` (the cats). The office is drawn by the app: `node render-map.mjs` draws it to a picture |
 | What the app reads | `app/src/office/` (`views/v0..v3.json`, `parts/*.png`, `cats.png`, `cats.json`) |
 | The office on screen | `app/src/components/Office.tsx` |
 | Set up a role (personality, job, model, permissions, skills, connectors) | `app/src/components/RoleSetup.tsx`, `app/src-tauri/src/roles.rs`, `skills.rs`, `session.rs` |
@@ -30,6 +30,8 @@ Data on disk, per project: `<project>\.kona\role-kits.json` (skills and connecto
 ---
 
 ## 2. The office art
+
+> **Changed in 0.26.0 (decision 57).** The office is no longer built by `art/office.mjs` and `art/walls.mjs`: it is a map drawn by the engine in `app/src/office/engine/`, with walls as full-tile blocks. Sections 2.1, 2.4, 2.5, 2.6 and 2.10 below describe the first pipeline and are kept as history. What still holds: the rules of 2.2 (tile, steps, 1/8 positions, plain seats), the idea of 2.3 (four sides from one drawing), the ordering rule of 2.5 (A before B when A lies wholly behind B along u or v, which `scene.ts` uses), the cat (2.8) and Kibby's look (2.9; he now walks the hall tiles of the map). Read `docs/EDITOR.md`.
 
 ### 2.1 What the picture is made of
 
@@ -187,7 +189,7 @@ Keep the page to short words; put every full explanation behind a "?" (`Help`). 
 
 ### 6.3 Before you say a release is ready
 
-- `npx tsc --noEmit`, `npm test`, `npm run build`, `cargo test` (19 pass, 2 are manual), and `node build-office.mjs` prints no `CHECK:` and four "pixel for pixel" lines.
+- `npx tsc --noEmit`, `npm test`, `npm run build`, `cargo test` (19 pass, 2 are manual), and the office tests (`npm test`) pass.
 - Look at all four sides of the office and the screens that changed.
 - (First run: 2026-10-30, 0.22.0, all passed.) Run the smoke test on the built program when your own Kona is closed: start the built program with `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9223`, then `node tests/smoke.mjs` in `app/`. It changes nothing and starts no session.
 

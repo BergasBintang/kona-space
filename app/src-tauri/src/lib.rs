@@ -10,6 +10,7 @@ mod kibby;
 mod leftovers;
 mod mcp;
 mod needs;
+mod office_map;
 mod persona;
 mod ledger;
 mod projects;
@@ -580,6 +581,23 @@ fn workflow_delete(projects: State<'_, Projects>, folder: String, id: String) ->
     workflows::delete(&project_folder(&projects, &folder)?, &id)
 }
 
+/// The map of this project's office (its own, or None: the standard office is shown).
+#[tauri::command]
+fn office_map_load(projects: State<'_, Projects>, folder: String) -> Result<Option<String>, String> {
+    office_map::load(&project_folder(&projects, &folder)?)
+}
+
+#[tauri::command]
+fn office_map_save(projects: State<'_, Projects>, folder: String, map: String) -> Result<(), String> {
+    office_map::save(&project_folder(&projects, &folder)?, &map)
+}
+
+/// Forget the project's own map: the standard office is shown again.
+#[tauri::command]
+fn office_map_reset(projects: State<'_, Projects>, folder: String) -> Result<(), String> {
+    office_map::reset(&project_folder(&projects, &folder)?)
+}
+
 /// Raise the Board tickets of a workflow, one per step.
 #[tauri::command]
 fn workflow_start(projects: State<'_, Projects>, folder: String, workflow: workflows::Workflow) -> Result<Vec<Ticket>, String> {
@@ -686,7 +704,7 @@ pub fn run() {
             app.manage(backup::SettingsStore::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, cost_rows, set_project_github, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, kibby_say, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, workflow_list, workflow_save, workflow_delete, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
+        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, cost_rows, set_project_github, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, kibby_say, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, workflow_list, workflow_save, workflow_delete, office_map_load, office_map_save, office_map_reset, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

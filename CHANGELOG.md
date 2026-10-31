@@ -2,6 +2,18 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.26.0, 2026-10-31
+
+Edit the office: a map maker, bulky walls, a map with its own zoom.
+
+- **Edit the office.** A new screen (a button over the office) to put things where you want them: floor, walls, windows, doors and boards on the walls, doorways, furniture, and the cats with their desks (a cat and its desk move, turn and are removed as one). A plan from above, the real office beside it, undo and redo, and a list of what looks wrong (it still lets you save).
+- **One office for each project.** It is kept in the project's own .kona folder. A project with none shows the standard office, and the standard office is never changed.
+- **Bulky walls.** A wall is now a block as big as a tile, so the building is bigger (45 x 27 tiles).
+- **The map has its own zoom.** Ctrl and the wheel (or the + and - keys) zoom the map round the pointer, whatever the percent view is; the mouse wheel moves it up and down, Shift and the wheel left and right, Ctrl and the left button drags it, and Center brings the secretary's desk back to the middle.
+- **Wall joints fixed for good.** Where a tall brick wall met a low wall, the low wall was drawn over the brick from some sides of the building. A tall wall is now ordered like every other piece, and windows, doors and boards are painted into their wall tile, so they can never be out of order with it.
+- **The old drawing scripts are gone.** The office is drawn by the app itself from the map, so the scripts that drew it before are removed.
+- Kibby walks the hall tiles of the map, mostly straight on along a corridor, and a map that is changed changes where he walks. His forehead stripes no longer run into his eyes.
+
 ## 0.25.0, 2026-10-31
 
 A button for the Kona mark, no more plants, and the floor under the walls lined up.

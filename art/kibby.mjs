@@ -12,8 +12,9 @@ const body = (r) => r.replace(/f/g, "B").replace(/d/g, "D"); // the rows below a
 const APRON = ["fAAAAAAAdd", "fAAAAAAAdd", "fAPPPAAAdd", "fAPPPAAAdd", "fAAAAAAAdd", "faaaaaaadd"].map(body); // a bib with a pocket, a darker hem
 const BACK = ["ffffffffdd", "ffffffffdd", "ffffffffdd", "fAAAAAAAdd", "fffAAfffdd", "ffffffffdd"].map(body); // from behind: the coat, the apron's belt and the bow of its strings
 const put = (row, x, c) => row.slice(0, x) + c + row.slice(x + 1);
-// three stripes on the forehead (the middle one is the longest), seen from the front only; the old shade patch on the forehead goes
-const STRIPES = [[4, 3], [4, 4], [6, 3], [6, 4], [6, 5], [8, 3], [8, 4]]; // [column, row] inside the 16 x 18 cat
+// three stripes on the forehead (the middle one is the longest), seen from the front only; the old shade patch on the forehead goes. The forehead is rows 3 and 4 and the eyes are on row 5,
+// so the two outer stripes are one pixel long (row 3) and the middle one two (rows 3 and 4): a row of fur is left between a stripe and an eye, so the eyes never run into a stripe
+const STRIPES = [[4, 3], [6, 3], [6, 4], [8, 3]]; // [column, row] inside the 16 x 18 cat
 const forehead = TURNED.map((r, n) => (n === 4 ? r.replace(/d/g, (m, i) => (i < 8 ? "f" : m)) : r));
 const front = forehead.map((r, n) => (n >= 11 && n <= 16 ? torso(APRON[n - 11]) : STRIPES.reduce((s, [x, y]) => (y === n ? put(s, x, "S") : s), r)));
 const behind = BEHIND.map((r, n) => (n >= 11 && n <= 16 ? torso(BACK[n - 11]) : r));

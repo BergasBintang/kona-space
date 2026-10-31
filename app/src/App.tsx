@@ -9,6 +9,9 @@ import { PLACES, type Place } from "./lib/places";
 import { tabsFor } from "./lib/rooms";
 import { roomName } from "./lib/roomName";
 import { Office } from "./components/Office";
+import { OfficeEditor } from "./components/OfficeEditor";
+import { STANDARD, parseMap } from "./office/map";
+import type { OfficeMap } from "./office/engine/types";
 import { Sheet, type Guard } from "./components/Sheet";
 import { TeamRoom } from "./components/TeamRoom";
 import { officeLooks, looksSignature } from "./lib/office";
@@ -37,7 +40,7 @@ import { localDate, redact } from "./lib/brain/text.ts";
 import { loadZoom, stepZoom } from "./lib/zoom";
 import { checkForUpdate } from "./lib/update";
 import { UpdateCard } from "./components/UpdateCard";
-import { getSettings, earlierSessions, saveNote, wantedRemove, kibbySay, type Earlier } from "./lib/api";
+import { getSettings, earlierSessions, saveNote, wantedRemove, kibbySay, officeMapLoad, officeMapSave, officeMapReset, type Earlier } from "./lib/api";
 
 const remembered = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const remember = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* the choice is just not kept */ } };
@@ -67,6 +70,10 @@ export default function App() {
   const [adding, setAdding] = useState(false); // the Add a project screen
   const [creating, setCreating] = useState(false); // the Start a session screen
   const [notice, setNotice] = useState<string | null>(null);
+  const [officeMap, setOfficeMap] = useState<OfficeMap>(STANDARD); // the office of the open project: its own map, or the standard one
+  const [ownMap, setOwnMap] = useState(false); // the project has a map of its own
+  const [brokenMap, setBrokenMap] = useState<string | null>(null); // why the project's map file could not be used (the standard office is shown, the file is left alone)
+  const [editing, setEditing] = useState(false); // the Edit the office screen
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState("");
   // the latest of these, for the listener below (it is set up once, so it cannot read them from the render)
@@ -142,6 +149,22 @@ export default function App() {
     roleKits(project.folder).then((k) => { if (live) setKits(k); }).catch(() => { if (live) setKits({}); });
     return () => { live = false; };
   }, [project?.folder]); // eslint-disable-line react-hooks/exhaustive-deps
+  // the office of a project is kept in the project (.kona/office-map.json); a project with none, or with one that cannot be read, shows the standard office and its file is left as it is
+  useEffect(() => {
+    setEditing(false);
+    setBrokenMap(null);
+    if (!project) { setOfficeMap(STANDARD); setOwnMap(false); return; }
+    let live = true;
+    officeMapLoad(project.folder).then((text) => {
+      if (!live) return;
+      if (text == null) { setOfficeMap(STANDARD); setOwnMap(false); return; }
+      const r = parseMap(text);
+      if ("map" in r) { setOfficeMap(r.map); setOwnMap(true); }
+      else { setOfficeMap(STANDARD); setOwnMap(false); setBrokenMap(r.error); setNotice(`The office map of this project could not be read (${r.error}), so the standard office is shown. The file was not touched.`); }
+    }).catch((e) => { if (live) { setOfficeMap(STANDARD); setOwnMap(false); setBrokenMap("the file could not be opened"); setNotice(`The office map of this project could not be opened (${String(e)}), so the standard office is shown. The file was not touched.`); } });
+    return () => { live = false; };
+  }, [project?.folder]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!greeted || place !== "office") setEditing(false); }, [greeted, place]); // going anywhere else closes the editor (it asked first if there was something unsaved)
   const mine = useMemo(() => (project ? state.order.filter((id) => samePlace(state.sessions[id].folder, project.folder)) : []), [state, project]);
   const looksSig = looksSignature(state);
   const looks = useMemo(() => officeLooks(project, state), [project, looksSig]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -328,7 +351,12 @@ export default function App() {
   } else if (adding || !project) {
     content = <AddProject first={!project} accounts={accounts} onDone={added} onCancel={() => setAdding(false)} onOpenAccounts={() => { setAdding(false); setPlace("accounts"); }} />;
   } else {
-    content = <Office looks={looks} sheetOpen={place !== "office" || teamRoom !== null} onOpen={openPlace} onOpenRoom={openRoom} onKibbySay={sayToKibby} />;
+    content = editing
+      ? <OfficeEditor key={project.id} map={officeMap} hasOwn={ownMap} broken={brokenMap} guard={sheetGuard}
+          onSave={async (m) => { await officeMapSave(project.folder, JSON.stringify(m)); setOfficeMap(m); setOwnMap(true); setBrokenMap(null); setNotice("Saved the office of this project."); }}
+          onReset={async () => { await officeMapReset(project.folder); setOfficeMap(STANDARD); setOwnMap(false); setBrokenMap(null); setNotice("This project shows the standard office again."); }}
+          onClose={() => setEditing(false)} />
+      : <Office map={officeMap} looks={looks} sheetOpen={place !== "office" || teamRoom !== null} onOpen={openPlace} onOpenRoom={openRoom} onKibbySay={sayToKibby} onEdit={() => setEditing(true)} />;
     if (place !== "office") {
       const tabs = tabsFor(place);
       const info = PLACES.find((x) => x.id === place);

@@ -12,7 +12,7 @@ export function TopBar({ project, onHome, place, onPlace, attention, leftBehind,
 }) {
   return (
     <header className="flex min-h-[72px] shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b-2 border-line-strong bg-surface-1 px-5 py-2">
-      <button type="button" onClick={onHome} title="Back to the welcome page" aria-label="Kona, back to the welcome page" className="flex items-center gap-1.5 py-1 hover:opacity-80">
+      <button type="button" onClick={onHome} title="Back to the welcome page" aria-label="Kona, back to the welcome page" className="px-btn px-btn-paper flex items-center gap-1.5 px-2">
         <svg width="20" height="20" viewBox="0 0 16 16" aria-hidden="true" className="shrink-0 text-text-secondary">
           <path d="M10 3 L5 8 L10 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter" />
         </svg>

@@ -2,6 +2,14 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.25.0, 2026-10-31
+
+A button for the Kona mark, no more plants, and the floor under the walls lined up.
+
+- **The Kona mark is a button.** The chevron, the mark and "Kona" in the top bar now sit in a framed button, so it is clear you can press it (it still goes back to the welcome page).
+- **No more plants.** They were only decoration, so every plant is gone from the office.
+- **Walls and floor line up.** The tan base under the building used to stop short of the walls, leaving a step at the corners and a strip that did not match. It now follows the outer face of the walls. Where a room's outer wall meets the open edge of the hall the base still steps by the wall's thickness.
+
 ## 0.24.2, 2026-10-31
 
 Every page in the sheet now uses the full width.

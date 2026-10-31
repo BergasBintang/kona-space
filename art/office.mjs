@@ -140,7 +140,7 @@ function clipToWalls([i, j, wi, dj], info) {
 // materials: [top, left face, right face]
 const M = {
   wood: ["#e0ad6c", "#b9834a", "#936339"], darkwood: ["#b07d4f", "#8a5d36", "#6c4727"], white: ["#f4efe5", "#d6d0c2", "#b7b1a3"],
-  metal: ["#c4ccd6", "#97a1ad", "#76808c"], server: ["#4a5362", "#363e4b", "#2a313c"], pot: ["#c97b4f", "#a35f3a", "#7f4a2d"],
+  metal: ["#c4ccd6", "#97a1ad", "#76808c"], server: ["#4a5362", "#363e4b", "#2a313c"],
   leaf: ["#8fd18a", "#5ea866", "#468651"], crate: ["#d7a566", "#b08049", "#8b6137"],
   teal: ["#8ed8c9", "#5fb4a2", "#468e80"], gold: ["#f3c978", "#d09b45", "#a87a32"], red: ["#d9786a", "#b05a4d", "#8b463c"],
   blue: ["#7fb1e0", "#5b88b8", "#456a92"], paper: ["#fffaf0", "#e7dfcf", "#cfc6b4"], black: ["#3b3f46", "#2b2e34", "#20232a"],
@@ -276,17 +276,28 @@ export function drawOffice({ cats = true, parts = false, probes = null } = {}) {
       ln(PR(u0, v1, z0), PR(u1, v1, z0), OUT); ln(PR(u1, v1, z0), PR(u1, v0, z0), OUT);
     }
   }
-  // ---- the front edge of the floor slab, wherever a tile has nothing in front of it (drawn first: the floor never overlaps it wrongly)
+  // ---- the front edge of the floor slab, wherever the ground has nothing in front of it (drawn first: the floor never overlaps it wrongly).
+  // The ground is the tiles plus the wall slabs standing on its rim (a wall is a quarter of a tile thick and sticks out half of that past the tile edge, and a corner
+  // is filled): so the edge of the slab runs along the outer face of the walls and ends at the corner of the walls, and a wall never hangs over its own base.
   const runs = (len, test) => { const out = []; let s = -1; for (let k = 0; k <= len; k++) { const ok = k < len && test(k); if (ok && s < 0) s = k; if (!ok && s >= 0) { out.push([s, k]); s = -1; } } return out; };
   add(-100, () => {
-    const [U, V] = sidesOf();
-    for (let c = 1; c <= V; c++) for (const [a, b] of runs(U, (u) => atR(u, c - 1) && !atR(u, c))) {
-      poly([PR(a, c, 0), PR(b, c, 0), PR(b, c, -9), PR(a, c, -9)], "#caa971");
-      ln(PR(a, c, 0), PR(b, c, 0), OUT); ln(PR(a, c, -9), PR(b, c, -9), OUT); ln(PR(a, c, 0), PR(a, c, -9), OUT); ln(PR(b, c, 0), PR(b, c, -9), OUT);
+    const [U, V] = sidesOf(), N = 8; // the ground in cells of 1/8 tile, in the camera's own space
+    const slabs = SLABS.map(([i0, j0, i1, j1]) => {
+      const lenI = i1 - i0 > j1 - j0, [e0, e1] = lenI ? [i0 - WALL_HALF, i1 + WALL_HALF] : [j0 - WALL_HALF, j1 + WALL_HALF];
+      const c = (lenI ? [[e0, j0], [e1, j1]] : [[i0, e0], [i1, e1]]).map(([i, j]) => rot(i, j));
+      return [Math.min(c[0][0], c[1][0]), Math.min(c[0][1], c[1][1]), Math.max(c[0][0], c[1][0]), Math.max(c[0][1], c[1][1])];
+    });
+    const ground = (x, y) => { // the cell with its corner at (x, y) eighths
+      const u = (x + 0.5) / N, v = (y + 0.5) / N;
+      return (u >= 0 && v >= 0 && u < U && v < V && !!atR(Math.floor(u), Math.floor(v))) || slabs.some(([u0, v0, u1, v1]) => u > u0 && u < u1 && v > v0 && v < v1);
+    };
+    const g = (x, y) => (x < -N || y < -N || x > (U + 1) * N || y > (V + 1) * N ? false : ground(x, y));
+    const face = (pts, col) => { poly(pts, col); ln(pts[0], pts[1], OUT); ln(pts[2], pts[3], OUT); ln(pts[0], pts[3], OUT); ln(pts[1], pts[2], OUT); };
+    for (let c = -N + 1; c <= (V + 1) * N; c++) for (const [a, b] of runs((U + 2) * N, (x) => g(x - N, c - 1) && !g(x - N, c))) {
+      face([PR((a - N) / N, c / N, 0), PR((b - N) / N, c / N, 0), PR((b - N) / N, c / N, -9), PR((a - N) / N, c / N, -9)], "#caa971");
     }
-    for (let c = 1; c <= U; c++) for (const [a, b] of runs(V, (v) => atR(c - 1, v) && !atR(c, v))) {
-      poly([PR(c, a, 0), PR(c, b, 0), PR(c, b, -9), PR(c, a, -9)], "#a98756");
-      ln(PR(c, a, 0), PR(c, b, 0), OUT); ln(PR(c, a, -9), PR(c, b, -9), OUT); ln(PR(c, a, 0), PR(c, a, -9), OUT); ln(PR(c, b, 0), PR(c, b, -9), OUT);
+    for (let c = -N + 1; c <= (U + 1) * N; c++) for (const [a, b] of runs((V + 2) * N, (y) => g(c - 1, y - N) && !g(c, y - N))) {
+      face([PR(c / N, (a - N) / N, 0), PR(c / N, (b - N) / N, 0), PR(c / N, (b - N) / N, -9), PR(c / N, (a - N) / N, -9)], "#a98756");
     }
   }, undefined, "floor edge");
 
@@ -355,7 +366,6 @@ export function drawOffice({ cats = true, parts = false, probes = null } = {}) {
     add(D(i0 + sw / 2, j0 + sd / 2), () => build(L), undefined, `${label} at ${i0},${j0}`, { fp: footprint(i0, j0, sw, sd) });
   };
 
-  const plant = (i, j) => piece(i, j, 1, 1, 0, "plant", 16, (L) => { L.b(0.25, 0.25, 0.5, 0.5, 4, M.pot); L.b(0.125, 0.125, 0.75, 0.75, 4, M.leaf, 4); L.b(0.25, 0.25, 0.5, 0.5, 4, M.leaf, 8); L.b(0.375, 0.375, 0.25, 0.25, 4, M.leaf, 12); });
   const rug = (i0, j0, wi, dj, c, c2) => add(-60, () => { poly([P(i0, j0), P(i0 + wi, j0), P(i0 + wi, j0 + dj), P(i0, j0 + dj)], c); img.polyLine([P(i0 + 0.125, j0 + 0.125), P(i0 + wi - 0.125, j0 + 0.125), P(i0 + wi - 0.125, j0 + dj - 0.125), P(i0 + 0.125, j0 + dj - 0.125)], c2); }, undefined, "rug");
   // a plain block: a bench, a crate, a low table. It sits a little inside its footprint, so two neighbours do not melt into one block.
   const block = (i, j, w, d, h, m, label = "block", facing = 0) => piece(i, j, w, d, facing, label, h, (L) => L.b(0.125, 0.125, (facing % 2 ? d : w) - 0.25, (facing % 2 ? w : d) - 0.25, h, m));
@@ -424,12 +434,12 @@ export function drawOffice({ cats = true, parts = false, probes = null } = {}) {
 
   // ===== the back row =====
   // --- Board (0,0): a bench in front of the notes
-  block(1, 2, 3, 1, 4, M.darkwood, "bench"); block(1, 4, 3, 1, 4, M.darkwood, "bench"); plant(0, 0); plant(4, 0);
+  block(1, 2, 3, 1, 4, M.darkwood, "bench"); block(1, 4, 3, 1, 4, M.darkwood, "bench");
   // --- Library (5,0): six bookshelves against the wall, a rug, a reading table, two armchairs
   rug(6, 2, 5, 3, "#7f5a8a", "#5c3f66");
   [5, 6, 7, 8, 9, 10].forEach((i, n) => shelf(i, 0, 0, n));
   piece(7, 3, 2, 1, 0, "reading table", 12, (L) => { L.b(0.125, 0.125, 1.75, 0.75, 8, M.wood); L.b(0.5, 0.375, 0.375, 0.25, 4, M.red, 8); L.top(1.125, 0.375, 0.375, 0.25, 8, M.paper[0]); });
-  armchair(6, 3, 3, M.rose); armchair(9, 3, 1, M.rose); plant(11, 0);
+  armchair(6, 3, 3, M.rose); armchair(9, 3, 1, M.rose);
   // --- Archive (12,0): four filing cabinets, a long table of folders
   [12, 13, 14, 15].forEach((i, n) => cabinet(i, 0, 0, n));
   piece(13, 2, 2, 1, 0, "folder table", 12, (L) => { L.b(0.125, 0.125, 1.75, 0.75, 8, M.wood); L.b(0.25, 0.25, 0.5, 0.375, 4, M.paper, 8); L.b(1.0, 0.25, 0.5, 0.375, 4, M.paper, 8); });
@@ -439,34 +449,28 @@ export function drawOffice({ cats = true, parts = false, probes = null } = {}) {
   piece(17, 3, 2, 1, 0, "console", 4, (L) => { L.b(0.125, 0.125, 1.75, 0.75, 4, M.server); L.fy(0.875, 0.25, 1.75, 1, 3, "#8ed8c9"); });
   // --- DevOps and Git (21,0): the DevOps desk under the branch board, a deploy console, a rocket
   workstation(22, 2, "devops");
-  plant(21, 4); plant(25, 4);
   piece(21, 0, 2, 1, 0, "deploy console", 16, (L) => { L.b(0.125, 0.125, 1.75, 0.75, 16, M.metal); [0, 1, 2].forEach((k) => L.fy(0.875, 0.25 + k * 0.5, 0.5 + k * 0.5, 9, 12, ["#8ed8c9", "#f3c978", "#d9786a"][k])); });
   piece(25, 0, 1, 1, 0, "rocket", 20, (L) => { L.b(0.125, 0.125, 0.75, 0.75, 4, M.black); L.b(0.25, 0.25, 0.5, 0.5, 12, M.white, 4); L.b(0.375, 0.375, 0.25, 0.25, 4, M.red, 16); });
   // --- Accounting (26,0): a chart board and a desk with coins
   chart(27, 0, 2, 0, [["#8ed8c9", 6], ["#f3c978", 11], ["#7fb1e0", 8], ["#d9786a", 14]]);
   piece(27, 2, 1, 1, 0, "accounts desk", 12, (L) => { L.b(0.125, 0.125, 0.75, 0.75, 8, M.wood); [4, 8].forEach((h, k) => L.b(0.25 + k * 0.25, 0.25, 0.25, 0.25, h, M.gold, 8)); L.b(0.25, 0.625, 0.375, 0.125, 4, M.white, 8); });
-  plant(28, 2);
   // --- Storage closet (29,0): crates and a bin
   piece(29, 0, 1, 1, 0, "crates", 16, (L) => { L.b(0.125, 0.125, 0.75, 0.75, 8, M.crate); L.b(0.25, 0.25, 0.5, 0.5, 8, M.crate, 8); });
   block(30, 0, 1, 1, 16, M.crate, "crate"); block(31, 0, 1, 1, 16, M.crate, "crate");
   piece(29, 2, 1, 1, 0, "bin", 16, (L) => { L.b(0.25, 0.25, 0.5, 0.5, 12, M.metal); L.b(0.125, 0.125, 0.75, 0.75, 4, M.black, 12); });
 
   // ===== the hall =====
-  block(13, 6, 2, 1, 4, M.wood, "bench"); plant(12, 5); plant(15, 5); // the bench niche
-  piece(26, 5, 1, 1, 0, "water cooler", 20, (L) => { L.b(0.25, 0.25, 0.5, 0.5, 12, M.white); L.b(0.375, 0.375, 0.25, 0.25, 8, M.blue, 12); }); plant(28, 5); // the water cooler niche
-  plant(29, 4); plant(31, 6); plant(0, 7);
+  block(13, 6, 2, 1, 4, M.wood, "bench"); // the bench niche
+  piece(26, 5, 1, 1, 0, "water cooler", 20, (L) => { L.b(0.25, 0.25, 0.5, 0.5, 12, M.white); L.b(0.375, 0.375, 0.25, 0.25, 8, M.blue, 12); }); // the water cooler niche
   rug(3, 7, 6, 1, "#d5c9b2", "#bfb298"); rug(17, 7, 6, 1, "#d5c9b2", "#bfb298");
 
   // ===== the west wing =====
   // --- Product and design (0,9): two desks, the staff board on the wall
   rug(1, 10, 2, 4, "#e6d6ee", "#8d6aa8");
   workstation(2, 10, "product"); workstation(1, 12, "design", "typeA");
-  plant(0, 13);
   // --- Engineering (4,9): four desks, a build server
   rug(5, 10, 4, 4, "#d3e1ef", "#4f7aa6");
   workstation(5, 10, "frontend", "typeA"); workstation(7, 10, "backend", "typeB"); workstation(5, 12, "qa", "idle", false, 2); workstation(7, 12, "security", "waitA", false, 2);
-  plant(9, 14);
-  plant(4, 14);
   // ===== the east wing =====
   // --- Marketing (12,9): the big room: the campaign desk, a meeting table, a reach chart, a wall of posts and a sofa
   rug(12, 10, 7, 5, "#f3c9bd", "#c4574a");
@@ -474,12 +478,12 @@ export function drawOffice({ cats = true, parts = false, probes = null } = {}) {
   piece(15, 12, 2, 1, 0, "meeting table", 8, (L) => L.b(0.125, 0.125, 1.75, 0.75, 8, M.wood));
   [15, 16].forEach((i) => chair(i, 11, 0)); [15, 16].forEach((i) => chair(i, 13, 2));
   chart(17, 10, 2, 0, [["#d9786a", 7], ["#f3c978", 12], ["#d9786a", 16], ["#f7e1b0", 10]]);
-  sofa(17, 11, 2, 0, M.rose); block(18, 13, 1, 1, 4, M.wood, "coffee table"); plant(19, 13);
+  sofa(17, 11, 2, 0, M.rose); block(18, 13, 1, 1, 4, M.wood, "coffee table");
   // --- Content and SEO (20,9): the writing desk, stacks of paper, two shelves
   rug(21, 10, 3, 3, "#f7e9b8", "#b8922a");
   workstation(21, 11, "content", "typeB");
   [20, 21].forEach((i, n) => shelf(i, 13, 2, n + 1)); // against the far wall, so a tall shelf does not hide the hall behind the room
-  block(23, 12, 1, 1, 8, M.gold, "paper stack"); block(22, 12, 1, 1, 8, M.wood, "table"); plant(24, 12);
+  block(23, 12, 1, 1, 8, M.gold, "paper stack"); block(22, 12, 1, 1, 8, M.wood, "table");
   // --- Support (25,9): the headset desk, a queue desk and a board of tickets
   rug(27, 10, 3, 2, "#c6ece2", "#2f8f7c");
   workstation(27, 10, "support");
@@ -490,7 +494,7 @@ export function drawOffice({ cats = true, parts = false, probes = null } = {}) {
   // --- Front desk (8,15): the lobby: the desk with a bell, a visitor bench, a rug
   rug(9, 15, 4, 3, "#b56a4a", "#8f4f36");
   workstation(11, 16, "secretary", "idle", true);
-  sofa(9, 17, 1, 0, M.blue, "bench"); plant(6, 15); plant(14, 15); plant(6, 18);
+  sofa(9, 17, 1, 0, M.blue, "bench");
   // --- Entrance (16,15): the key desk, a board of hooks, a visitor bench
   rug(16, 15, 3, 2, "#7f9a8e", "#5e7a6e"); rug(EXIT.c - 1, EXIT.d0, 1, EXIT.d1 - EXIT.d0, "#8b5e3c", "#5e3f27"); // the doormat, inside the street door (in the east wall)
   piece(18, 16, 1, 1, 0, "key desk", 12, (L) => { L.b(0.125, 0.125, 0.75, 0.75, 8, M.wood); [0, 1, 2].forEach((k) => L.b(0.25 + k * 0.25, 0.375, 0.125, 0.125, 4, M.gold, 8)); });
@@ -499,7 +503,7 @@ export function drawOffice({ cats = true, parts = false, probes = null } = {}) {
   // --- Back office (0,15): a control panel, a voice booth, a desk
   piece(0, 15, 2, 1, 3, "control panel", 16, (L) => { L.b(0.125, 0.125, 1.75, 0.5, 16, M.metal); [0, 1, 2, 3].forEach((k) => L.fy(0.625,0.25 + k * 0.375, 0.5 + k * 0.375, 6, 9 + (k % 2) * 2, ["#8ed8c9", "#f3c978", "#d9786a", "#7fb1e0"][k])); });
   piece(2, 15, 1, 1, 0, "voice booth", 28, (L) => { L.b(0.125, 0.125, 0.75, 0.75, 20, M.teal); L.b(0.125, 0.125, 0.75, 0.75, 4, M.white, 20); L.b(0.375, 0.375, 0.125, 0.125, 4, M.black, 24); });
-  block(1, 17, 2, 1, 8, M.wood, "desk"); plant(4, 17);
+  block(1, 17, 2, 1, 8, M.wood, "desk");
 
   // ---- things on the walls. A decoration is painted on the inner face of a wall (a plane of the plan) and only when that face looks towards the camera, which is
   // when the wall is one of the tall brick back walls of the current view. So every outer wall of the building carries its windows, seen from whichever side

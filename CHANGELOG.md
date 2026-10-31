@@ -2,6 +2,14 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.26.1, 2026-10-31
+
+A clearer font, a floor fix, and a tidier editor.
+
+- **A new interface font: Jersey 20.** In the old font ("Pixelify Sans" bold) the letter c looked like o, so "Launch" read "Launoh". Jersey 20 is a free pixel font whose letters stay apart, and it is about a fifth narrower, so long labels no longer spill out of their boxes. Nineteen fonts were tried first; the study is in `docs/FONTS.md`.
+- **Carpet dots stay on their carpet.** Some of the dots on a carpet were drawn on the hall tiles next to it, in the carpet's colour. A sign error in the position sum was the cause.
+- **The editor's bottom is one band.** The bar for the picked thing and the warnings had lines at different heights; now one band runs under the plan and the preview.
+
 ## 0.26.0, 2026-10-31
 
 Edit the office: a map maker, bulky walls, a map with its own zoom.

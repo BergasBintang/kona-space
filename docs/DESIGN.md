@@ -80,7 +80,7 @@ Focus is a 2 px accent ring with a 2 px gap.
 | Face | Use |
 |---|---|
 | Nunito Sans (variable) | Everything you read: replies, notes, tickets, help, the small print. Even digit widths turned on. |
-| Pixelify Sans (variable, open licence, bundled) | The interface: h1 to h4, every button, legends, badges, the plan bars, room names, speech bubbles |
+| Jersey 20 (one weight, open licence OFL-1.1, bundled; was Pixelify Sans until 0.26.1, see `docs/FONTS.md`) | The interface: h1 to h4, every button, legends, badges, the plan bars, room names, speech bubbles |
 | Cascadia Mono, then Consolas | Commands, paths, ports, ids, file contents |
 
 Sizes are by feel at the window: titles 22 to 34, headings 17 to 20, body 15, small 13 to 14. A pixel font looks right at its design size; the sizes were chosen by looking at the real window, not by the old scale. Fallback if the pixel font fails: Nunito, then Segoe UI.

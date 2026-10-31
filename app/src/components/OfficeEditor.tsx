@@ -290,8 +290,15 @@ export function OfficeEditor({ map, hasOwn, broken, guard, onSave, onReset, onCl
             <canvas ref={plan} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onPointerLeave={() => setHover(null)} aria-label="The plan of the office from above"
               style={{ cursor: tool === "select" ? "default" : "crosshair", touchAction: "none", imageRendering: "pixelated" }} />
           </div>
-          {selObj && kd && (
-            <div className="flex flex-wrap items-center gap-3 border-t border-line-subtle bg-surface-1 px-4 py-2" role="group" aria-label="The picked thing">
+        </section>
+        <aside className="flex w-[38%] min-w-[300px] max-w-[560px] shrink-0 flex-col border-l border-line-subtle" aria-label="Preview">
+          <Preview map={shown} />
+        </aside>
+      </div>
+      <footer className="flex shrink-0 border-t border-line-subtle bg-surface-1">
+        <div className="flex min-h-12 min-w-0 flex-1 flex-wrap items-center gap-3 px-4 py-2" role="group" aria-label="The picked thing">
+          {selObj && kd ? (
+            <>
               <strong className="text-[14px]">{kd.label}</strong>
               {selObj.kind !== "rug" && <Button variant="quiet" small onClick={() => commit(turnObject(draft, sel))} aria-label="Turn it (R)">Turn</Button>}
               {kd.params.map((p) => {
@@ -303,21 +310,18 @@ export function OfficeEditor({ map, hasOwn, broken, guard, onSave, onReset, onCl
                 return null;
               })}
               <Button variant="danger" small onClick={() => { commit(deleteObject(draft, sel)); setSel(-1); }} aria-label="Remove it (Delete)">Remove</Button>
-            </div>
-          )}
-        </section>
-        <aside className="flex w-[38%] min-w-[300px] max-w-[560px] shrink-0 flex-col border-l border-line-subtle" aria-label="Preview">
-          <Preview map={shown} />
-          <div className="max-h-[34%] shrink-0 overflow-y-auto border-t border-line-subtle bg-surface-1 p-3" aria-label="Warnings">
-            {broken && <div className="mb-2 flex items-start gap-2 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> The map saved in this project could not be read ({broken}), so the standard office is shown. Saving replaces that file.</div>}
-            {error && <div className="mb-2 flex items-start gap-2 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
-            {warnings.length === 0
-              ? <div className="flex items-center gap-2 text-[13px] text-text-secondary"><Glyph state="done" size={16} /> Nothing looks wrong.</div>
-              : <><div className="mb-1 text-[13px] font-bold text-text-secondary">{warnings.length} thing{warnings.length === 1 ? "" : "s"} to look at (you can still save)</div>
-                <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[13px] leading-5 text-text-secondary">{warnings.map((w, n) => <li key={n} className="flex items-start gap-2"><Glyph state="waiting" size={14} />{w}</li>)}</ul></>}
-          </div>
-        </aside>
-      </div>
+            </>
+          ) : <span className="text-[13px] text-text-tertiary">Nothing picked. With “Select and move”, click a piece of furniture to change it.</span>}
+        </div>
+        <div className="max-h-40 min-h-12 w-[38%] min-w-[300px] max-w-[560px] shrink-0 overflow-y-auto border-l border-line-subtle px-4 py-3" aria-label="Warnings">
+          {broken && <div className="mb-2 flex items-start gap-2 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> The map saved in this project could not be read ({broken}), so the standard office is shown. Saving replaces that file.</div>}
+          {error && <div className="mb-2 flex items-start gap-2 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
+          {warnings.length === 0
+            ? <div className="flex items-center gap-2 text-[13px] text-text-secondary"><Glyph state="done" size={16} /> Nothing looks wrong.</div>
+            : <><div className="mb-1 text-[13px] font-bold text-text-secondary">{warnings.length} thing{warnings.length === 1 ? "" : "s"} to look at (you can still save)</div>
+              <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[13px] leading-5 text-text-secondary">{warnings.map((w, n) => <li key={n} className="flex items-start gap-2"><Glyph state="waiting" size={14} />{w}</li>)}</ul></>}
+        </div>
+      </footer>
       {asks === "close" && (
         <Confirm title="Close without saving?" confirmLabel="Close and lose it" danger onConfirm={() => { const g = goAfter.current; setAsks(null); goAfter.current = null; undo.current = []; g?.(); }} onCancel={() => { setAsks(null); goAfter.current = null; }}>
           <p className="m-0">You changed the office and did not save it. If you close now, the changes are lost.</p>

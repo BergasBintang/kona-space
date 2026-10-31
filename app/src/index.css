@@ -1,12 +1,12 @@
 @import "@fontsource-variable/nunito-sans";
-@import "@fontsource-variable/pixelify-sans";
+@import "@fontsource/jersey-20";
 @import "tailwindcss";
 
 /* Kona's tokens (decision 48): light paper and cream, bright but never pure white. Meaning-based names. Every pair of colours was computed against
    the contrast rules (text 4.5 to 1, control borders and the focus ring 3 to 1): see tools/contrast.mjs. Hover goes darker on a light ground. */
 @theme {
   --font-sans: "Nunito Sans Variable", "Segoe UI", system-ui, sans-serif; /* long text: replies, notes, tickets */
-  --font-pixel: "Pixelify Sans Variable", "Nunito Sans Variable", "Segoe UI", system-ui, sans-serif; /* the interface: headings, buttons, labels */
+  --font-pixel: "Jersey 20", "Nunito Sans Variable", "Segoe UI", system-ui, sans-serif; /* the interface: headings, buttons, labels */
   --font-mono: "Cascadia Mono", Consolas, "Courier New", monospace; /* code, paths, file contents */
 
   --color-ground: #f2e9d4;
@@ -46,9 +46,9 @@ html, body, #root { height: 100%; }
    scrolling it, which pushed the whole app up and left an empty strip below. */
 html, body { overflow: hidden; }
 #root { overflow: clip; }
-/* The pixel font is drawn on a tight grid: at small sizes neighbouring letters touch and read as one ("Bug Fix" as "Bug Ax", "Launch" as "Launoh").
-   A little extra space between letters (about 1.6 px at 16 px) keeps each one apart; it is inherited by what sits inside a button. */
-h1, h2, h3, h4, button, summary, legend, .font-pixel { font-family: var(--font-pixel); letter-spacing: 0.1em; }
+/* The pixel font is Jersey 20 (decision 58, docs/FONTS.md). It has one weight, so the weight is fixed at 400 here (a bold class would only smear it) and the browser
+   may not make a fake bold. A little space between letters (about 1.6 px at 16 px) keeps each one apart; it is inherited by what sits inside a button. */
+h1, h2, h3, h4, button, summary, legend, .font-pixel { font-family: var(--font-pixel); font-weight: 400; font-synthesis-weight: none; letter-spacing: 0.1em; }
 .font-mono { letter-spacing: normal; } /* code and paths keep their own spacing, even inside a button */
 body {
   margin: 0;

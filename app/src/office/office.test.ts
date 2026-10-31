@@ -185,3 +185,21 @@ test("a saved map that is hand-edited into nonsense cannot crash or freeze the d
   assert.doesNotThrow(() => checkMap((r as { map: OfficeMap }).map));
   assert.ok(Date.now() - t0 < 10000, "it did not freeze");
 });
+
+test("the dots of a carpet stay on the carpet tile they belong to, on every side", () => {
+  const map = STANDARD, carpets = map.rooms.filter((r) => r.pattern === "carpet");
+  const rgb = (s: string) => [1, 3, 5].map((k) => parseInt(s.slice(k, k + 2), 16));
+  for (let view = 0; view < 4; view++) {
+    const g = buildScene(map, view).ground, iso = new Iso(map.cols, map.rows, view);
+    for (let y = 0; y < g.h; y++) for (let x = 0; x < g.w; x++) {
+      const o = (y * g.w + x) * 4;
+      if (!g.d[o + 3]) continue;
+      for (const r of carpets) {
+        const [a, b, c] = rgb(r.floor[1]);
+        if (g.d[o] !== a || g.d[o + 1] !== b || g.d[o + 2] !== c) continue;
+        const dy = (y - 42) / 8, dx = (x - iso.OX) / 16, [i, j] = iso.unCell(Math.floor((dy + dx) / 2), Math.floor((dy - dx) / 2));
+        assert.equal(map.floor[j]?.[i], r.id, `a dot of ${r.id} lies on ${map.floor[j]?.[i]} at ${x},${y} (side ${view})`);
+      }
+    }
+  }
+});

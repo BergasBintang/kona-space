@@ -201,9 +201,41 @@ Keep the page to short words; put every full explanation behind a "?" (`Help`). 
 |---|---|
 | Room layout on whole tiles | You said you will report what looks wrong. When you do: say the side and send a crop; I fix the rule, then check all four sides. Growing a room means editing `DEFS`; then rerun the build, read every `CHECK:`, check there is no short tall-wall stub, and look at all four sides. |
 | Cat looks | Redrawn after 0.22.0 as a true three-quarter view with shading and a tail (section 2.8); still drawn by script. A hand-drawn LibreSprite cat can replace it, keeping the sheet layout. |
+| Font | Jersey 20 was tried on this PC only. If a letter looks wrong, send a crop; `docs/FONTS.md` says how to go back or make the text a little bigger. |
 | Real window | Done once for 0.22.0 on 2026-10-30, with your Kona closed: all 19 smoke checks passed (welcome page, office, every place including Workflows, no content-policy blocks), and a short extra check showed the turn buttons change and remember the side, the Workflows screen has its three suggestions and its chart, and the top bar shows v0.22.0. Run it again after each release (section 6.3). |
 | Workflow follow-ups | Left: roles reading only their own steps, chart lines that skip a column, an optional auto-start. Section 4. |
 | Kibby inside the rooms | He walks the hall only. Rooms need their own ordering checks (furniture, desks); extend `WALK` with a door and a few steps inside, then read the CHECK lines. |
 | Kibby's talk, measured | Measure the cost and the delay of a message, then decide on a longer memory or a saved talk. |
 | Decor on every wall | Windows are on all outer walls; art boards only on three. Add more through the `ART` list in `office.mjs`. |
 | Workflows and the Board in the office | A room may later show a "Workflows" tag of its own; today the Board room opens both. |
+
+---
+
+## 8. What was found in the session of 2026-10-31 (0.24.2 to 0.26.1)
+
+Each line: what was seen, the cause, the rule to keep.
+
+| Seen | Cause | Keep |
+|---|---|---|
+| Floor tiles looked odd, rugs hid the pattern | The floor was drawn tile by tile with its own rules | One picture of one tile per colour (33 x 17 px) with its grout on the rim, copied onto every tile; rugs removed (0.25.0 and 0.26.0) |
+| A 1 to 2 px black gap along the open edge of the hall | A slab edge was counted as ground but not drawn | Every counted ground tile is drawn: a lip of hall floor |
+| Floor shifted on turned sides | The tile sprite assumed the top corner | Use the highest of the four corners |
+| Strange wall joints from some sides | Tall walls had a fixed early drawing place, so a low wall was painted over them | Every wall tile has a footprint and is ordered like furniture; windows, doors and boards are painted into the wall tile they hang on (`docs/EDITOR.md`) |
+| Kibby walked one tile and stopped | Too many pauses and no preference for going straight | Straight on first, fewer pauses, and a test that the average run is more than 3 tiles |
+| Kibby's eye blended with his forehead stripes | The stripes reached the eye | Stripes shortened (`art/kibby.mjs`, `STRIPES`) |
+| Dots of one carpet on the hall tiles above it | `h >> 8` is signed in JavaScript: half the hashes gave a negative offset, so the dot moved up a tile | Use `>>>` for a hash; the test "the dots of a carpet stay on the carpet tile" checks all four sides |
+| The editor's bottom had two lines at different heights | The picked-thing bar lived under the plan and the warnings under the preview, each with its own border | One full-width band under both: the picked thing left, the warnings right |
+| "c" read as "o" in buttons | Pixelify Sans bold is nearly closed there | Jersey 20, weight 400 (`docs/FONTS.md`) |
+| The smoke test failed with "welcome page" | The app was already in the project | The test now skips what is already done; it needs the map editor closed |
+| A synthetic pointer capture threw and left a drag stuck | `setPointerCapture` needs a real pointer | try/catch around it |
+
+Habits that paid off: look at all four sides before saying a wall or floor is fixed; find the general cause (an ordering rule, a number type) before touching a picture; write long patch scripts to a file with the Write tool, never a shell heredoc; keep each file's own line endings; never run the editor test on a project that has its own map.
+
+### 8.1 Audit of old and unused files (2026-10-31, before 0.26.1)
+
+Checked: every file of `app/src` against the imports from `main.tsx`, every export, every npm and Rust dependency, the tracked files outside the program, and the links in the notes.
+
+- **Unused, still in the repo (not deleted, the owner decides):** `app/src/assets/frames/frame-paper-hover.png` and `frame-paper-pressed.png` (the big paper frame is only ever used in its normal look); the unused exports `STARTER_VERSION` (`lib/brain/starter.ts`), `TILE_W` (`engine/iso.ts`) and `SEE` (`engine/palette.ts`).
+- **Old text, kept as history:** sections 2.1 to 2.9 of this file still describe the first pipeline (`office.mjs`, `walls.mjs`); they have a banner saying it was replaced in 0.26.0, and three rows of section 7 ("Room layout", "Kibby inside the rooms", "Decor on every wall") name the old scripts too. `docs/AUDIT.md` is the audit of 0.16.0.
+- **Not a problem:** the 14 Brain starter notes (loaded by `import.meta.glob`), `typescript` (used by `npm run build`), `art/out` (the generated sheets and frames the app copies and the owner can redraw), no Rust warnings, no unused locals.
+- **Big and safe to rebuild:** `app/src-tauri/target` is about 9.4 GB of build output (ignored by git). `cargo clean` frees it; the next build takes several minutes.

@@ -54,7 +54,7 @@ export function drawGround(map: OfficeMap, iso: Iso, rugs: Rug[], roomOf: Map<st
     if (!r) continue;
     const n = tileColour(r, i, j), [u, v] = iso.cell(i, j), [x, y] = PR(u, v);
     img.blit(makeTile(r.floor[n], r.pattern === "tiles" ? r.grout ?? mix(r.floor[n], "#000000", 0.12) : null), x - TILE_PIC_X, y);
-    if (r.pattern === "carpet") for (let k = 0; k < 4; k++) { const h = hash(i, j, k), p = iso.P(i + 0.15 + (h % 70) / 100, j + 0.15 + ((h >> 8) % 70) / 100); img.set(Math.round(p[0]), Math.round(p[1]), r.floor[1]); }
+    if (r.pattern === "carpet") for (let k = 0; k < 4; k++) { const h = hash(i, j, k), p = iso.P(i + 0.15 + (h % 70) / 100, j + 0.15 + ((h >>> 8) % 70) / 100); img.set(Math.round(p[0]), Math.round(p[1]), r.floor[1]); }
   }
   // rugs
   for (const g of rugs) {

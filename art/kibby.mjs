@@ -1,10 +1,10 @@
-// Kibby, the office boy: a grey cat (dark head with three stripes on the forehead, light body) in a blue apron and a red neckerchief, with a mug in his paw. He is not one of the eleven roles (no desk, no session): he walks the
+// Kibby, the office boy: a grey cat (light grey head with three dark stripes on the forehead, paler body) in a blue apron and a red neckerchief, with a mug in his paw. He is not one of the eleven roles (no desk, no session): he walks the
 // hall and talks. He is drawn like the cats (the same 28 x 20 frame and the same 16 x 18 body) with the same two drawn looks (0 down-left, 2 up-left; 1 and 3 are their mirror
 // images), but his frames are a walk: a small hop with a small lean, one way then the other (walkA, walkB, walkC, walkD), plus idle, blink and happy (while he talks).
 import { Img, fromRows } from "./lib.mjs";
 import { PAL, FRAME_W, FRAME_H, TURNED, BEHIND, TAIL, layer, CX, CY } from "./cat.mjs";
 
-// A dark grey head (f, with d for its shade and S for the three stripes on the forehead), a light grey body (B, with D for its shade) and a light muzzle (l).
+// A light grey head (f, with d for its shade and S for the three dark stripes on the forehead), a paler grey body (B, with D for its shade) and a lighter muzzle (l).
 export const KIBBY = { f: "#c7c7c7", d: "#acacac", S: "#363b43", l: "#f1f3f6", B: "#e3e7ec", D: "#c6ccd5", t: "#d9604f", e: "#1f1712", p: "#f0a8a0", A: "#5a86c8", a: "#46699e", P: "#f4efe5", c: "#6f4a30" };
 const KPAL = { ...PAL, ...KIBBY };
 const torso = (x) => "..o" + x + "o..";

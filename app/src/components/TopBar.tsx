@@ -1,9 +1,8 @@
 // The top bar, always in view: the Kona mark with a chevron (back to the welcome page, the only way to another project), the name of the open project,
-// a way back to the office and a list of every room, what is waiting on you, the account of the project and the two plan bars. It replaces the sidebar (decision 44).
+// what is waiting on you, the account of the project and the two plan bars. It replaces the sidebar (decision 44).
 import { Button, Glyph, PlanBar } from "./ui";
 import { KonaMark } from "./KonaMark";
-import { Select } from "./pick";
-import { PLACES, type Place } from "../lib/places";
+import type { Place } from "../lib/places";
 import type { Project } from "../lib/api";
 import type { Plan } from "../lib/sessions";
 
@@ -22,13 +21,7 @@ export function TopBar({ project, onHome, place, onPlace, attention, leftBehind,
       </button>
 
       {!project && place !== "office" && <Button variant="quiet" small onClick={() => onPlace("office")}>← Back</Button>}
-      {project && (
-        <>
-          <span className="max-w-[220px] truncate text-[18px] leading-6 font-bold" title={project.folder}>{project.name}</span>
-          <div className="w-[170px]"><Select ariaLabel="Go to" value={place} onChange={(v) => onPlace(v as Place)} search={false} options={PLACES.map((p) => ({ value: p.id, label: p.label, hint: p.room }))} /></div>
-          {place !== "office" && <Button variant="quiet" small onClick={() => onPlace("office")}>← Office</Button>}
-        </>
-      )}
+      {project && <span className="max-w-[220px] truncate text-[18px] leading-6 font-bold" title={project.folder}>{project.name}</span>}
 
       <div className="flex-1" />
 

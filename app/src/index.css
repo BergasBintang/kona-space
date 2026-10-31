@@ -46,7 +46,10 @@ html, body, #root { height: 100%; }
    scrolling it, which pushed the whole app up and left an empty strip below. */
 html, body { overflow: hidden; }
 #root { overflow: clip; }
-h1, h2, h3, h4, button, summary, legend, .font-pixel { font-family: var(--font-pixel); }
+/* The pixel font is drawn on a tight grid: at small sizes neighbouring letters touch and read as one ("Bug Fix" as "Bug Ax", "Launch" as "Launoh").
+   A little extra space between letters (about 1 px at 16 px) keeps each one apart; it is inherited by what sits inside a button. */
+h1, h2, h3, h4, button, summary, legend, .font-pixel { font-family: var(--font-pixel); letter-spacing: 0.06em; }
+.font-mono { letter-spacing: normal; } /* code and paths keep their own spacing, even inside a button */
 body {
   margin: 0;
   background: var(--color-ground);
@@ -74,6 +77,10 @@ body {
 /* The live mark breathes slowly (3 s between 100 and 70 percent). Reduced motion turns it off above.
    It moves in 12 small steps, not smoothly: a smooth fade of an SVG redraws it every frame and measured 15 percent of a core on this PC for the window
    process alone; 4 steps a second looks the same at this speed and costs almost nothing. */
+/* The sheet (components/Sheet.tsx) slides up from below in 6 small steps; reduced motion turns it off above. */
+@keyframes kona-sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.kona-sheet { animation: kona-sheet-up 180ms steps(6, end); }
+
 @keyframes kona-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
 .kona-live-core { animation: kona-breathe 3s steps(12, end) infinite; }
 

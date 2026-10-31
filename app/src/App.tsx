@@ -5,8 +5,12 @@ import { getVersion } from "@tauri-apps/api/app";
 import { initialState, loadPlans, reducer, savePlans } from "./lib/sessions";
 import { PLAIN_LINES, leftoverOverview, listAccounts, listProjects, accountStatus, getPersona, listRoles, listTools, roleKits, samePlace, type Account, type AddResult, type Project, type Persona, type LeftoverOverview, type Role, type RoleKit, type TicketView, type ToolInfo } from "./lib/api";
 import { TopBar } from "./components/TopBar";
-import type { Place } from "./lib/places";
+import { PLACES, type Place } from "./lib/places";
+import { tabsFor } from "./lib/rooms";
+import { roomName } from "./lib/roomName";
 import { Office } from "./components/Office";
+import { Sheet, type Guard } from "./components/Sheet";
+import { TeamRoom } from "./components/TeamRoom";
 import { officeLooks, looksSignature } from "./lib/office";
 import { Hello } from "./components/Hello";
 import { SessionList } from "./components/SessionList";
@@ -50,7 +54,9 @@ export default function App() {
   const [accountsReady, setAccountsReady] = useState(false); // the welcome page needs the accounts, or every project looks accountless
   const [helloNote, setHelloNote] = useState<string | null>(null); // why the welcome page came back
   const [lastAccount, setLastAccount] = useState(remembered("kona.account") ?? "main"); // the account used last
-  const [place, setPlace] = useState<Place>("office");
+  const [place, setPlace] = useState<Place>("office"); // the page open in the sheet over the office; "office" means no page
+  const [teamRoom, setTeamRoom] = useState<string | null>(null); // or the room with cats at desks that is open in the sheet
+  const sheetGuard = useRef<Guard | null>(null); // the open sheet, which asks before anything that would throw away unsaved text
   const [greeted, setGreeted] = useState(false); // the welcome page comes first on every launch
   // the account of a project, or null when it has none (or its account was removed): then nothing starts until the owner picks one on the welcome page
   const accountOf = (p: Project | null | undefined) => (p?.account && accounts.some((a) => a.id === p.account) ? p.account : null);
@@ -144,8 +150,13 @@ export default function App() {
 
   const pickProject = useCallback((id: string) => { setProjectId(id); remember("kona.project", id); setCreating(false); setPresetRole(null); }, []);
   useEffect(() => { if (place !== "sessions") setPresetRole(null); }, [place]);
-  // the office's three actions keep one identity, so the office does not redraw for a reason it cannot see
+  useEffect(() => { if (place !== "office") setTeamRoom(null); }, [place]);
+  // do a move that leaves the sheet's page (home, another page from the top bar), asking first if the page holds text that was not sent or saved
+  const leave = (go: () => void) => { if (sheetGuard.current) sheetGuard.current.leave(go); else go(); };
+  const closeSheet = () => { setPlace("office"); setTeamRoom(null); };
+  // the office's actions keep one identity, so the office does not redraw for a reason it cannot see
   const openPlace = useCallback((p: Place) => setPlace(p), []);
+  const openRoom = useCallback((id: string) => setTeamRoom(id), []);
   const startRoleHere = useCallback((id: string) => { setPresetRole(id); setError(null); setCreating(true); setPlace("sessions"); }, []);
   const openSessionHere = useCallback((id: string) => { dispatch({ type: "select", id }); setCreating(false); setPlace("sessions"); }, []);
 
@@ -273,7 +284,7 @@ export default function App() {
         <Hello projects={projects} accounts={accounts} persona={persona} version={version}
           note={helloNote}
           onOpen={(id) => { pickProject(id); setHelloNote(null); setGreeted(true); setAdding(false); setPlace("office"); }}
-          onAdd={() => { setGreeted(true); setAdding(true); }}
+          onAdd={() => { setGreeted(true); setAdding(true); setPlace("office"); }}
           onOpenAccounts={() => { setGreeted(true); setAdding(false); setPlace("accounts"); }}
           onProjects={setProjects} />
         <UpdateCard running={state.order.filter((id) => state.sessions[id].run !== "ended").length} />
@@ -281,61 +292,67 @@ export default function App() {
     );
   }
 
+  // the page of a place; the sheet shows it over the office
+  const pageOf = (which: Place): React.ReactNode => {
+    if (!project) return null;
+    switch (which) {
+      case "accounts": return <Accounts accounts={accounts} onChanged={setAccounts} />;
+      case "files": return <Files project={project} />;
+      case "roles": return <Roles roles={roles} tools={tools} kits={kits} onSetup={setSettingUp} />;
+      case "settings": return <Settings projects={projects} version={version} onProjects={(next) => { setProjects(next); if (projectId && !next.some((p) => p.id === projectId)) { setProjectId(next[0]?.id ?? null); remember("kona.project", next[0]?.id ?? ""); } }} />;
+      case "servers": return <Servers project={project} roles={roles} />;
+      case "brain": return <BrainPlace project={project} onAsk={askClaude} />;
+      case "leftovers": return <Leftovers state={state} roles={roles} overview={lo} onRefresh={() => { void leftoverOverview().then(setLo); }} />;
+      case "worktrees": return <Worktrees project={project} onChanged={() => {}} />;
+      case "board": return <Board project={project} roles={roles} state={state} onStart={startTicket} onOpenSession={(id) => { dispatch({ type: "select", id }); setCreating(false); setPlace("sessions"); }} />;
+      case "workflows": return <Workflows project={project} roles={roles} onOpenBoard={() => setPlace("board")} onStart={startTicket} />;
+      case "voice": return <Voice persona={persona} onChanged={setPersona} />;
+      case "costs": return <Costs project={project} roles={roles} accounts={accounts} />;
+      case "sessions": return (
+        <>
+          <SessionList state={state} project={project} roles={roles} leftBehind={leftBehind} earlier={shownEarlier} onResume={(e) => void resume(e)} creating={creating || !current} onSelect={(id) => { setPresetRole(null); setCreating(false); dispatch({ type: "select", id }); }} onNew={() => { setPresetRole(null); setError(null); setCreating(true); }} />
+          <div className="w-px bg-line-subtle" />
+          <main className="flex min-w-0 flex-1 flex-col">
+            {creating || !current ? <Welcome key={`${project.id}-${presetRole ?? ""}`} initialRole={roles.find((r) => r.id === presetRole) ?? null} project={project} roles={roles} accounts={accounts} persona={persona} accountId={accountOf(project) ?? ""} onOpenAccounts={() => setPlace("accounts")} onStart={start} error={error} /> : <Chat key={current.id} s={current} onNote={() => void noteSession(current.id, true)} onSaveAnswer={(t) => void saveAnswer(current.id, t)} role={roles.find((r) => r.id === current.roleId)} account={accounts.length > 1 ? accounts.find((a) => a.id === current.accountId)?.label : undefined} dispatch={dispatch} />}
+          </main>
+        </>
+      );
+      default: return null;
+    }
+  };
+
   let content: React.ReactNode;
-  if (place === "accounts" && !adding) {
-    content = <Accounts accounts={accounts} onChanged={setAccounts} />;
+  let sheet: React.ReactNode = null;
+  if (place === "accounts" && !adding && !project) {
+    content = <Accounts accounts={accounts} onChanged={setAccounts} />; // no project yet, so there is no office to open it over
   } else if (adding || !project) {
     content = <AddProject first={!project} accounts={accounts} onDone={added} onCancel={() => setAdding(false)} onOpenAccounts={() => { setAdding(false); setPlace("accounts"); }} />;
-  } else if (place === "office") {
-    content = <Office project={project} roles={roles} looks={looks} onOpen={openPlace} onStartRole={startRoleHere} onOpenSession={openSessionHere} onSetup={setSettingUp} onKibbySay={sayToKibby} />;
-  } else if (place === "files") {
-    content = <Files project={project} />;
-  } else if (place === "roles") {
-    content = <Roles roles={roles} tools={tools} kits={kits} onSetup={setSettingUp} />;
-  } else if (place === "settings") {
-    content = <Settings projects={projects} version={version} onProjects={(next) => { setProjects(next); if (projectId && !next.some((p) => p.id === projectId)) { setProjectId(next[0]?.id ?? null); remember("kona.project", next[0]?.id ?? ""); } }} />;
-  } else if (place === "servers") {
-    content = <Servers project={project} roles={roles} />;
-  } else if (place === "brain") {
-    content = <BrainPlace project={project} onAsk={askClaude} />;
-  } else if (place === "leftovers") {
-    content = <Leftovers state={state} roles={roles} overview={lo} onRefresh={() => { void leftoverOverview().then(setLo); }} />;
-  } else if (place === "worktrees") {
-    content = <Worktrees project={project} onChanged={() => {}} />;
-  } else if (place === "board") {
-    content = <Board project={project} roles={roles} state={state} onStart={startTicket} onOpenSession={(id) => { dispatch({ type: "select", id }); setCreating(false); setPlace("sessions"); }} />;
-  } else if (place === "workflows") {
-    content = <Workflows project={project} roles={roles} onOpenBoard={() => setPlace("board")} onStart={startTicket} />;
-  } else if (place === "voice") {
-    content = <Voice persona={persona} onChanged={setPersona} />;
-  } else if (place === "costs") {
-    content = <Costs project={project} roles={roles} accounts={accounts} />;
   } else {
-    content = (
-      <>
-        <SessionList state={state} project={project} roles={roles} leftBehind={leftBehind} earlier={shownEarlier} onResume={(e) => void resume(e)} creating={creating || !current} onSelect={(id) => { setPresetRole(null); setCreating(false); dispatch({ type: "select", id }); }} onNew={() => { setPresetRole(null); setError(null); setCreating(true); }} />
-        <div className="w-px bg-line-subtle" />
-        <main className="flex min-w-0 flex-1 flex-col">
-          {creating || !current ? <Welcome key={`${project.id}-${presetRole ?? ""}`} initialRole={roles.find((r) => r.id === presetRole) ?? null} project={project} roles={roles} accounts={accounts} persona={persona} accountId={accountOf(project) ?? ""} onOpenAccounts={() => setPlace("accounts")} onStart={start} error={error} /> : <Chat key={current.id} s={current} onNote={() => void noteSession(current.id, true)} onSaveAnswer={(t) => void saveAnswer(current.id, t)} role={roles.find((r) => r.id === current.roleId)} account={accounts.length > 1 ? accounts.find((a) => a.id === current.accountId)?.label : undefined} dispatch={dispatch} />}
-        </main>
-      </>
-    );
+    content = <Office looks={looks} sheetOpen={place !== "office" || teamRoom !== null} onOpen={openPlace} onOpenRoom={openRoom} onKibbySay={sayToKibby} />;
+    if (place !== "office") {
+      const tabs = tabsFor(place);
+      const info = PLACES.find((x) => x.id === place);
+      sheet = <Sheet key="sheet" title={info?.label ?? place} subtitle={tabs.length ? undefined : info?.room} tabs={tabs.map((id) => ({ id, label: PLACES.find((x) => x.id === id)?.label ?? id }))} active={place} onTab={(id) => setPlace(id as Place)} onClose={closeSheet} guard={sheetGuard}>{pageOf(place)}</Sheet>;
+    } else if (teamRoom) {
+      sheet = <Sheet key="sheet" title={roomName(teamRoom)} onClose={closeSheet} guard={sheetGuard}><TeamRoom room={teamRoom} roles={roles} looks={looks} onSetup={setSettingUp} onStartRole={startRoleHere} onOpenSession={openSessionHere} onOpen={setPlace} /></Sheet>;
+    }
   }
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <TopBar project={project} onHome={() => { setAdding(false); setGreeted(false); }} place={place}
-        onPlace={(p) => { setAdding(false); setPlace(p); }} attention={attention} leftBehind={leftTotal} plan={state.plans[current?.accountId ?? accountOf(project) ?? lastAccount]}
+      <TopBar project={project} onHome={() => leave(() => { setAdding(false); setGreeted(false); })} place={place}
+        onPlace={(p) => leave(() => { setAdding(false); setPlace(p); })} attention={attention} leftBehind={leftTotal} plan={state.plans[current?.accountId ?? accountOf(project) ?? lastAccount]}
         limitLine={persona.enabled ? persona.lines.limit : PLAIN_LINES.limit} accountLabel={project ? accounts.find((a) => a.id === (current?.accountId ?? accountOf(project)))?.label ?? null : null} version={version} />
       <div className="relative flex min-h-0 min-w-0 flex-1">
         {content}
+        {sheet}
         {settingUp && project && roles.some((r) => r.id === settingUp) && (
           <RoleSetup key={`${project.id}-${settingUp}`} role={roles.find((r) => r.id === settingUp)!} project={project} accountId={accountOf(project)} kit={kits[settingUp] ?? { skills: [], mcp: [] }}
             onSaved={(saved) => setRoles((all) => all.map((r) => (r.id === saved.id ? saved : r)))} onKitSaved={(id, kit) => setKits((all) => ({ ...all, [id]: kit }))} onClose={() => setSettingUp(null)} />
         )}
         <UpdateCard running={state.order.filter((id) => state.sessions[id].run !== "ended").length} />
         {notice && (
-          <div role="status" className="absolute right-6 bottom-6 flex max-w-[440px] items-start gap-3 px-card px-shadow p-2">
+          <div role="status" className="absolute right-6 bottom-6 z-20 flex max-w-[440px] items-start gap-3 px-card px-shadow p-2">
             <Glyph state="done" size={20} />
             <span className="text-[14px] leading-5 text-text-secondary">{notice}</span>
             <button className="ml-2 text-[13px] font-bold text-text-secondary hover:text-text" onClick={() => setNotice(null)}>Close</button>

@@ -56,7 +56,7 @@ Data on disk, per project: `<project>\.kona\role-kits.json` (skills and connecto
 
 - Hand-drawn walls kept breaking at corners, T joints and ends ("a V at the corner", "jagged teeth", "walls with gaps"). Patching each case made it worse ("IT JUST GETTING WORSE").
 - `walls.mjs` solves all cases at once: it paints every wall box into one picture and remembers, per pixel, which box painted it and which *surface* it is (a top at a height, or a side face on a plane in a colour). An outline is drawn only where a surface meets a *different* surface or air, and only on the nearer one. Two walls that run on into each other are the same surface, so no seam shows. Then each box takes the pixels it painted as its own piece.
-- Each wall piece carries `hides` (the room it stands in front of). When you zoom into a room the app leaves those pieces out, like a dollhouse with its front open.
+- Each wall piece carries `hides` (the room it stands in front of). The app no longer uses it (the zoom into a room was removed in 0.24.0); it stays in the data.
 - **If a wall looks wrong, fix `walls.mjs` or the wall plan, not one picture.**
 
 ### 2.5 Drawing order: the most expensive lesson
@@ -101,7 +101,7 @@ A `CHECK:` line is a problem to fix, not noise. A clean build prints none. They 
 - **On screen** (`Office.tsx`, component `Living`): his own clock, 8 steps a second (`TICK_MS` in `lib/kibby.ts`); at a place he stands 2 to 6 seconds, then picks a stretch that starts there (not straight back unless it is the only way). He stops while a room is zoomed (and is hidden), while you talk to him, and with Windows "reduce motion" (he then stands at one place). A click box over him opens the dialog; hover shows his name. The walking logic is plain functions in `lib/kibby.ts`, tested in `lib/kibby.test.ts`.
 - **His talk** (`KibbyChat.tsx`, `kibby.rs`): a dialog like an old role-playing game (a name tab, his face, text typed letter by letter, a click or "reduce motion" shows it at once). He starts with a plain "Hi!". Each message is **one one-shot Haiku call** with no tools (`summary::run_haiku`), his character as the system prompt (`PERSONA` in `kibby.rs`: kind, a little shy, quirks, kind gossip about the eleven role cats, cannot read or change anything, short plain replies, no markdown) and the last 12 turns in the prompt. The talk is on screen only. The call uses the project's account, and its dollars go in the ledger under the kind `kibby`. **Not measured yet:** the cost and the delay of one message on this PC.
 - **To change his character:** edit `PERSONA` in `kibby.rs` (the test `the_character_says_what_he_cannot_do` checks two promises in it). **To give him a longer memory or save the talk:** the history is passed from the screen; keep 12 turns unless the cost is measured.
-- **Turning the building is locked while a room is zoomed** (the two buttons are disabled with a short hint); go back first.
+- **Turning the building is locked while the sheet is open** (the two buttons are disabled); close the sheet first. Kibby and the cats hold still then.
 
 ### 2.10 How to handle a glitch you send me
 

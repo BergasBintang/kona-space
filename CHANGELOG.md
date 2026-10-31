@@ -2,6 +2,21 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.24.0, 2026-10-31
+
+Pages open in a sheet that slides up over the office. Plus a plainer top bar, a grey Kibby, a street door and cleaner furniture.
+
+- **A sheet from below.** Click a room and its page slides up over the office, under the top bar and the turn buttons. Close it with the X button or Esc. There is no zoom into a room, no preview card and no Go to list any more. While the sheet is open the building cannot be turned and its rooms cannot be clicked.
+- **Asks before it throws text away.** If you typed something in the page that no button or Enter has taken yet, closing it (X, Esc, a tab, the Kona mark, or a button in the top bar) asks first. A box you filled in and saved does not ask. Limit: pressing any button in the page counts as taking the text, so a draft is not protected after that.
+- **A plainer top bar.** The Kona mark has a chevron: it goes back to the welcome page, the only way to another project. The project name is plain text, not a list. The Go to list and the Office button are gone.
+- **Room names only on hover.** A room shows its name while the pointer is on it (or it has the keyboard focus), not all the time.
+- **Tabs and lists.** A room with two pages (Board and Workflows, Voice and Settings) shows them as tabs in the sheet. A room with cats at desks opens the list of its cats (what each is doing, Set up, start or open a session) and the pages it leads to.
+- **Kibby is grey.** A light grey head with three dark stripes on the forehead and a paler grey body. His written character says so too.
+- **A street door.** The Entrance has a door onto the outside, in its east wall: an opening with two posts where the wall is low, a painted double door where it is tall brick, and a doormat.
+- **Furniture stays out of walls.** Every piece is cut back from the walls it touched (shelves, racks, cabinets, the control panel, two chart boards), so none sinks into a wall. The build lists them and warns about any piece lying across a wall.
+- The two plants that closed the corridor to the front desk are gone, and the secretary's screen has a frame on its sides.
+- A little more space between letters in the pixel font, so small words such as "Bug Fix" and "Launch" stay readable.
+
 ## 0.23.0, 2026-10-30
 
 Kibby, the office boy, walks the hall and talks. Plus workflows that move on by themselves, better cats, and a turn lock while a room is zoomed.

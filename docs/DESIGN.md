@@ -134,7 +134,7 @@ The secretary sits at the front desk, answers general questions and turns what t
 
 - **The welcome page** opens on every launch: the Kona mark, a greeting, one card per project with its account and whether it is signed in. A signed-out account offers Sign in and Use another account; a project without an account asks "Which account does this project use?" once; Open is enabled only when the account is signed in. "Add another project" is the last card. The Kona mark in the top bar goes back to it.
 - **The top bar** is always in view: the mark, the project, a Go to list of every place, a way back to the office, what waits on you and what was left behind, the account of the project, the two plan bars and the version. There is no sidebar.
-- **The office** is one isometric pixel-art building with a room for every place. Every room wears its name plate; hover lights a room; click zooms in (twice the scale, the rest fogged); Esc or "Back to the office" returns. A room's panel lists its cats with their state and a button to start or open a session as that role, and the places the room opens. A room is also reachable by keyboard (Tab, then Enter).
+- **The office** is one isometric pixel-art building with a room for every place. A room shows its name only while the pointer is on it (or it has the keyboard focus); click opens its page in a sheet that slides up from below (decision 56), closed with the X button or Esc. A room with two pages shows them as tabs; a room with cats lists them with their state and a button to start or open a session as that role, and the pages the room leads to. While the sheet is open the building cannot be turned. A room is also reachable by keyboard (Tab, then Enter).
 
 | Room | Holds |
 |---|---|

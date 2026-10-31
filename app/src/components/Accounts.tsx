@@ -35,7 +35,7 @@ function Card({ account, status, onChanged, onRemoved, onRefresh }: {
           {name === null
             ? <div className="flex items-center gap-2.5"><h2 className="m-0 min-w-0 truncate text-[19px] leading-7 font-bold">{account.label}</h2>
                 <Help title="About this account"><p className="m-0">{isMain ? "The login already on this PC, the one the terminal uses." : "Its own login folder, kept apart from the main account. It starts clean: sessions on this account do not see your personal Claude settings, skills or servers from the main account."}</p></Help></div>
-            : <input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void rename(); if (e.key === "Escape") setName(null); }}
+            : <input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void rename(); if (e.key === "Escape") { e.preventDefault(); setName(null); } }}
                 aria-label="Account name" className="h-10 w-[260px] border border-line-strong bg-inset px-3 text-[15px] text-text" />}
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[14px] leading-5">
             {status === undefined

@@ -2,11 +2,11 @@
   "name": "app",
   "private": true,
   "license": "MIT",
-  "version": "0.23.0",
+  "version": "0.24.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "test": "node --test src/lib/brain/brain.test.ts src/lib/kibby.test.ts",
+    "test": "node --test src/lib/brain/brain.test.ts src/lib/kibby.test.ts src/lib/unsaved.test.ts src/lib/rooms.test.ts",
     "smoke": "node tests/smoke.mjs",
     "contrast": "node tools/contrast.mjs",
     "release": "node tools/release.mjs",

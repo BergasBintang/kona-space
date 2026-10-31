@@ -45,7 +45,7 @@ export function Voice({ persona, onChanged }: { persona: Persona; onChanged: (p:
 
   return (
     <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-[calc(880px*var(--k))] flex-col gap-6 px-8 pt-8 pb-10">
+      <div className="flex w-full flex-col gap-6 px-8 pt-8 pb-10">
         <div className="flex items-center gap-3"><h1 className="m-0 text-[30px] leading-[38px] font-bold">Voice</h1><Help title="Voice"><p className="m-0">How Claude talks to you in chat, and a few lines in Kona's own screens.</p><p className="m-0">It changes the wording only. It never changes what Claude does, and it never touches code, files, commands, warnings or numbers.</p></Help></div>
 
         <Check label="Use this voice" hint="Turn it off to get plain Claude. You can also turn it off for one session when you start it." on={draft.enabled} onChange={(v) => set({ enabled: v })} />

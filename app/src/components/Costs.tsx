@@ -94,7 +94,7 @@ export function Costs({ project, roles, accounts }: { project: Project | null; r
 
   return (
     <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-[calc(1160px*var(--k))] flex-col gap-6 px-8 pt-8 pb-10">
+      <div className="flex w-full flex-col gap-6 px-8 pt-8 pb-10">
         <div className="flex items-center gap-3"><h1 className="m-0 text-[30px] leading-[38px] font-bold">Costs</h1><Help title="Costs"><p className="m-0">What your sessions cost, from the ledger Kona keeps on this PC. Only sessions Kona ran are in it.</p><p className="m-0">Costs are always for the open project. Open another project to see its costs.</p><p className="m-0">The figures are an estimate at list price, not your bill. On a Pro or Max plan you pay a flat fee; use these figures to compare, not to count money.</p></Help></div>
 
         <div className="flex flex-wrap items-center justify-between gap-4">

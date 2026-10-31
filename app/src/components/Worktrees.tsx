@@ -84,7 +84,7 @@ export function Worktrees({ project, onChanged }: { project: Project; onChanged:
   const w = pending?.w;
   return (
     <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-[calc(1280px*var(--k))] flex-col gap-6 px-8 pt-8 pb-10">
+      <div className="flex w-full flex-col gap-6 px-8 pt-8 pb-10">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3"><h1 className="m-0 text-[30px] leading-[38px] font-bold">Worktrees</h1><Help title="Worktrees"><p className="m-0">The working copies of {project.name}: your main folder and every extra copy on its own branch.</p><p className="m-0">A ticket's own copy shows up here.</p></Help></div>
           <Button variant="quiet" small onClick={load}>Refresh</Button>

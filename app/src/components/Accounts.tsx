@@ -82,7 +82,7 @@ export function Accounts({ accounts, onChanged }: { accounts: Account[]; onChang
 
   return (
     <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-[calc(880px*var(--k))] flex-col gap-6 px-8 pt-8 pb-10">
+      <div className="flex w-full flex-col gap-6 px-8 pt-8 pb-10">
         <div className="flex items-center gap-3"><h1 className="m-0 text-[30px] leading-[38px] font-bold">Accounts</h1><Help title="Accounts"><p className="m-0">The Claude logins Kona can use. Each project uses one of them, chosen on the welcome page.</p><p className="m-0">Each account has its own limits. Use a second account for a real separate purpose, such as work and personal, not to get around a limit.</p></Help></div>
         {accounts.map((a) => (
           <Card key={a.id} account={a} status={status[a.id]} onRefresh={refresh}

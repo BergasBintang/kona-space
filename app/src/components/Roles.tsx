@@ -14,7 +14,7 @@ export function Roles({ roles, tools, kits, onSetup }: { roles: Role[]; tools: T
   const toolName = (id: string) => tools.find((t) => t.id === id)?.name ?? id;
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-8">
-      <div className="mx-auto flex w-full max-w-[920px] flex-col gap-6">
+      <div className="flex w-full flex-col gap-6">
         <div className="flex items-center gap-3">
           <h1 className="m-0 text-[30px] leading-[38px] font-bold">Roles</h1>
           <Help title="Roles"><p className="m-0">Each role is a cat with a job. Start a session as a role and Claude is told what that job is, how to behave, and gets only the skills and connectors you chose for it in this project, nothing else. Press Set up on a role to change them. The list of roles is fixed. All of them use the account of the project.</p></Help>

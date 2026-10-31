@@ -66,7 +66,7 @@ export function Servers({ project, roles }: { project: Project; roles: Role[] })
 
   return (
     <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-[calc(1160px*var(--k))] flex-col gap-6 px-8 pt-8 pb-10">
+      <div className="flex w-full flex-col gap-6 px-8 pt-8 pb-10">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3"><h1 className="m-0 text-[30px] leading-[38px] font-bold">Servers</h1><Help title="Servers"><p className="m-0">The servers {project.name} may reach. Kona keeps where the key file is, never the key.</p><p className="m-0">A role can use a server only if it is listed here for that role, and every command still asks you first.</p></Help></div>
           <Button onClick={() => { setDraft(blank(project.id)); setError(null); }}>Add a server</Button>

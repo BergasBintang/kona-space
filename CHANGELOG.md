@@ -2,6 +2,12 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.24.2, 2026-10-31
+
+Every page in the sheet now uses the full width.
+
+- **Full-width pages.** Some pages in the sheet (Costs, Servers, Settings, Voice, Roles, Accounts, Worktrees, Leftovers, Brain) stopped at a fixed width and left an empty strip at the side, while others filled the sheet. All of them now fill the sheet with the same side space (32 px), and the sheet's title bar lines up with it.
+
 ## 0.24.1, 2026-10-31
 
 Two fixes for the sheet of 0.24.0.

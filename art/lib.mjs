@@ -1,6 +1,6 @@
 // Tiny pixel canvas for Kona's art kit: no packages, only Node. Draws shapes, writes PNG files, scales with hard edges.
-import { deflateSync, crc32 } from "node:zlib";
-import { writeFileSync, mkdirSync } from "node:fs";
+import { deflateSync, inflateSync, crc32 } from "node:zlib";
+import { writeFileSync, readFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
 const parsed = new Map();
@@ -88,6 +88,30 @@ export class Img {
     };
     const head = Buffer.alloc(13); head.writeUInt32BE(this.w, 0); head.writeUInt32BE(this.h, 4); head[8] = 8; head[9] = 6;
     return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", head), chunk("IDAT", deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
+  }
+  // a PNG file (8 bits, colour with or without alpha, not interlaced: what LibreSprite and this kit write)
+  static fromPng(path) {
+    const buf = readFileSync(path);
+    let p = 8, w = 0, h = 0, ct = 6; const idat = [];
+    while (p < buf.length) {
+      const len = buf.readUInt32BE(p), type = buf.toString("ascii", p + 4, p + 8), data = buf.subarray(p + 8, p + 8 + len);
+      if (type === "IHDR") { w = data.readUInt32BE(0); h = data.readUInt32BE(4); ct = data[9]; if (data[8] !== 8 || (ct !== 6 && ct !== 2) || data[12]) throw new Error(path + ": only 8-bit RGB or RGBA PNG without interlacing"); }
+      if (type === "IDAT") idat.push(data);
+      p += 12 + len;
+    }
+    const bpp = ct === 6 ? 4 : 3, stride = w * bpp, raw = inflateSync(Buffer.concat(idat)), px = Buffer.alloc(h * stride), img = new Img(w, h);
+    for (let y = 0; y < h; y++) {
+      const f = raw[y * (stride + 1)];
+      for (let x = 0; x < stride; x++) {
+        const a = x >= bpp ? px[y * stride + x - bpp] : 0, b = y ? px[(y - 1) * stride + x] : 0, c = x >= bpp && y ? px[(y - 1) * stride + x - bpp] : 0;
+        let v = raw[y * (stride + 1) + 1 + x];
+        if (f === 1) v += a; else if (f === 2) v += b; else if (f === 3) v += (a + b) >> 1;
+        else if (f === 4) { const q = a + b - c, pa = Math.abs(q - a), pb = Math.abs(q - b), pc = Math.abs(q - c); v += pa <= pb && pa <= pc ? a : pb <= pc ? b : c; }
+        px[y * stride + x] = v & 255;
+      }
+      for (let x = 0; x < w; x++) { const o = y * stride + x * bpp; img.d.set([px[o], px[o + 1], px[o + 2], bpp === 4 ? px[o + 3] : 255], (y * w + x) * 4); }
+    }
+    return img;
   }
   save(path) { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, this.png()); }
 }

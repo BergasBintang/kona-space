@@ -7,6 +7,7 @@
 import { Img } from "./lib.mjs";
 import { renderWalls } from "./walls.mjs";
 import { cat, FRAME_W, FRAME_H } from "./cat.mjs";
+import { roomTile, TILE_PIC_X } from "./tiles.mjs";
 
 // One unit of length is a tile (32 x 16 px on the screen); one unit of height is a STEP of 4 px. Everything stands on whole tiles and is whole steps high.
 export const TILE_W = 32, TILE_H = 16, STEP = 4, WALL = 8 * STEP, LOW = 2 * STEP; // WALL: the tall brick back wall. LOW: the walls between rooms (a cut-away: low, so they hide little of the room behind them)
@@ -35,7 +36,7 @@ const shade = (hex) => [hex, mix(hex, "#000000", 0.18), mix(hex, "#000000", 0.34
 // "hall" (open floor with no name). r = [i, j, width, depth] in tiles. open: no wall towards the hall (the front desk stands in the lobby).
 // pattern: how the floor is laid (planks, checker, stripes, carpet, tiles), so rooms differ by more than a colour. wall: the colour of the wall seen from outside.
 const HALL = { id: "hall", kind: "hall", floor: ["#e9e2d3", "#e1dac9"], pattern: "tiles", grout: "#cfc7b4" };
-const DEFS = [
+export const DEFS = [
   // the hall: the main corridor, three niches off it, the branch to the front and the lobby
   { ...HALL, r: [0, 7, 32, 2] }, { ...HALL, r: [12, 5, 4, 2] }, { ...HALL, r: [26, 5, 3, 2] }, { ...HALL, r: [29, 4, 3, 3] }, { ...HALL, r: [10, 9, 2, 6] }, { ...HALL, r: [6, 15, 10, 4] },
   // the back row
@@ -108,7 +109,7 @@ const isExit = (o, c, k) => o === EXIT.o && c === EXIT.c && k >= EXIT.d0 && k < 
 // Where walls really stand on the plan, for every view: a slab a quarter of a tile thick (WALL_HALF on each side of the tile edge) on every border between two rooms
 // (except a door), and on every edge of the building. A piece of furniture is cut back from these slabs (see clipToWalls), so nothing ends up half inside a wall.
 const WALL_HALF = 0.125;
-const SLABS = []; // [i0, j0, i1, j1]
+const SLABS = []; // [i0, j0, i1, j1, drawn]: drawn is false for the open edge of the hall, which keeps its clearance but has no wall to draw
 {
   const doorKeys = new Set();
   for (const r of DOORS.values()) for (let k = r.d0; k < r.d1; k++) doorKeys.add(`${r.o}|${r.c}|${k}`);
@@ -117,7 +118,8 @@ const SLABS = []; // [i0, j0, i1, j1]
     if (!A && !B) continue;
     if (A && B && (group(A) === group(B) || doorKeys.has(`${o}|${c}|${k}`))) continue;
     if (isExit(o, c, k)) continue;
-    SLABS.push(o === "J" ? [k, c - WALL_HALF, k + 1, c + WALL_HALF] : [c - WALL_HALF, k, c + WALL_HALF, k + 1]);
+    const drawn = !((A ? !B : !!B) && (A ?? B).kind === "hall"); // the open edge of the hall has no wall (see wallPlan)
+    SLABS.push(o === "J" ? [k, c - WALL_HALF, k + 1, c + WALL_HALF, drawn] : [c - WALL_HALF, k, c + WALL_HALF, k + 1, drawn]);
   }
 }
 const EPS = 1e-6;
@@ -282,11 +284,13 @@ export function drawOffice({ cats = true, parts = false, probes = null } = {}) {
   const runs = (len, test) => { const out = []; let s = -1; for (let k = 0; k <= len; k++) { const ok = k < len && test(k); if (ok && s < 0) s = k; if (!ok && s >= 0) { out.push([s, k]); s = -1; } } return out; };
   add(-100, () => {
     const [U, V] = sidesOf(), N = 8; // the ground in cells of 1/8 tile, in the camera's own space
-    const slabs = SLABS.map(([i0, j0, i1, j1]) => {
+    const slabs = SLABS.map(([i0, j0, i1, j1, drawn]) => {
       const lenI = i1 - i0 > j1 - j0, [e0, e1] = lenI ? [i0 - WALL_HALF, i1 + WALL_HALF] : [j0 - WALL_HALF, j1 + WALL_HALF];
       const c = (lenI ? [[e0, j0], [e1, j1]] : [[i0, e0], [i1, e1]]).map(([i, j]) => rot(i, j));
-      return [Math.min(c[0][0], c[1][0]), Math.min(c[0][1], c[1][1]), Math.max(c[0][0], c[1][0]), Math.max(c[0][1], c[1][1])];
+      return [Math.min(c[0][0], c[1][0]), Math.min(c[0][1], c[1][1]), Math.max(c[0][0], c[1][0]), Math.max(c[0][1], c[1][1]), drawn];
     });
+    // the open edge of the hall has no wall, but the building's rim is as wide as everywhere else: the strip the wall would stand on is floor of the hall
+    for (const [u0, v0, u1, v1, drawn] of slabs) if (!drawn) poly([PR(u0, v0, 0), PR(u1, v0, 0), PR(u1, v1, 0), PR(u0, v1, 0)], HALL.floor[0]);
     const ground = (x, y) => { // the cell with its corner at (x, y) eighths
       const u = (x + 0.5) / N, v = (y + 0.5) / N;
       return (u >= 0 && v >= 0 && u < U && v < V && !!atR(Math.floor(u), Math.floor(v))) || slabs.some(([u0, v0, u1, v1]) => u > u0 && u < u1 && v > v0 && v < v1);
@@ -301,17 +305,16 @@ export function drawOffice({ cats = true, parts = false, probes = null } = {}) {
     }
   }, undefined, "floor edge");
 
-  // ---- the floor: a pattern and a colour pair per room, one part for every piece of floor
+  // ---- the floor: a pattern and a colour pair per room, one part for every piece of floor. Every tile is a copy of one tile picture (tiles.mjs), 33 x 17 px.
   const hash = (i, j, n) => ((i * 73856093) ^ (j * 19349663) ^ (n * 83492791)) >>> 0;
   for (const d of DEFS) {
     add(-90, () => {
       for (let i = d.r[0]; i < d.r[0] + d.r[2]; i++) for (let j = d.r[1]; j < d.r[1] + d.r[3]; j++) {
         if (own[i][j] !== d) continue;
-        const c = d.pattern === "checker" || d.pattern === "tiles" ? d.floor[(i + j) & 1] : d.pattern === "stripeI" ? d.floor[i & 1] : d.pattern === "carpet" ? d.floor[0] : d.floor[j & 1];
-        const dia = [P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i, j + 1)];
-        poly(dia, c);
-        if (d.pattern === "tiles") img.polyLine(dia, d.grout);
-        if (d.pattern === "carpet") for (let n = 0; n < 4; n++) { const h = hash(i, j, n), u = 0.15 + (h % 70) / 100, v = 0.15 + ((h >> 8) % 70) / 100; const p = P(i + u, j + v); img.set(Math.round(p[0]), Math.round(p[1]), d.floor[1]); }
+        const n = d.pattern === "checker" || d.pattern === "tiles" ? (i + j) & 1 : d.pattern === "stripeI" ? i & 1 : d.pattern === "carpet" ? 0 : j & 1;
+        const top = [P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i, j + 1)].reduce((a, b) => (b[1] < a[1] ? b : a)); // the top corner of the diamond: not (i, j) itself on the turned sides
+        img.blit(roomTile(d.id, n, d.floor[n], d.pattern === "tiles" ? d.grout : null), top[0] - TILE_PIC_X, top[1]);
+        if (d.pattern === "carpet") for (let k = 0; k < 4; k++) { const h = hash(i, j, k), u = 0.15 + (h % 70) / 100, v = 0.15 + ((h >> 8) % 70) / 100; const p = P(i + u, j + v); img.set(Math.round(p[0]), Math.round(p[1]), d.floor[1]); }
       }
     }, undefined, `floor of ${d.id}`, { room: d.id });
   }
@@ -462,7 +465,6 @@ export function drawOffice({ cats = true, parts = false, probes = null } = {}) {
   // ===== the hall =====
   block(13, 6, 2, 1, 4, M.wood, "bench"); // the bench niche
   piece(26, 5, 1, 1, 0, "water cooler", 20, (L) => { L.b(0.25, 0.25, 0.5, 0.5, 12, M.white); L.b(0.375, 0.375, 0.25, 0.25, 8, M.blue, 12); }); // the water cooler niche
-  rug(3, 7, 6, 1, "#d5c9b2", "#bfb298"); rug(17, 7, 6, 1, "#d5c9b2", "#bfb298");
 
   // ===== the west wing =====
   // --- Product and design (0,9): two desks, the staff board on the wall

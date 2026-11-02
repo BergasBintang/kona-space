@@ -463,3 +463,20 @@ Each chose the skill below by itself. "Opened" means it also opened a file besid
 **The throwaway project worked as written (benchmark 18):** a folder in the scratch directory, the project list saved to a copy, swapped for one entry, restored after, `cmp` showing the file identical, the folder deleted, no Claude transcripts (the smoke test starts no session).
 
 **Checked by the owner, not by Claude:** after trying the dev window the owner said it was good. Claude did not run a real chat to see the shaking gone (it needs a running session), and did not see the Brain map with a project's own notes and Claude's memory (the throwaway project has only the 14 starter notes).
+
+### 11.1 The file reader (2026-11-03: tables, diagrams, checklists)
+
+| Seen | Cause | Keep |
+|---|---|---|
+| A method called `declare` stopped every test from loading | `declare` is a TypeScript word, and Node strips types itself, without a compiler | Files that tests load (`lib/`) avoid TypeScript-only words and shortcuts (`constructor(private x)`). `npx tsc` alone does not catch it, `npm test` does |
+| An edit made through a Python script turned `\r` and `\n` into real line breaks inside the code | The quotes of the shell and of Python each ate a backslash | Benchmark line 22 again: for a line with backslashes use the Edit tool, not a script |
+| A command with `python3 -I -` waited for two minutes | A leftover reading from standard input | Benchmark line 22 a third time |
+| Chrome's extension was not connected, so the screen could not be looked at | Nothing | Edge is on this PC: start it headless with a debug port, drive it with a copy of `tests/cdp.mjs` pointed at the right tab, on a throwaway Vite port (`npx vite --port 5199`). Stop both and delete the test page after |
+| Numbered items kept counting across a bullet | The counter went up for bullets too | A bullet resets the count at its depth |
+| A new row for the Decisions table went to the end of the note | The anchor I edited at ("---" and "End of note") is the end of the file, not the end of the table | Add a table row next to the row before it (search for `\| 67 \|`), and look at the lines around it after |
+| The Files place could be checked in a browser although it needs Tauri | Its only link to Tauri is `invoke`, and `window.__TAURI_INTERNALS__.invoke` can be replaced by a pretend folder | For a screen that reads files: a temporary page that fakes `list_dir` and `read_file`, driven over the debug port; delete it after (done for 0.28: links, back, find, outline, polling) |
+| A link in a sentence was drawn in the interface font with wide spacing | The global rule for `button` is outside Tailwind's layers, so a `font-sans` class loses to it | A button that must look like text sets its font in `style`, not in a class |
+| A label on a left-to-right arrow hid the arrow | The gap between boxes was fixed, the label was wider | Along the flow the gap is the longest label plus room |
+| `cargo test mcp:: brain_search::` was refused | `cargo test` takes one name | `cargo test --lib` runs them all (about the same cost) |
+| Sessions "did not know where to put" lasting knowledge | The only hint was a line about searching; nothing said how to save, and the only place an agent knows is CLAUDE.md | Kona's own rules for sessions live in the program's prompt (`session.rs`), never in a project's CLAUDE.md, so an update fixes them for everyone. The prompt says to follow them over an older CLAUDE.md and never to copy them into one. Keep both paragraphs short: every session pays for them (about 400 tokens) |
+| Norbit's CLAUDE.md had nothing about Kona, only the "not Miralis" rules | It was written before the Brain tools existed | A project's CLAUDE.md carries only what is true of that project. It got a short "Where things go" section saying so (2026-11-03) |

@@ -132,3 +132,7 @@ body {
   input:where(:not([type]), [type="text"], [type="search"], [type="url"], [type="email"], [type="password"], [type="number"]):not(.bare):hover:not(:disabled) { border-image-source: url("./assets/frames/frame-paper-sm-hover.png"); }
   input:where(:not([type]), [type="text"], [type="search"], [type="url"], [type="email"], [type="password"], [type="number"]):not(.bare):disabled { opacity: 0.55; }
 }
+
+/* find in a file (Files place): every match, and the one being looked at */
+::highlight(kona-find) { background-color: color-mix(in srgb, var(--color-state-waiting) 32%, transparent); color: inherit; }
+::highlight(kona-find-now) { background-color: var(--color-accent); color: var(--color-on-accent); }

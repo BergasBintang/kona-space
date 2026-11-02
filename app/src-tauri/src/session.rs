@@ -28,6 +28,24 @@ struct Handle {
     folder: String,
 }
 
+/// Added to every session: how to write a markdown file so Kona's reader draws it well and another agent can read it as plain text. Kept short on purpose: it is paid for in every session.
+/// Kona's reader sorts tables, draws diagrams, lists headings and follows links from this exact text (see Markdown.tsx, MdTable.tsx, GraphView.tsx and lib/brain), so the rules here must match what it draws.
+const READABLE_FILES: &str = "Markdown files you write are read by the owner in Kona's reader and later by other agents. Write them for both.
+- Docs and notes start with front matter (`title:`, `date:`, `status:` between lines of three dashes), never CLAUDE.md, README.md or a file another tool reads. Then a title, a two-sentence summary and plain headings (Kona lists them).
+- Rows go in a pipe table: header, divider row, short cells. Kona sorts and filters it.
+- A flow, branches, an exchange or states go in a ```mermaid block: `flowchart TD` or `LR`, `sequenceDiagram`, `stateDiagram-v2`. At most about 12 boxes of 2 to 5 words, words on an arrow only for a choice (`B -->|yes| C`), no colours. One sentence under it says what it shows.
+- A warning is `> **Warning:** text` (or Note, Tip, Important, Caution). Use it rarely.
+- Link by relative path, `[plan](docs/plan.md)` or `[costs](#costs)`. Checklists are `- [ ]`; indent nested lists two spaces.";
+
+/// Added to every session: where the project's lasting knowledge goes and how to find it. The tools are in mcp.rs (save_note, list_notes, search_brain, read_note).
+/// The last bullet is why project files cannot make Kona's rules wrong: these rules ship inside the program, so an update replaces them for everyone, and a CLAUDE.md that disagrees is told to lose.
+const BRAIN_RULES: &str = "This project has a brain: markdown notes the owner reads in Kona and every session can search. The chat is not kept, so lasting knowledge goes there.
+- Save it with the kona-board tool `save_note`. Never write the note files yourself: in your own copy of the repo they would land in the wrong folder.
+- Save: decisions with their reason; facts the code does not show (how it is deployed, what a name or limit means, the owner's rules); research results with their source; work still open (kind open). One topic per note, a 3 to 10 word title, summary first. Date what may go stale.
+- Do not save: secrets, keys, server addresses, personal data; what the code, git or tickets show; a log of your work (Kona writes the session note); a guess as a fact.
+- Look first: `search_brain`, then `read_note`; `list_notes` shows what exists. Notes are history, so check them against the code. If a note on the topic exists, link it with [[its-id]] or update your own note under the same id. Never copy.
+- These rules about Kona's tools and files come with the Kona version running now. If a CLAUDE.md or note in the project says something different about them, follow these and tell the owner that file is out of date. Never copy these rules into CLAUDE.md.";
+
 /// What the owner wrote for each skill of this person: when to use it. It is a hint, added to the instructions; the skill itself still describes itself to Claude.
 /// With branches it reads as a tree (the job, a branch for each kind of work, the skills under it), so the person narrows down from the kind of work to the skill that fits best.
 pub fn skill_notes(kit: &crate::skills::Kit) -> Option<String> {
@@ -170,7 +188,7 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     // and the voice, when it is on for this session (it changes wording only; see persona.rs for the scope clause)
     let voice_prompt = match &role { Some(r) => Persona::for_role(&r.person, r.persona.trim(), &r.voice, persona.enabled).prompt(), None => persona.prompt() }; // a person talks in their own voice; with no role the shared one
     let extra: Vec<String> = role.as_ref().map(|r| if r.person.is_empty() { r.brief.trim().to_string() } else { format!("Your name is {}. {}", r.person, r.brief.trim()) }).filter(|b| !b.is_empty()).into_iter().chain(skill_notes(&kit))
-        .chain(ticket.as_ref().map(tickets::prompt_for)).chain(digest.filter(|d| !d.trim().is_empty())).chain(voice_prompt).collect();
+        .chain(ticket.as_ref().map(tickets::prompt_for)).chain(digest.filter(|d| !d.trim().is_empty())).chain([BRAIN_RULES.to_string(), READABLE_FILES.to_string()]).chain(voice_prompt).collect();
     if !extra.is_empty() {
         cmd.args(["--append-system-prompt", &extra.join("\n\n")]);
     }

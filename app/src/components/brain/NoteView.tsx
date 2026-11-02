@@ -67,6 +67,7 @@ export function NoteView({ projectId, brain, note, draftTitle, onOpen, onClose, 
             <div className="flex flex-wrap items-center gap-2">
               <Chip>{LAYER_WORD[note.layer]}</Chip>
               {note.kind !== "starter" && note.kind !== "memory" && <Chip>{note.kind}</Chip>}
+              {note.meta.source === "agent" && note.meta.edited_by !== "owner" && <Chip>Saved by a session</Chip>}
               {note.meta.edited_by === "owner" && <Chip>Edited by you</Chip>}
               {when && <span className="text-[13px] leading-5 text-text-tertiary">{note.layer === "memory" ? `Written ${when}. A memory records what was true then.` : when}</span>}
               {note.readonly && <span className="text-[13px] leading-5 text-text-tertiary">Read-only</span>}

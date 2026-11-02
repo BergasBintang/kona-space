@@ -115,7 +115,11 @@ function Drawer({ project, roles, ticket, state, guardDone, onClose, onSaved, on
           <span className="font-mono text-[13px] text-text-tertiary">{fresh ? "New ticket" : ticket!.id}</span>
           {!fresh && <span className="text-[13px] leading-5 text-text-tertiary">Raised by {ticket!.raised_by} · {ticket!.created}</span>}
         </div>
-        <Button variant="ghost" small onClick={onClose}>Close</Button>
+        {/* a framed button with words and an arrow toward the edge it slides to, so it is never taken for the sheet's X above it */}
+        <Button variant="quiet" small onClick={onClose}>
+          {fresh ? "Cancel" : "Close ticket"}
+          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="shrink-0"><path d="M2 8 H10 M7 4.5 L10.5 8 L7 11.5 M13.5 3 V13" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="square" /></svg>
+        </Button>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 pb-6">
         <label className="flex flex-col gap-2">

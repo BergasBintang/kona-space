@@ -103,7 +103,7 @@ pub struct Note {
     pub secret: bool,
 }
 
-fn front_matter(text: &str) -> (HashMap<String, String>, usize) {
+pub fn front_matter(text: &str) -> (HashMap<String, String>, usize) {
     let t = text.replace('\r', "");
     let lines: Vec<&str> = t.split('\n').collect();
     if lines.first() != Some(&"---") { return (HashMap::new(), 0); }

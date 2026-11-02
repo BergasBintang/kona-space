@@ -13,6 +13,9 @@ The brain is made of notes. A note can link to another with `[[its name]]`. Link
 - **Starter:** these notes, shipped with Kona. Read-only.
 - **Claude's memory:** the notes Claude keeps for the project, read-only. See [[claude-md-and-memory]].
 
+## Who writes notes
+You can write notes in the Brain place. Kona also writes a short note when a session ends (kind `session`). And every session is told to keep lasting knowledge here, with its `save_note` tool: decisions with their reason, facts the code does not show, research results, work still open. Those notes say "Saved by a session". If you edit one, it becomes yours and no session can change it again. Sessions find notes with `search_brain` and `list_notes`.
+
 ## Search
 Every note is cut into sections at its headings. Searching looks through the sections and tells you plainly whether the answer is found, partly there, or not in the brain. A miss goes on the wanted list in the report.
 

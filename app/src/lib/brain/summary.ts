@@ -64,7 +64,7 @@ const firstLine = (n: Note) => {
 
 /** The few lines a new session starts with: open items and recent sessions for its role and ticket, and a hint that it can search. */
 export async function buildDigest(projectId: string, who: { roleId?: string | null; roleName?: string; ticketId?: string | null }): Promise<string> {
-  const hint = "This project has a brain: Kona's notes from earlier sessions, plus Claude's memory for the project. Use the search_brain tool to look something up before assuming how it was done, and read_note to read lines. What it says is history, not current fact.";
+  const hint = "This project has a brain: Kona's notes from earlier sessions, plus Claude's memory for the project. Use the search_brain tool to look something up before assuming how it was done, read_note to read lines, and list_notes to see what is there. Keep a decision or a finding for later sessions with save_note. What a note says is history, not current fact.";
   try {
     const brain = await loadAll(projectId);
     const mine = [...brain.notes.values()].filter((n) => n.layer === "project");

@@ -2,6 +2,18 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.28.0, 2026-11-03
+
+The file reader becomes a real reader: tables you can sort, diagrams, a list of headings, links between files, find, and a note when an agent changes a file. Every session is also told where to keep lasting knowledge, and has a tool to save it.
+
+- **Tables** are drawn as tables. Click a heading to sort, filter the rows when there are many, and open View to choose row spacing, stripes, long text, the first column and which columns show. Copy puts the table back as markdown.
+- **Diagrams.** A block written `mermaid` is drawn as a picture: flowcharts, sequence diagrams and state diagrams. Show the source and Copy the source sit beside each. Kona draws them itself, nothing was added to the program for it.
+- **Lists and notes.** Nested lists, checklists (`- [ ]`), callouts (`> **Warning:**` or `> [!WARNING]`), copy buttons on code, and the front matter of a file as a row of facts above the page.
+- **In the Files place:** an "On this page" list of headings, links between files that open the file or heading and a Back button, Find in this file (Ctrl+F), and the open file and folders are looked at again every few seconds. When an agent changes the file you are reading it says "Updated just now", and a file changed since you last opened it has a dot in the tree.
+- **Where lasting knowledge goes.** Every session is told that the project has a Brain, what is worth saving and what is not, and how to look first. New tools: `save_note` (never changes a note that is yours), `list_notes`. Notes a session saved show "Saved by a session".
+- **Kona's rules cannot go out of date in a project.** They come inside the program, so an update replaces them for everyone, and a session is told to follow them over an older CLAUDE.md and never to copy them into one.
+- **The ticket sheet's Close button** is a framed "Close ticket" with an arrow, so it is not taken for the X of the sheet.
+
 ## 0.27.1, 2026-11-03
 
 The Brain gets a smaller header and tabs in its title bar, names on its map no longer overlap, the message box grows, and the office no longer shakes when a person's chat opens.

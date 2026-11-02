@@ -38,3 +38,6 @@ desktop.ini
 # art kit: what the build makes again each time (the app keeps its own copy in app/src/office)
 art/out/parts/
 art/out/views/
+
+# test pictures made by art/joint-sheet.mjs
+art/out/joints-v*.png

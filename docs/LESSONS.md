@@ -413,3 +413,4 @@ Each row: what was seen, the cause, the rule to keep. The strongest rows are in 
 - Saving the office editor in the real window, kept off to protect the owner's own office.
 - The other 9 people and the other 38 skills in a real conversation.
 - Pressing "Default map" replaces a project's saved office: save a copy first.
+- The smoke test on the built 0.27.0 (`tests/smoke.mjs`), which needs your Kona closed. Installing 0.27.0 over an older Kona, through Check now, has not been tried either.

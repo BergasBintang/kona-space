@@ -12,8 +12,10 @@ const isText = (el: Element): el is HTMLInputElement | HTMLTextAreaElement =>
   el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && (el.type === "text" || el.type === "" || el.type === "url" || el.type === "email" || el.type === "password")
     && el.getAttribute("role") !== "combobox" && !/search|filter/i.test(el.getAttribute("aria-label") ?? el.placeholder));
 
-export function Sheet({ title, subtitle, tabs, active, onTab, onClose, guard, children }: {
-  title: string; subtitle?: string; tabs?: { id: string; label: string }[]; active?: string; onTab?: (id: string) => void; onClose: () => void; guard: MutableRefObject<Guard | null>; children: ReactNode;
+export function Sheet({ title, subtitle, tabs, active, onTab, onClose, guard, keepDraftOnTab = false, children }: {
+  title: string; subtitle?: string; tabs?: { id: string; label: string }[]; active?: string; onTab?: (id: string) => void; onClose: () => void; guard: MutableRefObject<Guard | null>;
+  /** the tabs are views of one thing (a person's chat, skills and setup), all kept alive, so changing tab never throws a draft away and never asks */
+  keepDraftOnTab?: boolean; children: ReactNode;
 }) {
   const root = useRef<HTMLElement>(null);
   const typed = useRef(new Typed());
@@ -40,7 +42,7 @@ export function Sheet({ title, subtitle, tabs, active, onTab, onClose, guard, ch
     return () => { if (was && document.contains(was)) was.focus?.({ preventScroll: true }); };
   }, []);
 
-  const tab = (id: string) => { if (id !== active) leave(() => onTab?.(id)); };
+  const tab = (id: string) => { if (id === active) return; if (keepDraftOnTab) onTab?.(id); else leave(() => onTab?.(id)); };
 
   return (
     <>

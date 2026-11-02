@@ -3,7 +3,7 @@
 // here for that role; every such command still shows an approval card with the server's name. Kona never connects to a server for you: the one
 // thing it does on request is read a server's public fingerprint, after you confirm.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { saveServer, listServers, removeServer, readFingerprints, keyState, pickFile, type Fingerprint, type KeyState, type Project, type Role, type Server } from "../lib/api";
+import { roleLabel, saveServer, listServers, removeServer, readFingerprints, keyState, pickFile, type Fingerprint, type KeyState, type Project, type Role, type Server } from "../lib/api";
 import { Button, Glyph, RoleMark } from "./ui";
 import { Confirm } from "./Confirm";
 import { MultiSelect } from "./pick";
@@ -41,7 +41,7 @@ export function Servers({ project, roles }: { project: Project; roles: Role[] })
   const load = useCallback(() => { listServers(project.id).then(setList).catch((e) => { setList([]); setError(String(e)); }); }, [project.id]);
   useEffect(() => { setList(null); setDraft(null); load(); }, [load]);
 
-  const roleName = (id: string) => roles.find((r) => r.id === id)?.name ?? "A removed role";
+  const roleName = (id: string) => { const r = roles.find((x) => x.id === id); return r ? roleLabel(r) : "A removed role"; };
   const save = async (s: Server) => {
     setBusy(true); setError(null);
     try { await saveServer(s); setDraft(null); load(); } catch (e) { setError(String(e)); } finally { setBusy(false); }
@@ -62,7 +62,7 @@ export function Servers({ project, roles }: { project: Project; roles: Role[] })
     if (prints && !prints.some((p) => s.fingerprints.includes(p.fingerprint))) return { glyph: "left" as const, word: "The fingerprint CHANGED", tone: "text-state-left" };
     return { glyph: "done" as const, word: `Fingerprint saved (${s.fingerprints.length})`, tone: "text-state-done" };
   };
-  const roleOptions = useMemo(() => roles.map((r) => ({ value: r.id, label: r.name, hint: r.group })), [roles]);
+  const roleOptions = useMemo(() => roles.map((r) => ({ value: r.id, label: roleLabel(r), hint: r.group })), [roles]);
 
   return (
     <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">

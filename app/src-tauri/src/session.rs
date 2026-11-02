@@ -23,6 +23,36 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 struct Handle {
     tx: mpsc::UnboundedSender<String>,
     stop: Option<oneshot::Sender<()>>,
+    /// the role it runs as, and the project it runs in (written the way `projects::norm` writes a folder): a person does one thing at a time in a project
+    role: Option<String>,
+    folder: String,
+}
+
+/// What the owner wrote for each skill of this person: when to use it. It is a hint, added to the instructions; the skill itself still describes itself to Claude.
+/// With branches it reads as a tree (the job, a branch for each kind of work, the skills under it), so the person narrows down from the kind of work to the skill that fits best.
+pub fn skill_notes(kit: &crate::skills::Kit) -> Option<String> {
+    let note_of = |s: &str| kit.notes.iter().find(|(k, _)| k == s).map(|(_, n)| n.as_str());
+    let line = |indent: &str, s: &str| match note_of(s) { Some(n) => format!("{indent}- {s}: {n}"), None => format!("{indent}- {s}") };
+    if kit.branches.iter().all(|b| b.skills.is_empty()) {
+        if kit.notes.is_empty() { return None; }
+        return Some(format!("You have these skills. The owner says when to use each:\n{}", kit.notes.iter().map(|(s, n)| format!("- {s}: {n}")).collect::<Vec<_>>().join("\n")));
+    }
+    let mut out = vec!["Your skills are arranged as a tree. Look at the kind of work in front of you, take the branch that fits, then the skill under it that fits best. The owner wrote when to take each:".to_string()];
+    for b in kit.branches.iter().filter(|b| !b.skills.is_empty()) {
+        out.push(if b.when.is_empty() { format!("- Branch \"{}\"", b.name) } else { format!("- Branch \"{}\" (take it when: {})", b.name, b.when) });
+        for s in &b.skills { out.push(line("  ", s)); }
+    }
+    let loose: Vec<&(String, String)> = kit.notes.iter().filter(|(s, _)| !kit.branches.iter().any(|b| b.skills.contains(s))).collect();
+    if !loose.is_empty() {
+        out.push("- Not in a branch".to_string());
+        for (s, _) in loose { out.push(line("  ", s)); }
+    }
+    Some(out.join("\n"))
+}
+
+/// The session of this person in this project that is still running, if there is one.
+fn find_busy(map: &HashMap<String, Handle>, role_id: &str, folder: &str) -> Option<String> {
+    map.iter().find(|(_, h)| h.role.as_deref() == Some(role_id) && h.folder == folder).map(|(id, _)| id.clone())
 }
 
 pub struct Sessions {
@@ -85,6 +115,11 @@ impl Sessions {
             }
     }
 
+    /// The running session of this person in this project (decision 62: one thing at a time), or None when they are free.
+    pub fn busy(&self, role_id: &str, folder: &str) -> Option<String> {
+        find_busy(&self.map.lock().unwrap(), role_id, &crate::projects::norm(std::path::Path::new(folder)))
+    }
+
     pub fn running(&self) -> Vec<String> {
         self.map.lock().unwrap().keys().cloned().collect()
     }
@@ -121,6 +156,10 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     if sessions.running().len() >= cap {
         return Err(format!("{cap} sessions are already open. Stop one first: each uses about 400 MB of this PC's memory. (You can change the limit in Settings.)"));
     }
+    // a person does one thing at a time in a project: a second conversation with them is refused, whatever asked for it (the screen checks first, and says which one is open)
+    if let Some(r) = &role && let Some(other) = sessions.busy(&r.id, &folder) {
+        return Err(format!("{} is busy: there is a conversation with {} open in this project already (session {}). Open it, or end it, before starting another.", r.person, r.person, &other[..other.len().min(8)]));
+    }
     let id = resume.clone().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let mut cmd = Command::new(exe);
     cmd.args([
@@ -129,8 +168,9 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     ]);
     // the role's brief is added to Claude's own instructions; the mode and model come from the role unless the owner changed them
     // and the voice, when it is on for this session (it changes wording only; see persona.rs for the scope clause)
-    let persona_line = role.as_ref().map(|r| r.persona.trim().to_string()).filter(|p| !p.is_empty()).map(|p| format!("Your personality in this role: {p}"));
-    let extra: Vec<String> = role.as_ref().map(|r| r.brief.trim().to_string()).filter(|b| !b.is_empty()).into_iter().chain(persona_line).chain(ticket.as_ref().map(tickets::prompt_for)).chain(digest.filter(|d| !d.trim().is_empty())).chain(persona.prompt()).collect();
+    let voice_prompt = match &role { Some(r) => Persona::for_role(&r.person, r.persona.trim(), &r.voice, persona.enabled).prompt(), None => persona.prompt() }; // a person talks in their own voice; with no role the shared one
+    let extra: Vec<String> = role.as_ref().map(|r| if r.person.is_empty() { r.brief.trim().to_string() } else { format!("Your name is {}. {}", r.person, r.brief.trim()) }).filter(|b| !b.is_empty()).into_iter().chain(skill_notes(&kit))
+        .chain(ticket.as_ref().map(tickets::prompt_for)).chain(digest.filter(|d| !d.trim().is_empty())).chain(voice_prompt).collect();
     if !extra.is_empty() {
         cmd.args(["--append-system-prompt", &extra.join("\n\n")]);
     }
@@ -266,7 +306,58 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
         });
     }
 
-    sessions.map.lock().unwrap().insert(id.clone(), Handle { tx, stop: Some(stop_tx) });
+    sessions.map.lock().unwrap().insert(id.clone(), Handle { tx, stop: Some(stop_tx), role: role.as_ref().map(|r| r.id.clone()), folder: crate::projects::norm(std::path::Path::new(&folder)) });
     let _ = app.emit("session-event", json!({"sessionId": id, "record": {"type": "kona/started", "folder": folder, "roleId": role.as_ref().map(|r| r.id.clone()), "accountId": account.as_ref().map(|a| a.id.clone()), "resumed": resume.is_some(), "voice": persona.enabled, "ticketId": ticket.as_ref().map(|t| t.id.clone()), "workDir": work_dir, "lines": persona.lines_for(&project_name), "model": model, "mode": mode, "coveredByJob": covered}}));
     Ok(id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn handle(role: Option<&str>, folder: &str) -> Handle {
+        let (tx, _rx) = mpsc::unbounded_channel::<String>();
+        Handle { tx, stop: None, role: role.map(str::to_string), folder: folder.to_string() }
+    }
+
+    #[test]
+    fn the_notes_of_the_skills_reach_the_instructions_in_the_order_of_the_skills() {
+        let none = crate::skills::Kit::default();
+        assert!(skill_notes(&none).is_none(), "no note, nothing added");
+        let kit = crate::skills::Kit { notes: vec![("brainstorming".into(), "Use it when the idea is vague.".into()), ("bug-report".into(), "Use it for every bug.".into())], ..Default::default() };
+        let text = skill_notes(&kit).unwrap();
+        assert!(text.contains("- brainstorming: Use it when the idea is vague.") && text.contains("- bug-report: Use it for every bug."));
+        assert!(text.find("brainstorming").unwrap() < text.find("bug-report").unwrap());
+    }
+
+    #[test]
+    fn with_branches_the_notes_read_as_a_tree_and_a_skill_in_no_branch_hangs_off_the_job() {
+        use crate::skills::{Branch, Kit};
+        let kit = Kit {
+            notes: vec![("release-checklist".into(), "Before shipping.".into()), ("bug-report".into(), "For every bug.".into()), ("plain-words".into(), "For anything the owner reads.".into())],
+            branches: vec![Branch { name: "Shipping".into(), when: "the job is about a release".into(), skills: vec!["release-checklist".into()] }, Branch { name: "Empty".into(), when: String::new(), skills: vec![] }],
+            ..Default::default()
+        };
+        let text = skill_notes(&kit).unwrap();
+        assert!(text.contains("- Branch \"Shipping\" (take it when: the job is about a release)\n  - release-checklist: Before shipping."), "{text}");
+        assert!(!text.contains("Empty"), "a branch with nothing under it says nothing");
+        let rest = text.split("- Not in a branch").nth(1).expect("the loose skills are listed");
+        assert!(rest.contains("  - bug-report: For every bug.") && rest.contains("  - plain-words"));
+        assert!(!rest.contains("release-checklist"), "a skill is listed once");
+        // a branch without a note on its skill still names the skill
+        let bare = Kit { branches: vec![Branch { name: "A".into(), when: String::new(), skills: vec!["x".into()] }], ..Default::default() };
+        assert!(skill_notes(&bare).unwrap().contains("- Branch \"A\"\n  - x"));
+    }
+
+    #[test]
+    fn a_person_is_busy_in_the_project_where_they_work_and_free_in_another() {
+        let mut map = HashMap::new();
+        map.insert("s1".to_string(), handle(Some("product"), "d:/norbit"));
+        map.insert("s2".to_string(), handle(None, "d:/norbit")); // a session with no role keeps nobody busy
+        assert_eq!(find_busy(&map, "product", "d:/norbit"), Some("s1".to_string()));
+        assert_eq!(find_busy(&map, "product", "d:/kona"), None, "another project is another place");
+        assert_eq!(find_busy(&map, "design", "d:/norbit"), None, "another person is free");
+        map.remove("s1");
+        assert_eq!(find_busy(&map, "product", "d:/norbit"), None, "an ended session frees the person");
+    }
 }

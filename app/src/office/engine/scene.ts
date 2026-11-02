@@ -1,16 +1,18 @@
 // The scene: a map seen from one side, ready to draw. It holds the ground (the slab, the floors, the rugs) as one picture, and everything that stands on it as a list of pictures
-// ordered from back to front: the walls, the things on the walls, the furniture and the cats. It also says where each room can be clicked, where its name goes, and which tiles
-// of the hall Kibby may walk on.
+// ordered from back to front: the walls, the things on the walls, the furniture and the cats. It also says what can be clicked (the people and the pieces that open a screen), and which
+// tiles Kibby may walk on.
 import { Img } from "./img.ts";
-import { CAP, CAPC, BRICK, NEUTRAL_WALL, mix, shade } from "./palette.ts";
+import { WALL_SHADES } from "./palette.ts";
 import { Iso, LOW, WALL, STEP } from "./iso.ts";
 import { KINDS, Stage, footprintOf, type Item } from "./furniture.ts";
 import { renderWalls, type WallBox } from "./walls.ts";
-import { decorPlan } from "./decor.ts";
+import { ARTS, UNIQUE_ARTS, WALL_PAGES, decorPlan, decorRect } from "./decor.ts";
 import { drawGround } from "./floor.ts";
-import type { OfficeMap, RoomDef } from "./types.ts";
+import { doorwayGaps } from "./doorway.ts";
+import type { FloorStyle, OfficeMap } from "./types.ts";
 
-export type RoomHit = { id: string; name: string; team: boolean; color: string | null; holds: string; /** where the name goes on the picture */ plate: [number, number]; /** the clickable area, as an SVG path */ path: string; /** the front of the room: front rooms win a click */ front: number };
+/** Something to click: a person (a cat with its desk) or a piece that opens a screen (furniture, or a board on a wall). `rect` is [x0, y0, x1, y1] in the picture's own pixels. */
+export type Hit = { key: string; kind: "person" | "piece"; /** the role of a person */ role?: string; /** the screen a piece opens (a Place) */ opens?: string; label: string; rect: [number, number, number, number]; /** the nearer ones are on top, so they win a click */ front: number };
 export type Scene = {
   iso: Iso;
   width: number;
@@ -23,45 +25,34 @@ export type Scene = {
   /** the screen box of each item, [x0, y0, x1, y1] */
   boxes: number[][];
   cats: { role: string; x: number; y: number; depth: number; dir: number }[];
-  rooms: RoomHit[];
-  /** the plan tiles of the hall Kibby may stand on: floor of the hall, no wall, nothing standing on it */
+  /** what can be clicked: the people and the pieces that open a screen, the nearest last */
+  hits: Hit[];
+  /** the plan tiles Kibby may stand on: floor, no wall, nothing standing on it */
   walkable: boolean[][];
   /** the tiles of the plan that are tall brick walls on this side */
   tall: Set<string>;
 };
 
-const RAISE = 28; // a room also owns the strip of wall and furniture above its floor
+const ARTS_LABEL = (art: string) => ARTS[art]?.label ?? art;
 
-export const roomMap = (map: OfficeMap) => new Map(map.rooms.map((r) => [r.id, r]));
-const isHall = (r: RoomDef | undefined) => !r || r.kind === "hall" || r.open === true;
+export const styleMap = (map: OfficeMap) => new Map(map.styles.map((r) => [r.id, r] as [string, FloorStyle]));
 
 export function buildScene(map: OfficeMap, view: number): Scene {
-  const iso = new Iso(map.cols, map.rows, view), roomOf = roomMap(map);
+  const iso = new Iso(map.cols, map.rows, view), styleOf = styleMap(map);
   const stage = new Stage(iso);
   map.objects.forEach((o, k) => { try { KINDS[o.kind]?.make(stage, k, o); } catch { /* a broken object is left out; checks.ts names it */ } });
-  const ground = drawGround(map, iso, stage.rugs, roomOf);
+  const ground = drawGround(map, iso, stage.rugs, styleOf);
 
-  // ---- walls: a block on every wall tile, tall brick where the open air is behind it
+  // ---- walls: a block on every wall tile, tall where the open air is behind it, low elsewhere; all one colour (palette.ts WALL_COLOUR)
   const wallAt = (i: number, j: number) => map.walls[j]?.[i] === true;
   const hasGround = (u: number, v: number) => { if (u < 0 || v < 0 || u >= iso.U || v >= iso.V) return false; const [i, j] = iso.unCell(u, v); return map.floor[j]?.[i] != null || wallAt(i, j); };
-  const roomColourAt = (u: number, v: number): string | null => {
-    if (u < 0 || v < 0 || u >= iso.U || v >= iso.V) return null;
-    const [i, j] = iso.unCell(u, v), id = map.floor[j]?.[i];
-    if (id == null || wallAt(i, j)) return null;
-    const r = roomOf.get(id);
-    return isHall(r) ? null : r!.wall;
-  };
   const tall = new Set<string>(), boxes: WallBox[] = [], boxAt = new Map<string, WallBox>();
   for (let j = 0; j < map.rows; j++) for (let i = 0; i < map.cols; i++) {
     if (!wallAt(i, j)) continue;
     const [u, v] = iso.cell(i, j), isTall = !hasGround(u - 1, v) || !hasGround(u, v - 1);
     if (isTall) tall.add(`${i},${j}`);
-    const own = [[i - 1, j], [i + 1, j], [i, j - 1], [i, j + 1]].map(([a, b]) => { const id = map.floor[b]?.[a]; const r = id == null || wallAt(a, b) ? undefined : roomOf.get(id); return isHall(r) ? null : r!.wall; }).find((c) => c) ?? NEUTRAL_WALL;
-    const wcV = roomColourAt(u, v + 1) ?? roomColourAt(u, v - 1) ?? own, wcU = roomColourAt(u + 1, v) ?? roomColourAt(u - 1, v) ?? own;
-    const dk = mix(wcU, "#000000", 0.2);
-    const box: WallBox = isTall
-      ? { u0: u, u1: u + 1, v0: v, v1: v + 1, h: WALL, m: [CAPC[0], BRICK[0], BRICK[1]], band: [CAPC[1], CAPC[2]], brick: true, tall: true, label: `back wall ${i},${j}`, ref: -1, kind: "wall" }
-      : { u0: u, u1: u + 1, v0: v, v1: v + 1, h: LOW, m: [CAP, wcV, dk], band: [mix(wcV, "#ffffff", 0.35), mix(dk, "#ffffff", 0.35)], brick: false, tall: false, label: `wall ${i},${j}`, ref: -1, kind: "wall" };
+    // every wall is the same colour in the same three shades; only the height differs
+    const box: WallBox = { u0: u, u1: u + 1, v0: v, v1: v + 1, h: isTall ? WALL : LOW, m: WALL_SHADES, band: null, tall: isTall, label: isTall ? `back wall ${i},${j}` : `wall ${i},${j}`, ref: -1, kind: "wall" };
     box.tile = [i, j]; boxes.push(box); boxAt.set(`${i},${j}`, box);
   }
   // things on walls are painted into the picture of each wall tile they cover (walls.ts)
@@ -69,17 +60,13 @@ export function buildScene(map: OfficeMap, view: number): Scene {
     const p = decorPlan(iso, a);
     if (p) for (const [i, j] of p.cells) { const b = boxAt.get(`${i},${j}`); if (b) (b.decor ??= []).push(p); }
   });
-  // a doorway is an opening in a wall line: a post at each end, in the room's colour
-  map.attach.forEach((a) => {
-    if (a.kind !== "doorway" || wallAt(a.i, a.j) || map.floor[a.j]?.[a.i] == null) return;
-    const room = roomOf.get(map.floor[a.j][a.i]!), accent = room?.color ?? mix(room?.wall ?? NEUTRAL_WALL, "#000000", 0.25), m = shade(accent);
-    const along = wallAt(a.i - 1, a.j) && wallAt(a.i + 1, a.j) ? "i" : wallAt(a.i, a.j - 1) && wallAt(a.i, a.j + 1) ? "j" : null;
-    if (!along) return;
-    for (const end of [0, 0.75]) {
-      const [u0, u1, v0, v1] = along === "i" ? iso.foot(a.i + end, a.j + 0.375, 0.25, 0.25) : iso.foot(a.i + 0.375, a.j + end, 0.25, 0.25);
-      boxes.push({ u0, u1, v0, v1, h: LOW + STEP, m, band: null, brick: false, tall: false, label: `door post at ${a.i},${a.j}`, ref: -1, kind: "post" });
-    }
-  });
+  // a doorway is an opening in a wall line, of any width up to four tiles: a post at each end of the gap, in the wall's colour (engine/doorway.ts)
+  for (const g of doorwayGaps(map)) {
+    const m = WALL_SHADES;
+    // a post is 0.2 of a tile along the wall and 0.25 across it, at the very end of the gap: Kibby stands on the middle of a tile and is 0.6 of a tile wide, so he never touches one
+    const posts = g.axis === "i" ? [iso.foot(g.first[0], g.first[1] + 0.375, 0.2, 0.25), iso.foot(g.last[0] + 0.8, g.last[1] + 0.375, 0.2, 0.25)] : [iso.foot(g.first[0] + 0.375, g.first[1], 0.25, 0.2), iso.foot(g.last[0] + 0.375, g.last[1] + 0.8, 0.25, 0.2)];
+    for (const [u0, u1, v0, v1] of posts) boxes.push({ u0, u1, v0, v1, h: LOW + STEP, m, band: null, tall: false, label: `door post at ${g.first[0]},${g.first[1]}`, ref: -1, kind: "post" });
+  }
   const items: Item[] = [...renderWalls(boxes, iso), ...stage.items];
 
   // ---- the order of drawing. Sorting by the centre of a piece is wrong for a long piece beside a wall (the wall is in front of one half of it and behind the other). So whatever
@@ -107,32 +94,27 @@ export function buildScene(map: OfficeMap, view: number): Scene {
   }
   const sbox = sorted.map((t) => (t.img ? [t.x, t.y, t.x + t.img.w, t.y + t.img.h] : [t.x, t.y, t.x + 28, t.y + 20]));
 
-  // ---- where a room can be clicked, and its name
-  const cells = new Map<string, [number, number][]>();
-  for (let j = 0; j < map.rows; j++) for (let i = 0; i < map.cols; i++) {
-    const id = map.floor[j][i];
-    if (id == null || wallAt(i, j) || roomOf.get(id)?.kind === "hall") continue; // the front desk is open to the hall but is a room you can click
-    (cells.get(id) ?? cells.set(id, []).get(id)!).push([i, j]);
-  }
-  const rooms: RoomHit[] = [];
-  for (const r of map.rooms) {
-    const list = cells.get(r.id);
-    if (!list || r.kind === "hall") continue;
-    let d = "", front = -Infinity, cx = 0, cy = 0;
-    for (const [i, j] of list) {
-      const [u, v] = iso.cell(i, j), top = iso.PR(u, v), right = iso.PR(u + 1, v), bottom = iso.PR(u + 1, v + 1), left = iso.PR(u, v + 1);
-      d += `M${left[0]} ${left[1] - RAISE}L${top[0]} ${top[1] - RAISE}L${right[0]} ${right[1] - RAISE}L${right[0]} ${right[1]}L${bottom[0]} ${bottom[1]}L${left[0]} ${left[1]}Z`;
-      front = Math.max(front, bottom[1]); cx += top[0]; cy += left[1];
-    }
-    cx /= list.length; cy /= list.length;
-    let best: [number, number] = [cx, cy], bd = Infinity; // the plate goes on the tile nearest the middle, so it is always on the room's own floor
-    for (const [i, j] of list) { const [u, v] = iso.cell(i, j), p = iso.PR(u + 0.5, v + 0.5), dd = (p[0] - cx) ** 2 + (p[1] - cy) ** 2; if (dd < bd) { bd = dd; best = [p[0], p[1]]; } }
-    rooms.push({ id: r.id, name: r.name, team: r.kind === "team", color: r.color ?? null, holds: r.holds, plate: [Math.round(best[0]), Math.round(best[1])], path: d, front });
-  }
-  rooms.sort((a, b) => a.front - b.front); // the front rooms are drawn last, so they win a click
+  // ---- what can be clicked: each person (the chair, the desk and the cat together) and each piece that opens a screen; and the boards on tall walls that open one
+  const hits: Hit[] = [];
+  map.objects.forEach((o, k) => {
+    const kd = KINDS[o.kind];
+    if (!kd || (o.kind !== "workstation" && !kd.opens)) return;
+    let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+    sorted.forEach((it, n) => { if (it.ref === k) { const b = sbox[n]; bx0 = Math.min(bx0, b[0]); by0 = Math.min(by0, b[1]); bx1 = Math.max(bx1, b[2]); by1 = Math.max(by1, b[3]); } });
+    if (!Number.isFinite(bx0)) return;
+    const person = o.kind === "workstation";
+    hits.push({ key: person ? `person:${String(o.role)}` : `piece:${o.kind}`, kind: person ? "person" : "piece", role: person ? String(o.role) : undefined, opens: kd.opens, label: kd.label, rect: [bx0 - 2, by0 - 2, bx1 + 2, by1 + 2], front: by1 });
+  });
+  map.attach.forEach((a) => {
+    const page = a.kind === "art" && a.art && UNIQUE_ARTS.includes(a.art) ? WALL_PAGES[a.art] : undefined;
+    if (!page || !a.art) return;
+    const r = decorRect(iso, a);
+    if (r && decorPlan(iso, a)!.cells.every(([i, j]) => tall.has(`${i},${j}`))) hits.push({ key: `board:${a.art}`, kind: "piece", opens: page, label: ARTS_LABEL(a.art), rect: [r[0] - 1, r[1] - 1, r[2] + 1, r[3] + 1], front: r[3] });
+  });
+  hits.sort((a, b) => a.front - b.front);
 
   // ---- where Kibby may walk
-  const walkable = Array.from({ length: map.rows }, (_, j) => Array.from({ length: map.cols }, (_, i) => { const id = map.floor[j][i]; return id != null && !wallAt(i, j) && isHall(roomOf.get(id)); }));
+  const walkable = Array.from({ length: map.rows }, (_, j) => Array.from({ length: map.cols }, (_, i) => map.floor[j][i] != null && !wallAt(i, j)));
   for (const o of map.objects) {
     const f = KINDS[o.kind] && o.kind !== "rug" ? footprintOf(o) : null;
     if (f) for (let j = f[1]; j < f[1] + f[3]; j++) for (let i = f[0]; i < f[0] + f[2]; i++) if (walkable[j]?.[i] !== undefined) walkable[j][i] = false;
@@ -146,7 +128,7 @@ export function buildScene(map: OfficeMap, view: number): Scene {
   if (x1 <= x0) { x0 = 0; y0 = 0; x1 = iso.width; y1 = iso.height; }
 
   const cats = sorted.filter((t) => t.kind === "cat").map((t) => ({ role: t.role!, x: t.x, y: t.y, depth: t.depth, dir: t.dir! }));
-  return { iso, width: iso.width, height: iso.height, content: [x0, y0, x1, y1], ground, items: sorted, boxes: sbox, cats, rooms, walkable, tall };
+  return { iso, width: iso.width, height: iso.height, content: [x0, y0, x1, y1], ground, items: sorted, boxes: sbox, cats, hits, walkable, tall };
 }
 
 /** Kibby standing at (i, j) of the plan (a point, in tiles): where his picture goes and the place in the list of items where he is drawn (between what lies behind him and what lies in

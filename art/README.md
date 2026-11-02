@@ -2,6 +2,10 @@
 
 Pixel art for Kona (ticket T-0001, decisions 44, 45 and 57 in `kona-space-app.md`). Drawn by script, to be refined by the owner in LibreSprite.
 
+## The standard office
+
+`node build-standard.mjs` writes `app/src/office/standard.json` from a short description of the rooms (floors, walls, doorways, windows, furniture). Change the rooms in that script and run it; do not edit the JSON by hand. It prints the checks of the map (`checkMap`), which must say nothing. Then run `node render-map.mjs ../app/src/office/standard.json <0-3> out/x.png 2` and look at all four sides.
+
 ## What is here
 
 - `node build-cats.mjs` writes `out/cats.png` (a sprite sheet: a row per role and look, a column per frame; the cat has four looks, one block of rows each), `out/cats.json` (the frame size, order, roles and number of looks), Kibby's sheet `out/kibby.png` with `out/kibby.json`, and a 5x preview. `node to-app.mjs` copies them into `app/src/office`.
@@ -15,6 +19,10 @@ Pixel art for Kona (ticket T-0001, decisions 44, 45 and 57 in `kona-space-app.md
 Since 0.26.0 the office is a **map** (a grid of tiles, decision 57): `app/src/office/standard.json` is the standard office built into Kona, and a project may have its own map in `.kona/office-map.json`. The app draws it with the engine in `app/src/office/engine/` (floor, walls, furniture, wall decorations, the order of drawing) and the map maker `app/src/components/OfficeEditor.tsx` edits it. Read `docs/EDITOR.md` first. The rules that still hold for any piece of furniture (written in `engine/furniture.ts`): the tile is 32 x 16 px; heights are whole steps of 4 px; positions snap to 1/8 of a tile; a piece is drawn in its own frame and turned with the plan; details smaller than a step are painted on a face.
 
 The first pipeline (a script that drew the office with thin walls, `office.mjs`, `walls.mjs`, `layout.mjs`, `tiles.mjs`, `build-office.mjs`) was removed in 0.26.0; it is in git history (commit `4d72069` and before). `art/find-joints.mjs` lists where tall walls meet low ones, and `art/joint-sheet.mjs` draws a made-up map with every kind of wall joint from all four sides: use them after a change to the walls.
+
+## The pieces that open a screen
+
+Since 2026-11-02 each screen that has no person is opened by one piece of the office (decision 61): the brain stand, archive drawers, server terminal, cash desk, key cabinet, gear console, leftovers bin and flow board, and the cork and branch boards on a wall. They are in `app/src/office/engine/furniture.ts` with `opens` and `unique`, each with its own height, outline and main colour so none looks like another (a test checks it). A contact sheet of all of them from the four sides is one small script away (draw the objects of the standard map by `ref`, as `render-map.mjs` does).
 
 ## Rules that still hold
 

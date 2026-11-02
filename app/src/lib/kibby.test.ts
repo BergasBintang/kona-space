@@ -50,7 +50,8 @@ test("along a corridor he walks several tiles in a row before he stops or turns"
   let w = startWalker(corridor)!, run = 0, runs: number[] = [], last = [w.x, w.y];
   for (let t = 0; t < 30000; t++) {
     w = step(w, corridor, rnd);
-    if (w.x === w.tx && w.y === w.ty && (w.x !== last[0] || w.y !== last[1])) { run++; last = [w.x, w.y]; if (w.wait > 0) { runs.push(run); run = 0; } }
+    // a tile counts when he is in its middle and was not on it a moment ago
+    if (w.x % 8 === 4 && w.y % 8 === 4 && (w.x !== last[0] || w.y !== last[1])) { run++; last = [w.x, w.y]; if (w.wait > 0) { runs.push(run); run = 0; } }
   }
   const mean = runs.reduce((a, b) => a + b, 0) / runs.length;
   assert.ok(mean > 3, `he walks ${mean.toFixed(1)} tiles between stops on average, not one`);
@@ -91,4 +92,32 @@ test("his look follows the way he goes, on the screen", () => {
   assert.equal(lookOf(scene, { ...base, hx: 0, hy: -1 }), 3);
   const turned = buildScene(STANDARD, 2);
   assert.equal(lookOf(turned, { ...base, hx: 0, hy: 1 }), 3, "seen from the opposite side, +j is up-right");
+});
+
+test("on every tile he may stand on, from every side, his body touches nothing that stands there: not a door post, not a piece of furniture", () => {
+  for (let view = 0; view < 4; view++) {
+    const scene = buildScene(STANDARD, view);
+    scene.walkable.forEach((row, j) => row.forEach((free, i) => {
+      if (!free) return;
+      const [u, v] = scene.iso.rot(i + 0.5, j + 0.5), h = 0.3 + 1e-6; // he is a square of 0.6 of a tile round the middle of the tile (scene.ts KIB.half)
+      for (const t of scene.items) {
+        if (!t.fp) continue;
+        const du = Math.min(u + h, t.fp[1]) - Math.max(u - h, t.fp[0]), dv = Math.min(v + h, t.fp[3]) - Math.max(v - h, t.fp[2]);
+        assert.ok(!(du > 2e-6 && dv > 2e-6), `side ${view}: he would stand inside ${t.label ?? t.kind} on the tile ${i},${j}`);
+      }
+    }));
+  }
+});
+
+test("when he is not stopping he sets off at once: he is never still for a tick between two tiles", () => {
+  const corridor = grid([".........."]), rnd = seeded(5);
+  let w = startWalker(corridor)!, still = 0, moving = 0, waited = true; // he starts by standing a moment
+  for (let t = 0; t < 4000; t++) {
+    const before = w.wait;
+    w = step(w, corridor, rnd);
+    if (w.wait > 0 || before > 0 || waited) { waited = w.wait > 0; continue; } // a pause he chose, and the tick on which it ends
+    if (w.x === w.tx && w.y === w.ty) still++; else moving++;
+  }
+  assert.ok(moving > 1000);
+  assert.equal(still, 0, "no tick of standing frames in the middle of a walk");
 });

@@ -41,10 +41,16 @@ export function step(w: Walker, walkable: boolean[][], rnd: () => number): Walke
     const i = tileOf(x), j = tileOf(y), straight = ok(walkable, i + w.hx, j + w.hy);
     const onward = DIRS.some(([a, b]) => ok(walkable, i + a, j + b) && !(w.last && w.last[0] === i + a && w.last[1] === j + b)); // any way but back
     const chance = straight ? PAUSE : onward ? PAUSE_AT_TURN : 1; // always at a dead end
-    return { ...w, x, y, n, wait: rnd() >= chance ? 0 : 16 + Math.floor(rnd() * 32) };
+    const arrived = { ...w, x, y, n, wait: rnd() >= chance ? 0 : 16 + Math.floor(rnd() * 32) };
+    return arrived.wait === 0 ? choose(arrived, walkable, rnd) : arrived; // not stopping: he sets off at once, so there is no standing frame between two tiles
   }
   if (w.wait > 0) return { ...w, wait: w.wait - 1, n };
-  const i = tileOf(w.x), j = tileOf(w.y);
+  return choose(w, walkable, rnd);
+}
+
+/** He stands on a tile and is not waiting: pick the next tile and head for it (or wait a while when there is nowhere to go). */
+function choose(w: Walker, walkable: boolean[][], rnd: () => number): Walker {
+  const n = w.n, i = tileOf(w.x), j = tileOf(w.y);
   const opts = DIRS.filter(([a, b]) => ok(walkable, i + a, j + b)), fresh = opts.filter(([a, b]) => !w.last || w.last[0] !== i + a || w.last[1] !== j + b), from = fresh.length ? fresh : opts;
   if (from.length === 0) return { ...w, wait: 40, n };
   const ahead = from.find(([a, b]) => a === w.hx && b === w.hy); // straight on, if he can and he feels like it

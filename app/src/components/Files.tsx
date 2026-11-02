@@ -24,9 +24,11 @@ const FileIcon = () => (
 
 type Tree = Record<string, Entry[] | "loading" | { error: string }>;
 
-function TreePanel({ project, selected, onPick }: { project: Project; selected: string | null; onPick: (e: Entry) => void }) {
+/** `root` is the folder the tree starts at (the project's own folder unless said otherwise); `only` keeps just the entries of that folder with these names (a person's own skills). */
+function TreePanel({ project, selected, onPick, root, only, title }: { project: Project; selected: string | null; onPick: (e: Entry) => void; root?: string; only?: string[]; title?: string }) {
+  const rootDir = root ?? project.folder;
   const [tree, setTree] = useState<Tree>({});
-  const [openDirs, setOpenDirs] = useState<Set<string>>(new Set([project.folder]));
+  const [openDirs, setOpenDirs] = useState<Set<string>>(new Set([rootDir]));
 
   const load = useCallback(async (dir: string) => {
     setTree((t) => ({ ...t, [dir]: "loading" }));
@@ -34,7 +36,7 @@ function TreePanel({ project, selected, onPick }: { project: Project; selected: 
     catch (e) { setTree((t) => ({ ...t, [dir]: { error: String(e) } })); }
   }, []);
 
-  useEffect(() => { setTree({}); setOpenDirs(new Set([project.folder])); void load(project.folder); }, [project.folder, load]);
+  useEffect(() => { setTree({}); setOpenDirs(new Set([rootDir])); void load(rootDir); }, [rootDir, load]);
 
   const toggle = (e: Entry) => {
     const next = new Set(openDirs);
@@ -65,9 +67,12 @@ function TreePanel({ project, selected, onPick }: { project: Project; selected: 
   const rows = (dir: string, depth: number): React.ReactNode => {
     const node = tree[dir];
     if (!node || node === "loading") return <div className="py-1 text-[13px] leading-5 text-text-tertiary" style={{ paddingLeft: 12 + depth * 18 }}>Reading…</div>;
-    if ("error" in node) return <div className="py-1 text-[13px] leading-5 text-state-left" style={{ paddingLeft: 12 + depth * 18 }}>{node.error}</div>;
-    if (node.length === 0) return <div className="py-1 text-[13px] leading-5 text-text-tertiary" style={{ paddingLeft: 12 + depth * 18 }}>Empty folder</div>;
-    return node.map((e) => {
+    if ("error" in node) return depth === 0 && only
+      ? <div className="py-1 text-[13px] leading-5 text-text-tertiary" style={{ paddingLeft: 12 + depth * 18 }}>No skills yet. Copy one from this computer on the right.</div> // the project has no skills folder until a skill is put in it
+      : <div className="py-1 text-[13px] leading-5 text-state-left" style={{ paddingLeft: 12 + depth * 18 }}>{node.error}</div>;
+    const list = depth === 0 && only ? node.filter((e) => only.includes(e.name)) : node;
+    if (list.length === 0) return <div className="py-1 text-[13px] leading-5 text-text-tertiary" style={{ paddingLeft: 12 + depth * 18 }}>{depth === 0 && only ? "No skills yet. Tick one on the right." : "Empty folder"}</div>;
+    return list.map((e) => {
       const isOpen = e.is_dir && openDirs.has(e.path);
       const on = selected === e.path;
       return (
@@ -92,9 +97,9 @@ function TreePanel({ project, selected, onPick }: { project: Project; selected: 
   };
 
   return (
-    <div className="flex h-full w-[320px] shrink-0 flex-col gap-3 overflow-y-auto bg-ground px-2.5 pt-6 pb-5" role="tree" aria-label={`Files of ${project.name}`} onKeyDown={onKey}>
-      <div className="px-2.5 text-[17px] leading-6 font-bold">{project.name}</div>
-      <div className="flex flex-col gap-px">{rows(project.folder, 0)}</div>
+    <div className="flex h-full w-[320px] shrink-0 flex-col gap-3 overflow-y-auto bg-ground px-2.5 pt-6 pb-5" role="tree" aria-label={`Files of ${title ?? project.name}`} onKeyDown={onKey}>
+      <div className="px-2.5 text-[17px] leading-6 font-bold">{title ?? project.name}</div>
+      <div className="flex flex-col gap-px">{rows(rootDir, 0)}</div>
     </div>
   );
 }
@@ -192,6 +197,18 @@ export function Files({ project }: { project: Project }) {
   return (
     <div className="flex h-full min-w-0 flex-1">
       <TreePanel project={project} selected={picked?.path ?? null} onPick={setPicked} />
+      <div className="w-px bg-line-subtle" />
+      <Viewer project={project} entry={picked} />
+    </div>
+  );
+}
+
+/** The same tree and reader, but only for some folders of one place: a person's own skills, read-only. `root` is the project's skills folder, `names` the skills this person has. */
+export function SkillFiles({ project, root, names, title }: { project: Project; root: string; names: string[]; title: string }) {
+  const [picked, setPicked] = useState<Entry | null>(null);
+  return (
+    <div className="flex h-full min-w-0 flex-1">
+      <TreePanel project={project} root={root} only={names} title={title} selected={picked?.path ?? null} onPick={setPicked} />
       <div className="w-px bg-line-subtle" />
       <Viewer project={project} entry={picked} />
     </div>

@@ -1,19 +1,16 @@
-// The places of Kona. Each one is a room in the office (components/Office.tsx); the top bar lists them too, as a way to jump.
-export type Place = "office" | "sessions" | "files" | "roles" | "accounts" | "costs" | "voice" | "board" | "workflows" | "worktrees" | "leftovers" | "brain" | "servers" | "settings";
+// The places of Kona. Each one is a piece of the office that opens a screen (or a person's sheet, for the pages of a person); the top bar lists them too, as a way to jump. Every page has a sheet of its own: no tabs between pages.
+export type Place = "office" | "files" | "accounts" | "costs" | "board" | "workflows" | "worktrees" | "leftovers" | "brain" | "servers" | "settings";
 
-export const PLACES: { id: Place; label: string; room: string }[] = [
-  { id: "office", label: "Office", room: "The whole building" },
-  { id: "sessions", label: "Sessions", room: "Front desk" },
-  { id: "board", label: "Board", room: "Notice wall" },
-  { id: "workflows", label: "Workflows", room: "Notice wall" },
-  { id: "worktrees", label: "Worktrees", room: "Git room" },
-  { id: "brain", label: "Brain", room: "Library" },
-  { id: "files", label: "Files", room: "Archive" },
-  { id: "leftovers", label: "Leftovers", room: "Storage closet" },
-  { id: "servers", label: "Servers", room: "Server room" },
-  { id: "costs", label: "Costs", room: "Accounting" },
-  { id: "roles", label: "Roles", room: "Staff board" },
-  { id: "voice", label: "Voice", room: "Back office" },
-  { id: "accounts", label: "Accounts", room: "Entrance" },
-  { id: "settings", label: "Settings", room: "Back office" },
+export const PLACES: { id: Place; label: string }[] = [
+  { id: "office", label: "Office" },
+  { id: "board", label: "Board" },
+  { id: "workflows", label: "Workflows" },
+  { id: "worktrees", label: "Worktrees" },
+  { id: "brain", label: "Brain" },
+  { id: "files", label: "Files" },
+  { id: "leftovers", label: "Leftovers" },
+  { id: "servers", label: "Servers" },
+  { id: "costs", label: "Costs" },
+  { id: "accounts", label: "Accounts" },
+  { id: "settings", label: "Settings" },
 ];

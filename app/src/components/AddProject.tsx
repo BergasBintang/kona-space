@@ -35,7 +35,7 @@ export function AddProject({ first, accounts, onDone, onCancel, onOpenAccounts }
   return (
     <div className="flex h-full flex-1 overflow-y-auto p-8">
       <div className="m-auto flex w-full max-w-[560px] flex-col gap-6">
-        <div className="flex items-center gap-3"><KonaMark size={36} /><h1 className="m-0 text-[30px] leading-[38px] font-bold">{first ? "Add your first project" : "Add a project"}</h1><Help title="What a project is"><p className="m-0">A project is one folder with your code in it.</p><p className="m-0">Kona adds a hidden folder inside it for notes and tickets, and tells Git to ignore that folder. Nothing else in your project is changed.</p></Help></div>
+        <div className="flex items-center gap-3"><KonaMark size={36} /><h1 className="m-0 text-[30px] leading-[38px] font-bold">{first ? "Add your first project" : "Add a project"}</h1><Help title="What a project is"><p className="m-0">A project is one folder with your code in it. Every session in it uses the account you choose here.</p><p className="m-0">Kona adds a hidden folder inside it for notes and tickets, and tells Git to ignore that folder. Nothing else in your project is changed.</p></Help></div>
         <div className="flex flex-col gap-2">
           <span className="text-[13px] leading-5 font-bold text-text-secondary">Folder</span>
           <div className="flex gap-3">
@@ -57,7 +57,6 @@ export function AddProject({ first, accounts, onDone, onCancel, onOpenAccounts }
           {signedIn.length > 0 || asking
             ? <Select label="Account" value={account} onChange={setAccount} placeholder={asking ? "Checking the accounts…" : "Choose an account"} disabled={asking} options={signedIn.map((a) => ({ value: a.id, label: a.label, hint: status[a.id]?.email ?? undefined }))} />
             : <div className="flex flex-col items-start gap-2"><span className="text-[13px] leading-5 font-bold text-text-secondary">Account</span><span className="text-[14px] leading-5 text-text-secondary">No account is signed in. A project needs one.</span><Button variant="quiet" small onClick={onOpenAccounts}>Sign in to an account</Button></div>}
-          <span className="text-[13px] leading-5 text-text-tertiary">Every session in this project will use this account.</span>
         </div>
         {error && <div className="flex items-start gap-2.5 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
         <div className="flex justify-end gap-3">

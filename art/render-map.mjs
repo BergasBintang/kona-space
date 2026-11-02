@@ -24,4 +24,4 @@ for (const it of scene.items) {
 const [x0, y0, x1, y1] = scene.content, crop = new Img(x1 - x0, y1 - y0);
 for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) crop.set(x - x0, y - y0, img.get(x, y));
 crop.scale(Number(scaleArg)).save(new URL(out, import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"));
-console.log(`view ${view}: ${scene.width} x ${scene.height}, content ${x1 - x0} x ${y1 - y0}, ${scene.items.length} items, ${scene.cats.length} cats, ${scene.rooms.length} rooms, built in ${ms} ms`);
+console.log(`view ${view}: ${scene.width} x ${scene.height}, content ${x1 - x0} x ${y1 - y0}, ${scene.items.length} items, ${scene.cats.length} cats, ${scene.hits.length} click areas, built in ${ms} ms`);

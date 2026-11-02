@@ -1,6 +1,6 @@
 # Kona
 
-Kona is a personal desktop workspace for Claude Code. It is for one person (the owner), on one Windows PC. The plan is in `kona-space-app.md`. Read it first.
+Kona is a personal desktop workspace for Claude Code. It is built by one owner on one Windows PC, but what ships inside the program must work for anyone who downloads it. The plan is in `kona-space-app.md`. Read it first.
 
 ## This is NOT a Miralis repo
 
@@ -28,4 +28,5 @@ Do not ask whether this is a Miralis product. The answer is no. `C:\miralis-cano
 - Tags in `kona-space-app.md`: (seen) checked on this PC, (web) read on a web page, (proposal) a suggestion, (to verify) test it before relying on it.
 - When a decision changes, update the Decisions table in `kona-space-app.md`.
 - The owner's UI taste is written down in `C:\miralis-canon\DESIGN.md` (Named Rules, Do's and Don'ts). Read it before designing or judging any Kona screen. Take the discipline (no kicker labels, one accent per area, state as glyph plus word, flat at rest, plain words), never the marks (no hexagon, cut lines, ticks). Kona's own look is now light paper and cream (bright, not too bright), pixel art, roomy and warm (decision 48 in `kona-space-app.md`; the old dark look is being replaced, tickets T-0001 to T-0003). Section 10.6 of the note has the list.
+- At the start of every session, read "The benchmark" at the top of `docs/LESSONS.md`, and check work against it before showing it. Add lessons as they happen and before a commit or a release, as "How this file grows" says there. When the owner says "write the lessons", do that whole flow.
 - The art (cats, the office, frames, the logo) is drawn by script in `art/`; read `art/README.md` first, and `docs/LESSONS.md` before changing the office, the walls or the cats (the rules and the mistakes of the long session of 2026-10-30). The old FigCraft design files were removed on 2026-10-30; they stay in git history.

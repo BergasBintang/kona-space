@@ -1,22 +1,15 @@
-// The map of the office, as it is saved: plain data, one map for each project (decision 57). A map is a grid of tiles. Each tile has a floor (the id of a room, which says
+// The map of the office, as it is saved: plain data, one map for each project (decision 57). A map is a grid of tiles. Each tile has a floor (the id of a floor style, which says
 // the colour and pattern) and may hold a wall (a block as big as the tile). Things on a wall (a window, a door, a board) and things on the floor (furniture, rugs, a cat with its
 // desk) are lists with a place. i runs along a row (to the right of the plan), j runs down the plan. Rows and columns are counted from 0.
 export type Pattern = "tiles" | "checker" | "planks" | "stripeI" | "carpet";
 
-export type RoomDef = {
+/** A floor style: two colours and a pattern (decision 59). Kona ships the palette (engine/styles.ts); a map keeps the definition of every style it uses, so it draws on its own. */
+export type FloorStyle = {
   id: string;
   name: string;
-  /** "hall": open floor with no name; "team": cats work here; "place": a screen of the app lives here */
-  kind: "hall" | "team" | "place";
-  /** a room that is one open space with the hall (the front desk): it has no walls of its own */
-  open?: boolean;
-  color?: string;
   floor: [string, string];
   pattern: Pattern;
   grout?: string;
-  /** the colour of its walls, seen from outside */
-  wall: string;
-  holds: string;
 };
 
 /** The face of a wall tile a thing is on: `i+` looks towards +i, `i-` towards -i, `j+` towards +j, `j-` towards -j. */
@@ -33,8 +26,9 @@ export type OfficeMap = {
   version: 1;
   cols: number;
   rows: number;
-  rooms: RoomDef[];
-  /** floor[j][i]: the id of a room, or null for no ground */
+  /** the floor styles this map uses */
+  styles: FloorStyle[];
+  /** floor[j][i]: the id of a floor style, or null for no ground */
   floor: (string | null)[][];
   /** walls[j][i]: a wall block stands here */
   walls: boolean[][];

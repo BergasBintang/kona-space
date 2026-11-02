@@ -2,31 +2,24 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
-import { initialState, loadPlans, reducer, savePlans } from "./lib/sessions";
-import { PLAIN_LINES, leftoverOverview, listAccounts, listProjects, accountStatus, getPersona, listRoles, listTools, roleKits, samePlace, type Account, type AddResult, type Project, type Persona, type LeftoverOverview, type Role, type RoleKit, type TicketView, type ToolInfo } from "./lib/api";
+import { initialState, loadPlans, reducer, savePlans, type Session } from "./lib/sessions";
+import { PLAIN_LINES, leftoverOverview, listAccounts, roleLabel, listProjects, accountStatus, getPersona, listRoles, roleKits, samePlace, type Account, type AddResult, type Project, type Persona, type LeftoverOverview, type Role, type RoleKit, type TicketView } from "./lib/api";
 import { TopBar } from "./components/TopBar";
 import { PLACES, type Place } from "./lib/places";
-import { tabsFor } from "./lib/rooms";
-import { roomName } from "./lib/roomName";
 import { Office } from "./components/Office";
 import { OfficeEditor } from "./components/OfficeEditor";
-import { STANDARD, parseMap } from "./office/map";
+import { STANDARD, ensurePages, parseMap } from "./office/map";
 import type { OfficeMap } from "./office/engine/types";
 import { Sheet, type Guard } from "./components/Sheet";
-import { TeamRoom } from "./components/TeamRoom";
 import { officeLooks, looksSignature } from "./lib/office";
 import { Hello } from "./components/Hello";
-import { SessionList } from "./components/SessionList";
-import { Welcome } from "./components/Welcome";
 import { AddProject } from "./components/AddProject";
-import { Chat } from "./components/Chat";
+import { PERSON_TABS, PersonSheet, type PersonTab } from "./components/PersonSheet";
+import type { Attached } from "./components/Chat";
 import { Files } from "./components/Files";
-import { Roles } from "./components/Roles";
-import { RoleSetup } from "./components/RoleSetup";
 import { Accounts } from "./components/Accounts";
 import { Kit } from "./components/Kit";
 import { Costs } from "./components/Costs";
-import { Voice } from "./components/Voice";
 import { Board } from "./components/Board";
 import { Workflows } from "./components/Workflows";
 import { Worktrees } from "./components/Worktrees";
@@ -40,7 +33,7 @@ import { localDate, redact } from "./lib/brain/text.ts";
 import { loadZoom, stepZoom } from "./lib/zoom";
 import { checkForUpdate } from "./lib/update";
 import { UpdateCard } from "./components/UpdateCard";
-import { getSettings, earlierSessions, saveNote, wantedRemove, kibbySay, officeMapLoad, officeMapSave, officeMapReset, type Earlier } from "./lib/api";
+import { getSettings, earlierSessions, costRows, saveNote, wantedRemove, kibbySay, officeMapLoad, officeMapSave, officeMapReset, type Earlier } from "./lib/api";
 
 const remembered = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const remember = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* the choice is just not kept */ } };
@@ -52,35 +45,35 @@ export default function App() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [persona, setPersona] = useState<Persona | null>(null);
   const [lo, setLo] = useState<LeftoverOverview>({ items: [], sessions: [] }); // what sessions started and left behind
-  const [tools, setTools] = useState<ToolInfo[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountsReady, setAccountsReady] = useState(false); // the welcome page needs the accounts, or every project looks accountless
   const [helloNote, setHelloNote] = useState<string | null>(null); // why the welcome page came back
   const [lastAccount, setLastAccount] = useState(remembered("kona.account") ?? "main"); // the account used last
   const [place, setPlace] = useState<Place>("office"); // the page open in the sheet over the office; "office" means no page
-  const [teamRoom, setTeamRoom] = useState<string | null>(null); // or the room with cats at desks that is open in the sheet
   const sheetGuard = useRef<Guard | null>(null); // the open sheet, which asks before anything that would throw away unsaved text
   const [greeted, setGreeted] = useState(false); // the welcome page comes first on every launch
   // the account of a project, or null when it has none (or its account was removed): then nothing starts until the owner picks one on the welcome page
   const accountOf = (p: Project | null | undefined) => (p?.account && accounts.some((a) => a.id === p.account) ? p.account : null);
   const NO_ACCOUNT = "This project has no account yet. Click the Kona mark and choose one.";
-  const [presetRole, setPresetRole] = useState<string | null>(null); // a role chosen in the office, for the start screen
-  const [settingUp, setSettingUp] = useState<string | null>(null); // the role whose setup dialog is open
+  const [person, setPerson] = useState<string | null>(null); // the person whose sheet is open (a role id): what a click on a cat opens
+  const [tab, setTab] = useState<PersonTab>("chat");
+  const [personError, setPersonError] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState<Record<string, true>>({}); // sessions the owner put away with New conversation: they stay in the list of what ran, but are not shown with the person
   const [kits, setKits] = useState<Record<string, RoleKit>>({}); // what each role may use in the open project (its skills and connectors)
   const [adding, setAdding] = useState(false); // the Add a project screen
-  const [creating, setCreating] = useState(false); // the Start a session screen
   const [notice, setNotice] = useState<string | null>(null);
   const [officeMap, setOfficeMap] = useState<OfficeMap>(STANDARD); // the office of the open project: its own map, or the standard one
   const [ownMap, setOwnMap] = useState(false); // the project has a map of its own
+  const told = useRef(new Set<string>()); // the projects whose office was told about missing pieces in this run (once is enough)
   const [brokenMap, setBrokenMap] = useState<string | null>(null); // why the project's map file could not be used (the standard office is shown, the file is left alone)
   const [editing, setEditing] = useState(false); // the Edit the office screen
-  const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState("");
   // the latest of these, for the listener below (it is set up once, so it cannot read them from the render)
   const live = useRef({ state, projects, roles });
   live.current = { state, projects, roles };
   const noting = useRef(new Set<string>());
-  const [earlier, setEarlier] = useState<Earlier[]>([]); // sessions Claude Code saved earlier, for Resume
+  const [earlier, setEarlier] = useState<Earlier[]>([]); // sessions Claude Code saved earlier, for History
+  const [roleBy, setRoleBy] = useState<Record<string, string | null>>({}); // which role each session of the cost ledger ran as
 
   // the window size (100, 90, 80 percent) and the keys for it; the window itself never scrolls
   useEffect(() => {
@@ -112,7 +105,6 @@ export default function App() {
     listProjects().then(setProjects).catch(() => setProjects([]));
     listRoles().then(setRoles).catch(() => setRoles([]));
     getPersona().then(setPersona).catch(() => setPersona(null));
-    listTools().then(setTools).catch(() => setTools([]));
     listAccounts().then((a) => { setAccounts(a); setAccountsReady(true); }).catch(() => { setAccounts([]); setAccountsReady(true); });
     // every message from every running `claude`, forwarded by the Rust core
     const un = listen<{ sessionId: string; record: unknown }>("session-event", (e) => {
@@ -159,36 +151,55 @@ export default function App() {
       if (!live) return;
       if (text == null) { setOfficeMap(STANDARD); setOwnMap(false); return; }
       const r = parseMap(text);
-      if ("map" in r) { setOfficeMap(r.map); setOwnMap(true); }
+      if ("map" in r) {
+        // a saved office that lacks a person's desk or a piece that opens a screen gets them put back (in memory; the file changes when the owner saves in Edit the office), and the owner is told once
+        const e = ensurePages(r.map);
+        setOfficeMap(e.map); setOwnMap(true);
+        if ((e.added.length || e.failed.length) && !told.current.has(project.id)) {
+          told.current.add(project.id);
+          setNotice(e.failed.length ? `This project's office lacks things that open screens and some could not be placed: ${e.failed.join(" ")} Open Edit the office to fix it.` : `This project's office lacked ${e.added.join(", ")}, so they were put back. Open Edit the office and Save to keep them, and move them where you like.`);
+        }
+      }
       else { setOfficeMap(STANDARD); setOwnMap(false); setBrokenMap(r.error); setNotice(`The office map of this project could not be read (${r.error}), so the standard office is shown. The file was not touched.`); }
     }).catch((e) => { if (live) { setOfficeMap(STANDARD); setOwnMap(false); setBrokenMap("the file could not be opened"); setNotice(`The office map of this project could not be opened (${String(e)}), so the standard office is shown. The file was not touched.`); } });
     return () => { live = false; };
   }, [project?.folder]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!greeted || place !== "office") setEditing(false); }, [greeted, place]); // going anywhere else closes the editor (it asked first if there was something unsaved)
-  const mine = useMemo(() => (project ? state.order.filter((id) => samePlace(state.sessions[id].folder, project.folder)) : []), [state, project]);
-  const looksSig = looksSignature(state);
-  const looks = useMemo(() => officeLooks(project, state), [project, looksSig]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [seen, setSeen] = useState<Record<string, number>>({}); // for each session, how many turns the owner has seen: "Finish" over a cat stays until the owner opens that person's chat
+  const looksSig = looksSignature(state, seen);
+  const looks = useMemo(() => officeLooks(project, state, seen), [project, looksSig]); // eslint-disable-line react-hooks/exhaustive-deps
   const attention = useMemo(() => state.order.filter((id) => state.sessions[id].run === "waiting").length, [state]);
-  const current = state.selected && mine.includes(state.selected) ? state.sessions[state.selected] : null;
-
-  const pickProject = useCallback((id: string) => { setProjectId(id); remember("kona.project", id); setCreating(false); setPresetRole(null); }, []);
-  useEffect(() => { if (place !== "sessions") setPresetRole(null); }, [place]);
-  useEffect(() => { if (place !== "office") setTeamRoom(null); }, [place]);
+  const pickProject = useCallback((id: string) => { setProjectId(id); remember("kona.project", id); setPerson(null); }, []);
   // do a move that leaves the sheet's page (home, another page from the top bar), asking first if the page holds text that was not sent or saved
   const leave = (go: () => void) => { if (sheetGuard.current) sheetGuard.current.leave(go); else go(); };
-  const closeSheet = () => { setPlace("office"); setTeamRoom(null); };
+  const closeSheet = () => { setPlace("office"); setPerson(null); };
   // the office's actions keep one identity, so the office does not redraw for a reason it cannot see
-  const openPlace = useCallback((p: Place) => setPlace(p), []);
-  const openRoom = useCallback((id: string) => setTeamRoom(id), []);
-  const startRoleHere = useCallback((id: string) => { setPresetRole(id); setError(null); setCreating(true); setPlace("sessions"); }, []);
-  const openSessionHere = useCallback((id: string) => { dispatch({ type: "select", id }); setCreating(false); setPlace("sessions"); }, []);
+  const openPlace = useCallback((p: Place) => { setPerson(null); setPlace(p); }, []);
+  const projectRef = useRef(project);
+  projectRef.current = project;
+  // a click on a person opens their sheet, on the chat
+  const openPerson = useCallback((roleId: string) => { setPlace("office"); setPerson(roleId); setTab("chat"); setPersonError(null); }, []);
+  // a person does one thing at a time in a project (decision 62): why a new conversation with them is refused, or null when they are free (the core refuses too, whatever asks)
+  const busyMessage = (roleId: string | null): string | null => {
+    const p = projectRef.current, st = live.current.state, r = live.current.roles.find((x) => x.id === roleId);
+    const s = roleId && p ? st.order.map((id) => st.sessions[id]).find((x) => x.roleId === roleId && x.run !== "ended" && samePlace(x.folder, p.folder)) : undefined;
+    if (!s) return null;
+    const who = r?.person || "This person";
+    return `${who} is busy: ${s.ticketId ? `working on ${s.ticketId}` : "a conversation is open"} in this project. Click ${who} in the office to open it, or end it, before starting another.`;
+  };
+  const names = useMemo(() => Object.fromEntries(roles.map((r) => [r.id, roleLabel(r)])), [roles]);
+  // the conversation shown with a person: their latest session in this project that the owner did not put away
+  const sessionOf = (roleId: string | null): Session | null => (roleId && project ? state.order.map((id) => state.sessions[id]).filter((s) => s.roleId === roleId && samePlace(s.folder, project.folder) && !dismissed[s.id]).pop() ?? null : null);
+  const personRole = person ? roles.find((r) => r.id === person) ?? null : null;
+  const shown = sessionOf(person);
+  const current = shown; // (the account of the conversation that is open, for the plan bars)
+  useEffect(() => { if (person && tab === "chat" && shown && seen[shown.id] !== shown.turns) setSeen((s) => ({ ...s, [shown.id]: shown.turns })); }, [person, tab, shown?.id, shown?.turns]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const added = (r: AddResult) => {
     setProjects((cur) => [...(cur ?? []), r.project]);
     pickProject(r.project.id);
     setGreeted(true);
     setAdding(false);
-    setPlace("sessions");
     setNotice(r.hidden_folder ? `Added ${r.project.name}. A hidden folder for Kona's notes is inside it${r.git_ignored ? ", and Git ignores it" : ""}.` : `Added ${r.project.name}.`);
   };
 
@@ -201,40 +212,60 @@ export default function App() {
     const t = setInterval(look, place === "leftovers" ? 2500 : 5000);
     return () => { live = false; clearInterval(t); };
   }, [state.order.length, place]);
-  const leftBehind = useMemo(() => Object.fromEntries(lo.sessions.map((s) => [s.id, s.left_behind])) as Record<string, number>, [lo]);
   const leftTotal = lo.items.filter((i) => i.left_behind && !i.ignored).length;
 
-  // the earlier sessions of this project (read from Claude Code's own transcript files)
+  // the earlier conversations of the open person: Claude Code's own transcript files of this project, filed by the role the cost ledger says each one ran as; a conversation with no role on record is
+  // filed under the Secretary (the front desk), because the role of an old session was not recorded
   useEffect(() => {
-    if (!project || place !== "sessions") return;
+    if (!project || !person) return;
     let live = true;
-    earlierSessions(project.id).then((l) => { if (live) setEarlier(l); }).catch(() => { if (live) setEarlier([]); });
+    Promise.all([earlierSessions(project.id), costRows(null)]).then(([l, rows]) => { if (live) { setEarlier(l); setRoleBy(Object.fromEntries(rows.map((r) => [r.session_id, r.role_id]))); } }).catch(() => { if (live) { setEarlier([]); setRoleBy({}); } });
     return () => { live = false; };
-  }, [project?.id, place, state.order.length]); // eslint-disable-line react-hooks/exhaustive-deps
-  const shownEarlier = useMemo(() => earlier.filter((e) => !state.sessions[e.id]), [earlier, state.sessions]);
+  }, [project?.id, person, state.order.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  const history = useMemo(() => earlier.filter((e) => (!state.sessions[e.id] || dismissed[e.id]) && (roleBy[e.id] ?? (person === "secretary" ? "secretary" : null)) === person), [earlier, state.sessions, dismissed, roleBy, person]);
 
-  // Resume an earlier session: the same session id, in the same folder, with no role (the old session's role is not recorded)
-  // Resuming keeps the account the session was saved under: its transcript lives in that account's folder, so no other account can find it.
-  const resume = async (e: Earlier) => {
+  // Resume an earlier conversation of this person: the same session id, in the same folder. It keeps the account it was saved under: its transcript lives in that account's folder.
+  const resume = async (role: Role, e: Earlier) => {
     if (!project || !persona) return;
-    setError(null);
+    const busy = busyMessage(role.id);
+    if (busy) { setNotice(busy); return; }
     try {
       const status = await accountStatus(e.account_id);
-      if (!status.logged_in) throw new Error("The account of that session is not signed in. Open Accounts to sign in.");
-      await invoke<string>("start_session", { folder: project.folder, roleId: null, accountId: e.account_id, useVoice: persona.enabled, ticketId: null, brainDigest: null, model: "sonnet", mode: "default", resume: e.id });
-      setCreating(false); setPlace("sessions");
+      if (!status.logged_in) throw new Error("The account of that conversation is not signed in. Open Accounts to sign in.");
+      await invoke<string>("start_session", { folder: project.folder, roleId: role.id, accountId: e.account_id, useVoice: persona.enabled, ticketId: null, brainDigest: null, model: role.model, mode: role.mode, resume: e.id });
+      setDismissed((d) => { const { [e.id]: _gone, ...rest } = d; return rest; });
+      setTab("chat");
     } catch (err) { setNotice(`Could not resume it: ${String(err)}`); }
+  };
+
+  // New conversation: end the open one (if it is still going) and put it away; the person is free and the chat is empty again
+  const newConversation = async (s: Session) => {
+    if (s.run !== "ended") await invoke("stop_session", { sessionId: s.id }).catch(() => {});
+    setDismissed((d) => ({ ...d, [s.id]: true }));
+    setPersonError(null);
   };
 
   // keep the plan readings for the next time Kona opens
   useEffect(() => { savePlans(state.plans); }, [state.plans]);
 
-  const start = async (folder: string, roleId: string | null, accountId: string, useVoice: boolean, model: string, mode: string) => {
-    setError(null);
+  // The first message to a person starts their session (nothing runs before it): the person's model, permissions and voice, the project's account, a digest of what the Brain knows.
+  const sendFirst = async (role: Role, text: string, images: Attached[]) => {
+    if (!project || !persona) return;
+    setPersonError(null);
+    const busy = busyMessage(role.id);
+    if (busy) { setPersonError(busy); return; }
     try {
-      const brainDigest = await buildDigest(project?.id ?? "", { roleId, roleName: roles.find((r) => r.id === roleId)?.name });
-      await invoke<string>("start_session", { folder, roleId, accountId, useVoice, ticketId: null, brainDigest, model, mode, resume: null }); setLastAccount(accountId); remember("kona.account", accountId); setCreating(false); setPresetRole(null); }
-    catch (e) { setError(String(e)); }
+      if (/PRIVATE KEY-----/.test(text)) throw new Error(`The message holds the text of a private key. Keys stay in their files; give ${role.person || role.name} the path, never the key.`);
+      const accountId = accountOf(project);
+      if (!accountId) throw new Error(NO_ACCOUNT);
+      const status = await accountStatus(accountId);
+      if (!status.logged_in) throw new Error("That account is not signed in. Open Accounts to sign in.");
+      const brainDigest = await buildDigest(project.id, { roleId: role.id, roleName: role.name });
+      const id = await invoke<string>("start_session", { folder: project.folder, roleId: role.id, accountId, useVoice: persona.enabled, ticketId: null, brainDigest, model: role.model, mode: role.mode, resume: null });
+      setLastAccount(accountId); remember("kona.account", accountId);
+      dispatch({ type: "user-sent", sessionId: id, text, images: images.map((i) => i.url) });
+      await invoke("send_message", { sessionId: id, text, images: images.map((i) => ({ media_type: i.mediaType, data: i.data })) });
+    } catch (e) { setPersonError(String(e)); }
   };
 
   // Start a session from a ticket card: the role's model, mode and account, the voice as set, and the ticket told to Claude.
@@ -242,6 +273,8 @@ export default function App() {
     if (!project || !persona) return;
     const role = roles.find((r) => r.id === t.role);
     if (!role) throw new Error("Choose a role for this ticket first");
+    const busy = busyMessage(role.id);
+    if (busy) throw new Error(busy);
     const accountId = accountOf(project);
     if (!accountId) throw new Error(NO_ACCOUNT);
     const status = await accountStatus(accountId);
@@ -252,7 +285,7 @@ export default function App() {
     const text = `Start on ticket ${t.id}: ${t.title}.`;
     dispatch({ type: "user-sent", sessionId: id, text, images: [] });
     await invoke("send_message", { sessionId: id, text, images: [] });
-    setCreating(false); setPlace("sessions");
+    openPerson(role.id);
   };
 
   // Kibby, the office boy, answers through the project's account (a cheap one-shot Haiku call; the talk is not kept).
@@ -265,19 +298,23 @@ export default function App() {
     return kibbySay(project.id, accountId, history, message);
   };
 
-  // Ask Claude a question from the Brain: a new session in plan-only mode (it can read, not change), with the question sent at once.
+  // Ask a question from the Brain: the Secretary (general questions) takes it, in a new session in plan-only mode (it can read, not change), with the question sent at once.
   const askClaude = async (question: string) => {
     if (!project) return;
+    const kupa = roles.find((r) => r.id === "secretary");
+    if (!kupa) throw new Error("The Secretary is not here to answer.");
+    const busy = busyMessage(kupa.id);
+    if (busy) throw new Error(busy);
     const accountId = accountOf(project);
     if (!accountId) throw new Error(NO_ACCOUNT);
     const status = await accountStatus(accountId);
     if (!status.logged_in) throw new Error("That account is not signed in. Open Accounts to sign in.");
-    const brainDigest = await buildDigest(project.id, {});
-    const id = await invoke<string>("start_session", { folder: project.folder, roleId: null, accountId, useVoice: persona?.enabled ?? false, ticketId: null, brainDigest, model: "sonnet", mode: "plan", resume: null });
+    const brainDigest = await buildDigest(project.id, { roleId: kupa.id, roleName: kupa.name });
+    const id = await invoke<string>("start_session", { folder: project.folder, roleId: kupa.id, accountId, useVoice: persona?.enabled ?? false, ticketId: null, brainDigest, model: "sonnet", mode: "plan", resume: null });
     dispatch({ type: "brain-question", sessionId: id, question });
     dispatch({ type: "user-sent", sessionId: id, text: question, images: [] });
     await invoke("send_message", { sessionId: id, text: question, images: [] });
-    setCreating(false); setPlace("sessions");
+    openPerson(kupa.id);
   };
 
   // Keep a session's answer to a brain question as a note (a secret-looking piece is hidden first), and take the question off the wanted list.
@@ -304,7 +341,7 @@ export default function App() {
   if (!greeted && projects.length > 0) {
     return (
       <div className="relative flex h-full overflow-hidden">
-        <Hello projects={projects} accounts={accounts} persona={persona} version={version}
+        <Hello projects={projects} accounts={accounts} version={version}
           note={helloNote}
           onOpen={(id) => { pickProject(id); setHelloNote(null); setGreeted(true); setAdding(false); setPlace("office"); }}
           onAdd={() => { setGreeted(true); setAdding(true); setPlace("office"); }}
@@ -321,25 +358,14 @@ export default function App() {
     switch (which) {
       case "accounts": return <Accounts accounts={accounts} onChanged={setAccounts} />;
       case "files": return <Files project={project} />;
-      case "roles": return <Roles roles={roles} tools={tools} kits={kits} onSetup={setSettingUp} />;
       case "settings": return <Settings projects={projects} version={version} onProjects={(next) => { setProjects(next); if (projectId && !next.some((p) => p.id === projectId)) { setProjectId(next[0]?.id ?? null); remember("kona.project", next[0]?.id ?? ""); } }} />;
       case "servers": return <Servers project={project} roles={roles} />;
       case "brain": return <BrainPlace project={project} onAsk={askClaude} />;
       case "leftovers": return <Leftovers state={state} roles={roles} overview={lo} onRefresh={() => { void leftoverOverview().then(setLo); }} />;
       case "worktrees": return <Worktrees project={project} onChanged={() => {}} />;
-      case "board": return <Board project={project} roles={roles} state={state} onStart={startTicket} onOpenSession={(id) => { dispatch({ type: "select", id }); setCreating(false); setPlace("sessions"); }} />;
+      case "board": return <Board project={project} roles={roles} state={state} onStart={startTicket} onOpenSession={(id) => openPerson(state.sessions[id]?.roleId ?? "secretary")} />;
       case "workflows": return <Workflows project={project} roles={roles} onOpenBoard={() => setPlace("board")} onStart={startTicket} />;
-      case "voice": return <Voice persona={persona} onChanged={setPersona} />;
       case "costs": return <Costs project={project} roles={roles} accounts={accounts} />;
-      case "sessions": return (
-        <>
-          <SessionList state={state} project={project} roles={roles} leftBehind={leftBehind} earlier={shownEarlier} onResume={(e) => void resume(e)} creating={creating || !current} onSelect={(id) => { setPresetRole(null); setCreating(false); dispatch({ type: "select", id }); }} onNew={() => { setPresetRole(null); setError(null); setCreating(true); }} />
-          <div className="w-px bg-line-subtle" />
-          <main className="flex min-w-0 flex-1 flex-col">
-            {creating || !current ? <Welcome key={`${project.id}-${presetRole ?? ""}`} initialRole={roles.find((r) => r.id === presetRole) ?? null} project={project} roles={roles} accounts={accounts} persona={persona} accountId={accountOf(project) ?? ""} onOpenAccounts={() => setPlace("accounts")} onStart={start} error={error} /> : <Chat key={current.id} s={current} onNote={() => void noteSession(current.id, true)} onSaveAnswer={(t) => void saveAnswer(current.id, t)} role={roles.find((r) => r.id === current.roleId)} account={accounts.length > 1 ? accounts.find((a) => a.id === current.accountId)?.label : undefined} dispatch={dispatch} />}
-          </main>
-        </>
-      );
       default: return null;
     }
   };
@@ -352,32 +378,33 @@ export default function App() {
     content = <AddProject first={!project} accounts={accounts} onDone={added} onCancel={() => setAdding(false)} onOpenAccounts={() => { setAdding(false); setPlace("accounts"); }} />;
   } else {
     content = editing
-      ? <OfficeEditor key={project.id} map={officeMap} hasOwn={ownMap} broken={brokenMap} guard={sheetGuard}
+      ? <OfficeEditor key={project.id} names={names} map={officeMap} hasOwn={ownMap} broken={brokenMap} guard={sheetGuard}
           onSave={async (m) => { await officeMapSave(project.folder, JSON.stringify(m)); setOfficeMap(m); setOwnMap(true); setBrokenMap(null); setNotice("Saved the office of this project."); }}
           onReset={async () => { await officeMapReset(project.folder); setOfficeMap(STANDARD); setOwnMap(false); setBrokenMap(null); setNotice("This project shows the standard office again."); }}
           onClose={() => setEditing(false)} />
-      : <Office map={officeMap} looks={looks} sheetOpen={place !== "office" || teamRoom !== null} onOpen={openPlace} onOpenRoom={openRoom} onKibbySay={sayToKibby} onEdit={() => setEditing(true)} />;
+      : <Office map={officeMap} looks={looks} sheetOpen={place !== "office" || person !== null} names={names} onOpen={openPlace} onOpenPerson={openPerson} onKibbySay={sayToKibby} onEdit={() => setEditing(true)} />;
     if (place !== "office") {
-      const tabs = tabsFor(place);
       const info = PLACES.find((x) => x.id === place);
-      sheet = <Sheet key="sheet" title={info?.label ?? place} subtitle={tabs.length ? undefined : info?.room} tabs={tabs.map((id) => ({ id, label: PLACES.find((x) => x.id === id)?.label ?? id }))} active={place} onTab={(id) => setPlace(id as Place)} onClose={closeSheet} guard={sheetGuard}>{pageOf(place)}</Sheet>;
-    } else if (teamRoom) {
-      sheet = <Sheet key="sheet" title={roomName(teamRoom)} onClose={closeSheet} guard={sheetGuard}><TeamRoom room={teamRoom} roles={roles} looks={looks} onSetup={setSettingUp} onStartRole={startRoleHere} onOpenSession={openSessionHere} onOpen={setPlace} /></Sheet>;
+      sheet = <Sheet key="sheet" title={info?.label ?? place} onClose={closeSheet} guard={sheetGuard}>{pageOf(place)}</Sheet>;
+    } else if (person && personRole) {
+      sheet = (
+        <Sheet key={`person-${person}`} title={roleLabel(personRole)} tabs={PERSON_TABS} active={tab} onTab={(id) => setTab(id as PersonTab)} keepDraftOnTab onClose={closeSheet} guard={sheetGuard}>
+          <PersonSheet tab={tab} onTab={setTab} role={personRole} project={project} session={shown} history={history} accountId={accountOf(project)} kit={kits[personRole.id] ?? { skills: [], mcp: [], notes: {} }} error={personError} dispatch={dispatch as (a: unknown) => void}
+            onFirst={(text, images) => void sendFirst(personRole, text, images)} onResume={(e) => void resume(personRole, e)} onNew={() => shown && void newConversation(shown)} onNote={() => shown && void noteSession(shown.id, true)}
+            onSaveAnswer={(text) => shown && void saveAnswer(shown.id, text)} onSaved={(saved) => setRoles((all) => all.map((r) => (r.id === saved.id ? saved : r)))} onKitSaved={(id, kit) => setKits((all) => ({ ...all, [id]: kit }))} />
+        </Sheet>
+      );
     }
   }
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <TopBar project={project} onHome={() => leave(() => { setAdding(false); setGreeted(false); })} place={place}
-        onPlace={(p) => leave(() => { setAdding(false); setPlace(p); })} attention={attention} leftBehind={leftTotal} plan={state.plans[current?.accountId ?? accountOf(project) ?? lastAccount]}
-        limitLine={persona.enabled ? persona.lines.limit : PLAIN_LINES.limit} accountLabel={project ? accounts.find((a) => a.id === (current?.accountId ?? accountOf(project)))?.label ?? null : null} version={version} />
+        onPlace={(p) => leave(() => { setAdding(false); setPerson(null); setPlace(p); })} onAttention={() => leave(() => { const w = state.order.map((id) => state.sessions[id]).find((s) => s.run === "waiting" && project && samePlace(s.folder, project.folder)); if (w) openPerson(w.roleId ?? "secretary"); })} attention={attention} leftBehind={leftTotal} plan={state.plans[current?.accountId ?? accountOf(project) ?? lastAccount]}
+        limitLine={PLAIN_LINES.limit} accountLabel={project ? accounts.find((a) => a.id === (current?.accountId ?? accountOf(project)))?.label ?? null : null} version={version} />
       <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
         {content}
         {sheet}
-        {settingUp && project && roles.some((r) => r.id === settingUp) && (
-          <RoleSetup key={`${project.id}-${settingUp}`} role={roles.find((r) => r.id === settingUp)!} project={project} accountId={accountOf(project)} kit={kits[settingUp] ?? { skills: [], mcp: [] }}
-            onSaved={(saved) => setRoles((all) => all.map((r) => (r.id === saved.id ? saved : r)))} onKitSaved={(id, kit) => setKits((all) => ({ ...all, [id]: kit }))} onClose={() => setSettingUp(null)} />
-        )}
         <UpdateCard running={state.order.filter((id) => state.sessions[id].run !== "ended").length} />
         {notice && (
           <div role="status" className="absolute right-6 bottom-6 z-20 flex max-w-[440px] items-start gap-3 px-card px-shadow p-2">

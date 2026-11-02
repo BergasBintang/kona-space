@@ -16,7 +16,6 @@ export type WallBox = {
   m: [string, string, string];
   /** the top 3 px of each face, as [+v face, +u face], or null */
   band: [string, string] | null;
-  brick: boolean;
   tall: boolean;
   label: string;
   /** the object of the map it belongs to, or -1 */
@@ -69,17 +68,6 @@ export function renderWalls(boxes: WallBox[], iso: Iso): Item[] {
       const [a0, a1] = edge(cut), [b0, b1] = edge(0);
       paint(id, [a0, a1, b1, b0], color, `${side}|${plane}|${color}`);
       if (bandColor) { const [c0, c1] = edge(h); paint(id, [c0, c1, a1, a0], bandColor, `${side}|${plane}|band|${bandColor}`); }
-    }
-    if (b.brick) for (const J of [true, false]) { // mortar on both faces: rows every 4 px, the joints half a tile apart and shifted every other row
-      const colour = J ? "#b98a74" : "#a67661", s0 = J ? u0 : v0, s1 = J ? u1 : v1;
-      const pt = (s: number, z: number) => (J ? PR(s, v1, z) : PR(u1, s, z));
-      for (let z = 4; z < h - 3; z += 4) { const [x0, y0] = pt(s0, z), [x1, y1] = pt(s1, z); img.line(x0, y0, x1, y1, colour); }
-      for (let r = 0; r * 4 < h - 3; r++) for (let n = Math.floor(s0 * 2) - 1; n <= Math.ceil(s1 * 2) + 1; n++) {
-        const s = n / 2 + (r % 2 ? 0.25 : 0);
-        if (s <= s0 || s >= s1) continue;
-        const [x0, y0] = pt(s, r * 4), [x1, y1] = pt(s, Math.min(r * 4 + 4, h - 3));
-        img.line(x0, y0, x1, y1, colour);
-      }
     }
     if (b.decor?.length && b.tile) { // things on the wall, on this tile's own face
       clip.id = id;

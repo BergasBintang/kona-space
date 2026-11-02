@@ -31,6 +31,8 @@ const FRAME_H = 20; // the cat's picture: 28 x 20
 /** The frame of one piece: boxes and paint in the piece's own coordinates. */
 type Frame = {
   at: (x: number, y: number) => [number, number];
+  /** is the point (ax, ay) of the piece nearer to the camera than the point (bx, by)? Parts of one piece are painted in the order they are written, so a piece whose parts hide each other must paint the far one first */
+  near: (ax: number, ay: number, bx: number, by: number) => boolean;
   b: (x: number, y: number, bw: number, bd: number, h: number, m: Material, z0?: number) => void;
   top: (x: number, y: number, bw: number, bd: number, z: number, c: Colour) => void;
   fy: (y: number, xa: number, xb: number, za: number, zb: number, c: Colour, s?: 1 | -1) => void;
@@ -72,6 +74,7 @@ export class Stage {
     };
     return {
       at: toPlan,
+      near: (ax, ay, bx, by) => iso.D(...toPlan(ax, ay)) > iso.D(...toPlan(bx, by)),
       b: (x, y, bw, bd, h, m, z0 = 0) => this.box(img, ...rect(x, y, bw, bd), h, m, z0),
       top: (x, y, bw, bd, z, c) => { const [a, b, w2, d2] = rect(x, y, bw, bd); img.poly([P(a, b, z), P(a + w2, b, z), P(a + w2, b + d2, z), P(a, b + d2, z)], c); },
       fy: (y, xa, xb, za, zb, c, s = 1) => plane(toPlan(xa, y), toPlan(xb, y), dir(0, s), za, zb, c),
@@ -148,8 +151,11 @@ function workstation(S: Stage, ref: number, o: Obj) {
     L.b(0, 0.125, dw, 0.75, DESK, M.wood);
     for (const [y, s] of [[0.875, 1], [0.125, -1]] as [number, 1 | -1][]) { L.fy(y, 0.125, dw - 0.125, 1, 5, shade(M.wood[1])[1], s); L.fy(y, 0.375, 0.625, 3, 4, "#33241a", s); } // a drawer on each long side
     L.top(0.25, 0.25, 0.5, 0.125, DESK, M.white[0]); // the keyboard
+    // the thing beside the screen and the screen can hide each other, so whichever is farther from the camera is painted first (a piece is painted in the order it is written)
+    const px = wide ? 1.25 : 0.75, prop = PROPS[role], propNear = L.near(px + 0.125, 0.625, 0.5, 0.55);
+    if (prop && !propNear) prop(L, px, 0.5);
     L.b(0.25, 0.5, 0.5, 0.125, 8, M.black, DESK); L.fy(0.5, 0.375, 0.625, DESK + 2, DESK + 7, "#2e4a5c", -1); L.fy(0.5, 0.375, 0.5, DESK + 3, DESK + 6, "#8ed8c9", -1); // the screen, lit on the cat's side
-    PROPS[role]?.(L, wide ? 1.25 : 0.75, 0.5);
+    if (prop && propNear) prop(L, px, 0.5);
   });
   const c = W.at(0.5, 0.5), [sx, sy] = iso.P(c[0], c[1], 4);
   const to = iso.rot(c[0] + [0, -1, 0, 1][facing], c[1] + [1, 0, -1, 0][facing]), from = iso.rot(c[0], c[1]);
@@ -173,18 +179,64 @@ const fixed: Record<string, Spec> = {
   "queue desk": { label: "Queue desk", w: 1, d: 1, h: 12, draw: (L) => { L.b(0.125, 0.125, 0.75, 0.75, 8, M.wood); L.b(0.25, 0.25, 0.5, 0.25, 4, M.blue, 8); } },
   "key desk": { label: "Key desk", w: 1, d: 1, h: 12, draw: (L) => { L.b(0.125, 0.125, 0.75, 0.75, 8, M.wood); [0, 1, 2].forEach((k) => L.b(0.25 + k * 0.25, 0.375, 0.125, 0.125, 4, M.gold, 8)); } },
   "control panel": { label: "Control panel", w: 2, d: 1, h: 16, draw: (L) => { L.b(0.125, 0.125, 1.75, 0.5, 16, M.metal); [0, 1, 2, 3].forEach((k) => L.fy(0.625, 0.25 + k * 0.375, 0.5 + k * 0.375, 6, 9 + (k % 2) * 2, ["#8ed8c9", "#f3c978", "#d9786a", "#7fb1e0"][k])); } },
-  "voice booth": { label: "Voice booth", w: 1, d: 1, h: 28, draw: (L) => { L.b(0.125, 0.125, 0.75, 0.75, 20, M.teal); L.b(0.125, 0.125, 0.75, 0.75, 4, M.white, 20); L.b(0.375, 0.375, 0.125, 0.125, 4, M.black, 24); } },
+  // The pieces that open a screen (see PAGES below). Each has its own height, outline and main colour, so none can be taken for another or for a plain piece of furniture.
+  "brain stand": { label: "Brain stand", w: 1, d: 1, h: 24, draw: (L) => { // a lilac orb on a wooden stand
+    const P = shade("#b793d0");
+    L.b(0.25, 0.25, 0.5, 0.5, 8, M.darkwood); L.b(0.375, 0.375, 0.25, 0.25, 4, P, 8); L.b(0.125, 0.125, 0.75, 0.75, 8, P, 12); L.b(0.25, 0.25, 0.5, 0.5, 4, P, 20);
+    L.fy(0.875, 0.25, 0.5, 14, 18, "#e6d6f0"); L.fy(0.875, 0.5, 0.75, 13, 14, "#7a5c95"); L.top(0.375, 0.375, 0.25, 0.25, 24, "#f7e1b0");
+  } },
+  "archive drawers": { label: "Archive drawers", w: 2, d: 1, h: 24, draw: (L) => { // two columns of green drawers, one pulled out
+    const G = shade("#6f8f6a");
+    // the pulled-out drawer sticks out of the front: seen from the back it is behind the cabinet, so it is painted first there
+    const body = () => { L.b(0.125, 0, 1.75, 0.625, 24, G);
+      for (const x of [0.25, 1.125]) for (let r = 0; r < 3; r++) { const z = 2 + r * 7; L.fy(0.625, x, x + 0.625, z, z + 6, "#9ab894"); L.fy(0.625, x + 0.25, x + 0.375, z + 2, z + 4, "#f3c978"); } };
+    const drawer = () => { L.b(0.25, 0.625, 0.625, 0.25, 4, shade("#9ab894"), 9); L.top(0.375, 0.75, 0.375, 0.125, 13, M.paper[0]); };
+    if (L.near(0.5, 0.75, 0.5, 0.3)) { body(); drawer(); } else { drawer(); body(); }
+  } },
+  "server terminal": { label: "Server terminal", w: 2, d: 1, h: 16, draw: (L) => { // a dark desk with a large green screen
+    // the keyboard lies in front of the screen: seen from the other side the screen is in front of it, so whichever is farther from the camera is painted first
+    const monitor = () => { L.b(0.375, 0.375, 1.25, 0.125, 8, M.black, 8);
+      L.fy(0.5, 0.5, 1.5, 10, 15, "#16303a"); [[0.625, 1.0, 13], [0.625, 1.25, 11], [1.125, 1.375, 13]].forEach(([a, b, z]) => L.fy(0.5, a, b, z, z + 1, "#8ed8c9")); };
+    const keys = () => L.b(0.375, 0.5625, 1.25, 0.1875, 2, M.white, 8);
+    L.b(0.125, 0.125, 1.75, 0.75, 8, M.server);
+    if (L.near(1, 0.65, 1, 0.45)) { monitor(); keys(); } else { keys(); monitor(); }
+    L.fy(0.875, 0.25, 0.375, 3, 4, "#f3c978"); L.fy(0.875, 0.5, 0.625, 3, 4, "#8ed8c9"); L.fy(0.875, 1.0, 1.75, 2, 3, "#2a313c");
+  } },
+  "cash desk": { label: "Cash desk", w: 1, d: 1, h: 16, draw: (L) => { // a gold counter with a till
+    L.b(0.125, 0.125, 0.75, 0.75, 8, M.gold); L.b(0.25, 0.25, 0.5, 0.375, 4, M.white, 8); L.b(0.375, 0.25, 0.25, 0.125, 4, M.black, 12);
+    L.fy(0.375, 0.375, 0.625, 13, 15, "#8ed8c9"); L.fy(0.625, 0.375, 0.625, 9, 10, "#3b3f46");
+  } },
+  "key cabinet": { label: "Key cabinet", w: 1, d: 1, h: 24, draw: (L) => { // a red cabinet with three long keys hanging on it and a dark lock plate
+    L.b(0.125, 0.125, 0.75, 0.5, 24, M.red); L.fy(0.625, 0.25, 0.75, 3, 21, "#c4695b");
+    [0.25, 0.4375, 0.625].forEach((x) => { L.fy(0.625, x, x + 0.125, 10, 20, "#f3c978"); L.fy(0.625, x - 0.0625, x + 0.1875, 17, 20, "#f3c978"); L.fy(0.625, x + 0.0625, x + 0.125, 8, 10, "#f3c978"); });
+    L.fy(0.625, 0.25, 0.75, 4, 7, "#33241a");
+  } },
+  "gear console": { label: "Gear console", w: 1, d: 1, h: 24, draw: (L) => { // a blue column with a big gold cog
+    L.b(0.125, 0.125, 0.75, 0.5, 24, M.blue);
+    L.fy(0.625, 0.25, 0.75, 9, 19, "#f3c978"); L.fy(0.625, 0.375, 0.625, 12, 16, "#456a92");
+    L.fy(0.625, 0.375, 0.625, 19, 22, "#f3c978"); L.fy(0.625, 0.375, 0.625, 6, 9, "#f3c978"); L.fy(0.625, 0.125, 0.25, 12, 16, "#f3c978"); L.fy(0.625, 0.75, 0.875, 12, 16, "#f3c978");
+  } },
+  "leftovers bin": { label: "Leftovers bin", w: 1, d: 1, h: 24, draw: (L) => { // a grey bin that is too full, with paper and a crate lid sticking out
+    L.b(0.25, 0.25, 0.5, 0.5, 16, M.metal); L.b(0.125, 0.125, 0.75, 0.75, 4, shade("#76808c"), 16); L.fy(0.75, 0.375, 0.625, 4, 12, "#97a1ad");
+    L.b(0.25, 0.25, 0.25, 0.25, 4, M.white, 20); L.b(0.5, 0.375, 0.25, 0.25, 4, M.crate, 20); L.b(0.125, 0.75, 0.25, 0.125, 4, M.white);
+  } },
 };
 
 const BOOKS = ["#d9786a", "#8ed8c9", "#f3c978", "#7fb1e0", "#b793d0", "#e8b25a"];
 type Param = { key: string; label: string; kind: "number" | "text" | "material" | "role" | "flag"; min?: number; max?: number };
 /** The catalog: what can be placed on the floor. `size` is the footprint on the plan (width, depth) for the object as it is placed; `make` draws it; `params` are the settings the editor offers. */
-export type Kind = { label: string; group: "seating" | "tables" | "storage" | "machines" | "boards" | "desks" | "other"; defaults: Record<string, unknown>; params: Param[]; size: (o: Obj) => [number, number]; make: (S: Stage, ref: number, o: Obj) => void };
+export type Kind = {
+  label: string; group: "seating" | "tables" | "storage" | "machines" | "boards" | "desks" | "pages" | "other"; defaults: Record<string, unknown>; params: Param[]; size: (o: Obj) => [number, number]; make: (S: Stage, ref: number, o: Obj) => void;
+  /** the screen of the app this piece opens (a Place of lib/places.ts); only the pieces of the group "pages" have one, and no two open the same screen */
+  opens?: string;
+  /** there is only one of it in an office (every piece that opens a screen): the editor greys it out once it is placed */
+  unique?: boolean;
+};
 
 const swap = (o: Obj, w: number, d: number): [number, number] => ((o.facing ?? 0) % 2 ? [d, w] : [w, d]);
-const fixedKind = (key: string, group: Kind["group"]): Kind => {
+const fixedKind = (key: string, group: Kind["group"], opens?: string): Kind => {
   const s = fixed[key];
-  return { label: s.label, group, defaults: {}, params: [], size: (o) => swap(o, s.w, s.d), make: (S, ref, o) => { S.piece(ref, o.i, o.j, s.w, s.d, (o.facing ?? 0) as Facing, key, s.h, s.draw); } };
+  return { label: s.label, group, opens, unique: opens !== undefined ? true : undefined, defaults: {}, params: [], size: (o) => swap(o, s.w, s.d), make: (S, ref, o) => { S.piece(ref, o.i, o.j, s.w, s.d, (o.facing ?? 0) as Facing, key, s.h, s.draw); } };
 };
 
 export const KINDS: Record<string, Kind> = {
@@ -228,7 +280,22 @@ export const KINDS: Record<string, Kind> = {
   "hooks board": { label: "Board of hooks", group: "boards", defaults: {}, params: [], size: () => [1, 1], make: (S, ref, o) => standing(S, ref, o, 1, (L, y) => [0, 1, 2, 3].forEach((k) => L.fy(y, 0.125 + k * 0.25, 0.25 + k * 0.25, 8 + (k % 2) * 3, 12 + (k % 2) * 3, "#f3c978"))) },
   "reading table": fixedKind("reading table", "tables"), "folder table": fixedKind("folder table", "tables"), "meeting table": fixedKind("meeting table", "tables"),
   "cooling unit": fixedKind("cooling unit", "machines"), "console": fixedKind("console", "machines"), "deploy console": fixedKind("deploy console", "machines"), "rocket": fixedKind("rocket", "machines"),
-  "control panel": fixedKind("control panel", "machines"), "voice booth": fixedKind("voice booth", "machines"),
+  "control panel": fixedKind("control panel", "machines"),
+  // the pieces that open a screen, one for each screen that has no worker (the two on walls, the cork board and the branch board, are in decor.ts: WALL_PAGES)
+  "brain stand": fixedKind("brain stand", "pages", "brain"), "archive drawers": fixedKind("archive drawers", "pages", "files"),
+  "server terminal": fixedKind("server terminal", "pages", "servers"), "cash desk": fixedKind("cash desk", "pages", "costs"), "key cabinet": fixedKind("key cabinet", "pages", "accounts"),
+  "gear console": fixedKind("gear console", "pages", "settings"), "leftovers bin": fixedKind("leftovers bin", "pages", "leftovers"),
+  "flow board": {
+    label: "Flow board", group: "pages", opens: "workflows", unique: true, defaults: {}, params: [], size: (o) => swap(o, 2, 1), // a pale blue board of boxes joined by arrows, one of them branching; a blue rail on top and a stripe on the back, so it is not taken for a chart
+    make: (S, ref, o) => S.piece(ref, o.i, o.j, 2, 1, (o.facing ?? 0) as Facing, "flow board", 20, (L) => {
+      const y = 0.375;
+      L.b(0.125, 0.25, 0.125, 0.125, 4, M.darkwood); L.b(1.75, 0.25, 0.125, 0.125, 4, M.darkwood);
+      L.b(0, 0.25, 2, 0.125, 12, shade("#e9eef5"), 4); L.b(0, 0.25, 2, 0.125, 4, M.blue, 16);
+      [[0.125, 0.5, "#8ed8c9"], [0.75, 1.125, "#f3c978"], [1.375, 1.75, "#d9786a"]].forEach(([a, b, c]) => L.fy(y, a as number, b as number, 9, 15, c as string));
+      L.fy(y, 0.5, 0.75, 11, 12, "#33241a"); L.fy(y, 1.125, 1.375, 11, 12, "#33241a"); L.fy(y, 0.875, 1.0, 7, 9, "#33241a"); L.fy(y, 0.75, 1.125, 4, 7, "#7fb1e0");
+      L.fy(0.25, 0.25, 1.75, 8, 12, "#5b88b8", -1);
+    }),
+  },
   "accounts desk": fixedKind("accounts desk", "desks"), "queue desk": fixedKind("queue desk", "desks"), "key desk": fixedKind("key desk", "desks"),
   "crates": fixedKind("crates", "storage"), "bin": fixedKind("bin", "other"), "water cooler": fixedKind("water cooler", "other"),
   rug: {

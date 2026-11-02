@@ -85,7 +85,7 @@ async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: Sta
     if !projects.allows(std::path::Path::new(&folder)) {
         return Err("That folder is not inside a project".into());
     }
-    let who = format!("the owner{}", role.as_ref().map(|r| format!(", as {}", r.name)).unwrap_or_default());
+    let who = format!("the owner{}", role.as_ref().map(|r| format!(", as {}", r.the())).unwrap_or_default());
     let tdir = tickets::dir(std::path::Path::new(&folder));
     let mut work_dir = folder.clone();
     let ticket = match &ticket_id {
@@ -153,13 +153,16 @@ fn list_projects(projects: State<'_, Projects>) -> Vec<Project> {
 fn add_project(projects: State<'_, Projects>, accounts: State<'_, Accounts>, folder: String, name: Option<String>, github: Option<String>, account: Option<String>) -> Result<AddResult, String> {
     if let Some(a) = account.as_deref().map(str::trim).filter(|a| !a.is_empty()) && accounts.get(a).is_none() { return Err("That account does not exist".into()); }
     let r = projects.add(&folder, name, account)?;
-    match github.filter(|g| !g.trim().is_empty()) {
+    let r = match github.filter(|g| !g.trim().is_empty()) {
         Some(g) => match projects.set_github(&r.project.id, &g) {
-            Ok(p) => Ok(AddResult { project: p, ..r }),
-            Err(e) => { let _ = projects.remove(&r.project.id); Err(e) }
+            Ok(p) => AddResult { project: p, ..r },
+            Err(e) => { let _ = projects.remove(&r.project.id); return Err(e); }
         },
-        None => Ok(r),
-    }
+        None => r,
+    };
+    // a new project starts with the skills that come with Kona and each person's starting tree (decision 67); if that fails the project is still fine, only without them
+    if let Err(e) = skills::seed_new_project(std::path::Path::new(&folder)) { eprintln!("could not give the new project its skills: {e}"); }
+    Ok(r)
 }
 
 /// Forget a project. Its files are never touched.
@@ -176,14 +179,27 @@ fn cost_rows(sessions: State<'_, Sessions>, since_day: Option<String>) -> Vec<le
 
 /// The tools Kona knows how to look for.
 #[tauri::command]
-fn list_tools() -> Vec<needs::ToolInfo> {
-    needs::catalog()
+fn list_tools(app: AppHandle) -> Result<Vec<needs::ToolInfo>, String> {
+    Ok(needs::catalog(&kona_base(&app)?))
+}
+
+/// Add a tool of the owner's own (no id) or change one (with its id).
+#[tauri::command]
+fn save_tool(app: AppHandle, tool: needs::CustomTool) -> Result<needs::ToolInfo, String> {
+    needs::save_custom(&kona_base(&app)?, tool)
+}
+
+/// Take one of the owner's own tools away.
+#[tauri::command]
+fn delete_tool(app: AppHandle, id: String) -> Result<(), String> {
+    needs::delete_custom(&kona_base(&app)?, &id)
 }
 
 /// Is each of these tools installed on this PC? Looks only; installs nothing.
 #[tauri::command]
-async fn check_tools(ids: Vec<String>) -> Result<Vec<needs::ToolStatus>, String> {
-    tauri::async_runtime::spawn_blocking(move || needs::check(&ids)).await.map_err(|e| e.to_string())
+async fn check_tools(app: AppHandle, ids: Vec<String>) -> Result<Vec<needs::ToolStatus>, String> {
+    let base = kona_base(&app)?;
+    tauri::async_runtime::spawn_blocking(move || needs::check(&base, &ids)).await.map_err(|e| e.to_string())
 }
 
 /// What the files in a project folder suggest it needs.
@@ -536,7 +552,22 @@ fn project_folder(projects: &Projects, folder: &str) -> Result<std::path::PathBu
 /// The skills of one project: the only ones a role of that project can be given, with what each costs at the start of a session.
 #[tauri::command]
 fn skill_catalog(projects: State<'_, Projects>, folder: String) -> Result<Vec<skills::SkillInfo>, String> {
-    Ok(skills::catalog(&project_folder(&projects, &folder)?))
+    let path = project_folder(&projects, &folder)?;
+    skills::refresh_builtins(&path);
+    Ok(skills::catalog(&path))
+}
+
+/// What Kona gives a person to start with: their skills, the short lines and the branches. Nothing is written.
+#[tauri::command]
+fn default_role_kit(role_id: String) -> Option<skills::RoleKit> {
+    skills::default_kit(&role_id)
+}
+
+/// Give a person their starting tree in this project: it joins what they already have.
+#[tauri::command]
+fn apply_default_tree(roles: State<'_, Roles>, projects: State<'_, Projects>, folder: String, role_id: String) -> Result<skills::RoleKit, String> {
+    if roles.get(&role_id).is_none() { return Err("That role does not exist".into()); }
+    skills::apply_default_tree(&project_folder(&projects, &folder)?, &role_id)
 }
 
 /// The skills on this PC that could be copied into the project (not used by any session until they are).
@@ -551,6 +582,36 @@ fn computer_skills(app: AppHandle, accounts: State<'_, Accounts>, projects: Stat
 fn import_skill(app: AppHandle, accounts: State<'_, Accounts>, projects: State<'_, Projects>, folder: String, account_id: Option<String>, name: String) -> Result<skills::SkillInfo, String> {
     let dir = account_id.and_then(|id| accounts.get(&id)).and_then(|a| a.config_dir);
     skills::import_skill(&kona_base(&app)?, dir.as_deref(), &project_folder(&projects, &folder)?, &name)
+}
+
+/// The text of one of the project's skills, to read and change.
+#[tauri::command]
+fn read_skill(projects: State<'_, Projects>, folder: String, name: String) -> Result<String, String> {
+    skills::read_skill(&project_folder(&projects, &folder)?, &name)
+}
+
+/// Make a new skill in the project, or replace the text of one it has.
+#[tauri::command]
+fn write_skill(projects: State<'_, Projects>, folder: String, name: String, text: String, create: bool) -> Result<skills::SkillInfo, String> {
+    skills::write_skill(&project_folder(&projects, &folder)?, &name, &text, create)
+}
+
+/// The other files of a skill, for the editor.
+#[tauri::command]
+fn read_skill_files(projects: State<'_, Projects>, folder: String, name: String) -> Result<Vec<skills::SkillFile>, String> {
+    skills::read_skill_files(&project_folder(&projects, &folder)?, &name)
+}
+
+/// Keep a skill's whole folder from the editor, all at once.
+#[tauri::command]
+fn save_skill_folder(projects: State<'_, Projects>, folder: String, name: String, text: String, create: bool, writes: Vec<skills::FileWrite>, deletes: Vec<String>) -> Result<skills::SkillInfo, String> {
+    skills::save_skill_folder(&project_folder(&projects, &folder)?, &name, &text, create, &writes, &deletes)
+}
+
+/// Remove one of the project's skills.
+#[tauri::command]
+fn delete_skill(projects: State<'_, Projects>, folder: String, name: String) -> Result<(), String> {
+    skills::delete_skill(&project_folder(&projects, &folder)?, &name)
 }
 
 /// The folder where a project's own skills live (it may not exist yet).
@@ -704,7 +765,7 @@ pub fn run() {
             app.manage(backup::SettingsStore::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![check_claude, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, cost_rows, set_project_github, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, kibby_say, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, workflow_list, workflow_save, workflow_delete, office_map_load, office_map_save, office_map_reset, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
+        .invoke_handler(tauri::generate_handler![read_skill_files, save_skill_folder, default_role_kit, apply_default_tree, check_claude, save_tool, delete_tool, read_skill, write_skill, delete_skill, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, cost_rows, set_project_github, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, kibby_say, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, workflow_list, workflow_save, workflow_delete, office_map_load, office_map_save, office_map_reset, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

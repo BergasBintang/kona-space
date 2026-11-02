@@ -4,7 +4,8 @@
 // Under the chart, "Running now" lists the open tickets of the workflow: the core moves a waiting step to Ready by itself when what it waits for is done,
 // and a Ready step has a button that starts its role's session (the owner presses it; Kona never starts a session unasked, it costs plan and can change files).
 import { useEffect, useMemo, useState } from "react";
-import { deleteWorkflow, listTickets, listWorkflows, saveWorkflow, startWorkflow, type Project, type Role, type Step, type TicketView, type Workflow } from "../lib/api";
+import { Select } from "./pick";
+import { deleteWorkflow, listTickets, listWorkflows, roleLabel, saveWorkflow, startWorkflow, type Project, type Role, type Step, type TicketView, type Workflow } from "../lib/api";
 import { Button, Glyph, RoleMark } from "./ui";
 import { Help } from "./Help";
 
@@ -40,7 +41,7 @@ function Chart({ steps, roles, pick, onPick }: { steps: Step[]; roles: Role[]; p
         {steps.map((s) => {
           const p = at.get(s.id)!, role = roles.find((r) => r.id === s.role);
           return (
-            <g key={s.id} transform={`translate(${p.x},${p.y})`} role="button" tabIndex={0} aria-label={`${s.title}, ${role?.name ?? s.role}`} style={{ cursor: "pointer", outline: "none" }}
+            <g key={s.id} transform={`translate(${p.x},${p.y})`} role="button" tabIndex={0} aria-label={`${s.title}, ${role ? roleLabel(role) : s.role}`} style={{ cursor: "pointer", outline: "none" }}
               onClick={() => onPick(s.id)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(s.id); } }}>
               <rect width={BOX_W} height={BOX_H} fill="var(--color-surface-1)" stroke={pick === s.id ? "var(--color-accent)" : "var(--color-line-strong)"} strokeWidth={pick === s.id ? 3 : 2} />
               <foreignObject x="6" y="6" width={BOX_W - 12} height={BOX_H - 12}>
@@ -97,7 +98,7 @@ function Running({ project, workflowId, roles, onStart, onOpenBoard }: { project
             <span className="font-mono text-[13px] text-text-tertiary">{t.id}</span>
             <span className="min-w-0 flex-1 text-[14px] leading-5 font-bold">{t.title.includes(": ") ? t.title.slice(t.title.indexOf(": ") + 2) : t.title}</span>
             <span className="text-[13px] leading-5 text-text-secondary">{WORDS[t.status] ?? t.status}{waits.length > 0 ? `, waits for ${waits.join(", ")}` : ""}</span>
-            {t.status === "ready" && role && <Button small onClick={() => void go(t)} disabled={busyId !== null}>{busyId === t.id ? "Starting…" : `Start as ${role.name}`}</Button>}
+            {t.status === "ready" && role && <Button small onClick={() => void go(t)} disabled={busyId !== null}>{busyId === t.id ? "Starting…" : `Start as ${roleLabel(role)}`}</Button>}
           </div>
         );
       })}
@@ -223,11 +224,9 @@ export function Workflows({ project, roles, onOpenBoard, onStart }: { project: P
                   <div className="flex flex-wrap gap-3">
                     <label className="flex min-w-[220px] flex-[2] flex-col gap-1"><span className="text-[13px] leading-5 font-bold text-text-secondary">Step</span>
                       <input value={step.title} onChange={(e) => changeStep(step.id, { title: e.target.value })} maxLength={80} className="h-10 border border-line-strong bg-inset px-3 text-[15px] text-text" /></label>
-                    <label className="flex min-w-[160px] flex-1 flex-col gap-1"><span className="text-[13px] leading-5 font-bold text-text-secondary">Role</span>
-                      <select value={step.role} onChange={(e) => changeStep(step.id, { role: e.target.value })} className="h-10 border border-line-strong bg-inset px-2 text-[15px] text-text">
-                        {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-                        {!roles.some((r) => r.id === step.role) && <option value={step.role}>{step.role}</option>}
-                      </select></label>
+                    <div className="flex min-w-[160px] flex-1 flex-col gap-1"><span className="text-[13px] leading-5 font-bold text-text-secondary">Role</span>
+                      <Select ariaLabel="Role of this step" value={step.role} onChange={(v) => changeStep(step.id, { role: v })}
+                        options={[...roles.map((r) => ({ value: r.id, label: roleLabel(r), hint: r.group })), ...(roles.some((r) => r.id === step.role) ? [] : [{ value: step.role, label: step.role }])]} /></div>
                   </div>
                   <fieldset className="m-0 flex flex-col gap-1 border-0 p-0"><legend className="p-0 text-[13px] leading-5 font-bold text-text-secondary">Comes after</legend>
                     {draft.steps.slice(0, draft.steps.findIndex((s) => s.id === step.id)).length === 0

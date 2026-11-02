@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clampCenter, fitScale, origin, stepScale, wheelPan, wheelZoom, zoomAround } from "./mapview.ts";
+import { clampCenter, fitScale, origin, pinchBoost, stepScale, wheelPan, wheelZoom, zoomAround } from "./mapview.ts";
 
 const content: [number, number, number, number] = [12, 8, 837, 422];
 
@@ -24,8 +24,11 @@ test("the centre stays inside the drawing", () => {
   assert.deepEqual(clampCenter({ x: 200, y: 200 }, content), { x: 200, y: 200 });
 });
 
-test("the wheel moves up and down, Shift moves left and right", () => {
+test("the wheel moves up and down, Shift moves left and right, two fingers on a touchpad move both ways, a pinch counts for more than a notch", () => {
   assert.deepEqual(wheelPan(0, 100, false, 2), { x: 0, y: 50 });
+  assert.deepEqual(wheelPan(40, -20, false, 2), { x: 20, y: -10 }, "two fingers sliding sideways and up move the map sideways and up");
+  assert.equal(pinchBoost(100), 100, "a notch of a mouse wheel stays one notch");
+  assert.equal(pinchBoost(-5), -20, "a small pinch delta is made bigger");
   assert.deepEqual(wheelPan(0, 100, true, 2), { x: 50, y: 0 });
   assert.deepEqual(wheelPan(60, 0, true, 3), { x: 20, y: 0 });
 });

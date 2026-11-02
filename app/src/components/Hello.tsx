@@ -1,7 +1,7 @@
 // The first screen of every launch: the Kona mark, a greeting, then one card per project with its account.
 // A project has exactly one account (decision 42). A project without one asks for it here, once. A signed-out account offers Sign in or Use another account.
 import { useCallback, useEffect, useState } from "react";
-import { accountStatusCached, forgetAccountStatus, setProjectAccount, signInAccount, type Account, type AccountStatus, type Persona, type Project } from "../lib/api";
+import { accountStatusCached, forgetAccountStatus, setProjectAccount, signInAccount, type Account, type AccountStatus, type Project } from "../lib/api";
 import { Button, Glyph } from "./ui";
 import { Select } from "./pick";
 import { checkForUpdate, useUpdate } from "../lib/update";
@@ -9,8 +9,8 @@ import { KonaMark } from "./KonaMark";
 
 type Status = AccountStatus | "asking";
 
-export function Hello({ projects, accounts, persona, version, note = null, onOpen, onAdd, onOpenAccounts, onProjects }: {
-  version: string; note?: string | null; projects: Project[]; accounts: Account[]; persona: Persona; onOpen: (id: string) => void; onAdd: () => void; onOpenAccounts: () => void; onProjects: (next: Project[]) => void;
+export function Hello({ projects, accounts, version, note = null, onOpen, onAdd, onOpenAccounts, onProjects }: {
+  version: string; note?: string | null; projects: Project[]; accounts: Account[]; onOpen: (id: string) => void; onAdd: () => void; onOpenAccounts: () => void; onProjects: (next: Project[]) => void;
 }) {
   const [status, setStatus] = useState<Record<string, Status>>({});
   const [swapping, setSwapping] = useState<string | null>(null); // the project whose account is being changed
@@ -49,7 +49,6 @@ export function Hello({ projects, accounts, persona, version, note = null, onOpe
         <div className="flex flex-col items-center gap-3 text-center">
           <KonaMark size={64} />
           <h1 className="m-0 text-[34px] leading-[42px] font-bold">Welcome to Kona</h1>
-          <p className="m-0 max-w-[520px] text-[15px] leading-6 text-text-tertiary">{persona.enabled ? persona.lines.greeting : "Pick a project to open its office."}</p>
         </div>
 
         {note && <p role="status" className="m-0 flex items-center justify-center gap-2 text-center text-[14px] leading-5 font-bold text-state-waiting"><Glyph state="waiting" size={16} />{note}</p>}

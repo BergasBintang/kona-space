@@ -13,7 +13,7 @@ struct Ctx {
     dir: PathBuf,
     project: PathBuf,
     who: String,
-    roles: Vec<(String, String)>, // id, name
+    roles: Vec<(String, String, String)>, // id, job, person
 }
 
 fn arg(args: &[String], name: &str) -> String {
@@ -21,8 +21,13 @@ fn arg(args: &[String], name: &str) -> String {
 }
 
 // the roles are a fixed list since 0.20.0 (decision 43), so the tool server no longer reads a file for them
-fn read_roles() -> Vec<(String, String)> {
-    crate::roles::starting_roles().into_iter().map(|r| (r.id, r.name)).collect()
+fn read_roles() -> Vec<(String, String, String)> {
+    crate::roles::starting_roles().into_iter().map(|r| (r.id, r.name, r.person)).collect()
+}
+
+/// How one person refers to another: "Kiki the Product".
+fn the(r: &(String, String, String)) -> String {
+    if r.2.is_empty() { r.1.clone() } else { format!("{} the {}", r.2, r.1) }
 }
 
 fn tools() -> Value {
@@ -36,7 +41,7 @@ fn tools() -> Value {
          "inputSchema": {"type": "object", "properties": {
             "title": {"type": "string"}, "description": {"type": "string", "description": "What needs doing and why."},
             "done_when": {"type": "string", "description": "How the owner can tell it is finished."},
-            "role": {"type": "string", "description": "Which role should do it (for example Frontend). Optional."},
+            "role": {"type": "string", "description": "Which person should do it, by name or job (for example Jiro, or Frontend). Optional."},
             "status": {"type": "string", "enum": ["backlog", "ready"]}}, "required": ["title"]}},
         {"name": "update_ticket", "description": "Change a ticket: its column (not done), its next step, a note for the history, or whether it waits on the owner. Only the fields you give are changed.",
          "inputSchema": {"type": "object", "properties": {
@@ -56,19 +61,21 @@ fn role_id(ctx: &Ctx, given: &str) -> Result<Option<String>, String> {
     if g.is_empty() {
         return Ok(None);
     }
-    ctx.roles.iter().find(|(id, name)| id.eq_ignore_ascii_case(g) || name.eq_ignore_ascii_case(g)).map(|(id, _)| Some(id.clone()))
-        .ok_or_else(|| format!("There is no role called {g}. Roles: {}", ctx.roles.iter().map(|r| r.1.as_str()).collect::<Vec<_>>().join(", ")))
+    // a role is found by its id, its job (Product), its person (Kiki), or "Kiki the Product" / "Kiki, Product"
+    let g = g.to_lowercase();
+    ctx.roles.iter().find(|r| [r.0.to_lowercase(), r.1.to_lowercase(), r.2.to_lowercase(), the(r).to_lowercase(), format!("{}, {}", r.2, r.1).to_lowercase()].contains(&g)).map(|r| Some(r.0.clone()))
+        .ok_or_else(|| format!("There is no role called {given}. Roles: {}", ctx.roles.iter().map(the).collect::<Vec<_>>().join(", ")))
 }
 
 fn line(ctx: &Ctx, t: &Ticket) -> String {
-    let role = t.role.as_ref().and_then(|r| ctx.roles.iter().find(|x| &x.0 == r)).map(|r| r.1.as_str()).unwrap_or("no role");
+    let role = t.role.as_ref().and_then(|r| ctx.roles.iter().find(|x| &x.0 == r)).map(the).unwrap_or_else(|| "no role".to_string());
     let blocked = if t.blocked_by.is_empty() { String::new() } else { format!(" - waits for {}", t.blocked_by.join(", ")) }; // a step of a workflow that comes after other steps
     format!("{} [{}] {} ({}){}{}", t.id, t.status, t.title, role, if t.waiting { " - waiting on the owner" } else { "" }, blocked)
 }
 
 fn full(ctx: &Ctx, t: &Ticket) -> String {
     let mut s = format!("{}\nStatus: {}\nRole: {}\nRaised by: {}\nNext: {}\nWaiting on the owner: {}\n", line(ctx, t), t.status,
-        t.role.as_ref().and_then(|r| ctx.roles.iter().find(|x| &x.0 == r)).map(|r| r.1.as_str()).unwrap_or("none"), t.raised_by, if t.next.is_empty() { "-" } else { &t.next }, if t.waiting { "yes" } else { "no" });
+        t.role.as_ref().and_then(|r| ctx.roles.iter().find(|x| &x.0 == r)).map(the).unwrap_or_else(|| "none".to_string()), t.raised_by, if t.next.is_empty() { "-" } else { &t.next }, if t.waiting { "yes" } else { "no" });
     s.push_str(&format!("\nDescription:\n{}\n\nDone when:\n{}\n\nHistory:\n", if t.description.is_empty() { "-" } else { &t.description }, if t.acceptance.is_empty() { "-" } else { &t.acceptance }));
     for h in &t.history { s.push_str(&format!("- {h}\n")); }
     s
@@ -162,7 +169,7 @@ pub fn run(args: &[String]) {
     let session = arg(args, "--session");
     let role = arg(args, "--role");
     let roles = read_roles();
-    let role_name = roles.iter().find(|r| r.0 == role).map(|r| r.1.clone());
+    let role_name = roles.iter().find(|r| r.0 == role).map(the);
     let who = format!("session {}{}", &session[..session.len().min(8)], role_name.map(|n| format!(" (role: {n})")).unwrap_or_default());
     let ctx = Ctx { dir: tickets::dir(Path::new(&folder)), project: PathBuf::from(&folder), who, roles };
     let stdin = std::io::stdin();

@@ -1,0 +1,137 @@
+{
+  "product": [
+    { "branch": "Shaping an idea", "when": "the ask is vague or big", "skills": [
+      ["shape-an-idea", "A wish with no clear shape yet"],
+      ["write-a-brief", "The idea is agreed and needs writing down"]
+    ] },
+    { "branch": "Choosing the order", "when": "several things compete for time", "skills": [
+      ["prioritise-work", "Deciding what comes first"]
+    ] },
+    { "branch": "Handing it over", "when": "the work is clear and someone must do it", "skills": [
+      ["slice-the-work", "Too big for one ticket"],
+      ["write-a-ticket", "One small piece for one person"]
+    ] }
+  ],
+  "design": [
+    { "branch": "Making a screen", "when": "something new or a redesign", "skills": [
+      ["design-a-screen", "Layout, order and every state"],
+      ["ui-words", "Buttons, errors, empty states"]
+    ] },
+    { "branch": "Judging a screen", "when": "something already exists", "skills": [
+      ["ui-critique", "What is wrong, ranked"],
+      ["accessibility-check", "Keyboard, contrast, screen readers"]
+    ] }
+  ],
+  "frontend": [
+    { "branch": "Building", "when": "adding or changing what people see", "skills": [
+      ["build-a-screen", "Any screen, form or component"],
+      ["write-tests-first", "Logic that can break"],
+      ["accessibility-check", "Forms, dialogs, menus"]
+    ] },
+    { "branch": "Something is broken", "when": "a bug, a failure, a strange result", "skills": [
+      ["find-root-cause", "Before proposing any fix"]
+    ] },
+    { "branch": "Finishing", "when": "about to call it done", "skills": [
+      ["verify-before-done", "Before saying it works"],
+      ["review-a-change", "Reading a diff or branch"]
+    ] }
+  ],
+  "backend": [
+    { "branch": "Building", "when": "adding or changing server work", "skills": [
+      ["design-an-api", "An endpoint others depend on"],
+      ["change-a-database", "Structure changes and data moves"],
+      ["write-tests-first", "Logic that can break"]
+    ] },
+    { "branch": "Something is broken", "when": "a bug, a failure, slowness", "skills": [
+      ["find-root-cause", "Before proposing any fix"]
+    ] },
+    { "branch": "Finishing", "when": "about to call it done", "skills": [
+      ["verify-before-done", "Before saying it works"],
+      ["review-a-change", "Reading a diff or branch"]
+    ] }
+  ],
+  "qa": [
+    { "branch": "Planning", "when": "before testing starts", "skills": [
+      ["test-plan", "What to test and what to leave"]
+    ] },
+    { "branch": "Trying it", "when": "using the real thing", "skills": [
+      ["test-in-the-browser", "Clicking through a web page or app"],
+      ["accessibility-check", "Can everyone use it"],
+      ["verify-before-done", "Before saying it passed"]
+    ] },
+    { "branch": "Reporting", "when": "something is wrong or needs a verdict", "skills": [
+      ["bug-report", "Steps someone else can repeat"],
+      ["find-root-cause", "Tracing why, when asked"],
+      ["review-a-change", "Reading a diff or branch"]
+    ] }
+  ],
+  "security": [
+    { "branch": "Looking at what exists", "when": "code or a project is already there", "skills": [
+      ["security-check", "Holes in code or a feature"],
+      ["find-secrets", "Keys and passwords that leaked"],
+      ["check-dependencies", "Risky packages"]
+    ] },
+    { "branch": "Before it is built", "when": "a design or plan", "skills": [
+      ["threat-model", "How it could be attacked"]
+    ] }
+  ],
+  "devops": [
+    { "branch": "Shipping", "when": "a version is going out", "skills": [
+      ["release-checklist", "Is it ready"],
+      ["deploy-safely", "Putting it on a server"]
+    ] },
+    { "branch": "Something is down", "when": "live and broken right now", "skills": [
+      ["incident-response", "Stop the harm first"],
+      ["find-root-cause", "Why it happened"]
+    ] },
+    { "branch": "Keeping it running", "when": "writing down how things are done", "skills": [
+      ["write-a-runbook", "Steps a stranger can follow"]
+    ] }
+  ],
+  "marketing": [
+    { "branch": "What to say", "when": "the message is not settled", "skills": [
+      ["positioning", "Who it is for and why"]
+    ] },
+    { "branch": "Writing it", "when": "the message is settled", "skills": [
+      ["landing-copy", "A page with one action"],
+      ["launch-note", "Announcing something new"],
+      ["plain-words", "Any text that reads stiff"]
+    ] }
+  ],
+  "content": [
+    { "branch": "Planning", "when": "before a page is written", "skills": [
+      ["seo-brief", "What people search for and need"]
+    ] },
+    { "branch": "Writing", "when": "making or improving a text", "skills": [
+      ["write-an-article", "Articles and guides"],
+      ["plain-words", "Any text that reads stiff"]
+    ] },
+    { "branch": "Checking", "when": "a page already exists", "skills": [
+      ["page-seo-check", "Why a page is not found"]
+    ] }
+  ],
+  "support": [
+    { "branch": "Answering", "when": "one person is waiting", "skills": [
+      ["support-reply", "A question or a complaint"],
+      ["plain-words", "A reply that reads stiff"]
+    ] },
+    { "branch": "Sorting", "when": "many reports or a suspected bug", "skills": [
+      ["triage-reports", "Many reports at once"],
+      ["bug-report", "A problem someone must fix"]
+    ] },
+    { "branch": "Preventing", "when": "the same question keeps coming", "skills": [
+      ["help-article", "A page people can use alone"]
+    ] }
+  ],
+  "secretary": [
+    { "branch": "Turning wishes into work", "when": "the owner wants something done", "skills": [
+      ["route-the-work", "Who should do what"],
+      ["write-a-ticket", "One small piece for one person"]
+    ] },
+    { "branch": "Writing things down", "when": "the owner wants a record or a summary", "skills": [
+      ["meeting-notes", "After a talk"],
+      ["status-update", "What is going on"],
+      ["plain-words", "Anything that reads stiff"]
+    ] }
+  ]
+}

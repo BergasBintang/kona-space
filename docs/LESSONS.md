@@ -6,6 +6,72 @@ Plain words are used on purpose. Terms are explained the first time.
 
 ---
 
+## The benchmark: read this first, in every session
+
+Every line was paid for with a correction or a wasted hour. Before showing the owner any work, go down the list. A line that fails means the work is not ready. The reasons and the stories are in the sections below (most in section 10).
+
+**Listening**
+
+1. Something the owner said once still holds. Before building a screen, read this list and search the Decisions table for what was already agreed.
+2. When a redesign replaces a screen, list what the old one had first. Nothing agreed may disappear without saying so.
+3. If a word could mean two things (they said "b-tree"), show a small picture of what you understood before building it. A wrong guess costs more than one question.
+4. When the owner says "I don't understand", take things away. More explaining text makes it worse.
+5. A question gets answered first, in plain words ("WHAT IS THIS?" means explain it). While the owner says "we are discussing", change nothing.
+
+**Screens**
+
+6. No explanation sits on the page. It goes behind the round "?" (`Help`) beside the heading. Only what is true right now stays: empty, busy, failed, a warning at the moment of an action, live numbers.
+7. The same words never appear twice on one screen. Look at the opened state too, not only the closed one.
+8. A box shows the text that already exists, ready to change. It saves by itself and says "Saved". No empty box with an example inside when real text exists.
+9. Only Kona's own pickers (`Select`, `SmartSearch`), never a system `<select>`. Icons are centred, and where the owner asked for an icon, there are no words.
+10. Try it with a real amount: forty skills, long names, an empty project, a narrow window. One item proves nothing about a list.
+11. A file or thing nothing points at is a dead end. Whatever can be placed or added shows where it lands, or says when it is used, before you commit to it.
+
+**The office**
+
+12. Look at all four sides before saying anything drawn is fixed, and say which sides were looked at.
+13. Change the default map through `art/build-standard.mjs`, never by hand. `checkMap` must report nothing.
+14. A piece of several parts paints in call order: use `near` so nearer parts paint last. Kibby is checked against doorway posts too.
+
+**Saying it works**
+
+15. Tests passing does not mean it works. Say what was seen in the real window and what was not. Anything Claude has to use (a skill, a tool, a prompt) is proven only by a real conversation in a throwaway project.
+16. Never warn about a risk that can be tested in a minute. Test it, then report the result.
+17. A running window can be older than the code. `cargo test` does not update it, and `tauri dev` does not rebuild for files outside the Rust code (touch `src/lib.rs`). Check the program's time before believing a window test.
+
+**The owner's data**
+
+18. Never test on the owner's project: add a throwaway one, remove it afterwards, and delete its folder and its Claude transcripts. If a real project must be touched, save a copy of its data first and say so.
+19. Reloading the window throws away what the owner has open. Do not reload or drive it while they may be in the office editor with unsaved work.
+
+**Shipping**
+
+20. What goes inside the program must work for anyone who downloads it: no company names, keys, addresses or local paths. Text from other people's projects stays out; write it fresh.
+21. Commit, tag, publish and anything on a server wait for the owner's word.
+
+**Tools on this PC**
+
+22. Long scripts: write the file with the Write tool, then run it. No heredocs with quotes or backslashes, and never `python -`. Keep each file's own line endings.
+23. A Rust compile error kills the dev window. A backslash in a Rust test string is the usual cause.
+
+---
+
+## How this file grows
+
+The owner asked for this on 2026-11-02, so that every session ends up teaching the next one.
+
+1. **At the start of a session:** read the benchmark above.
+2. **As it happens:** when the owner corrects something, or a test or a real run shows a surprise, add a row to the section of the current session straight away. Summaries of a long session lose these details.
+3. **Before a commit or a release, at the end of a session, or when the owner says "write the lessons":**
+   - Run `node tests/owner-said.mjs` in `app/`. It prints everything the owner typed in the newest session on this PC.
+   - Go down it. For each correction, each repeated request and each "why": is the lesson in the file? Add what is missing as a row: what was seen, the cause, the rule to keep.
+   - Add your own mistakes too (a wrong guess, a wasted hour), not only the owner's corrections.
+   - If a rule was broken twice, or would have saved real time, make it a line of the benchmark. Keep the benchmark short: replace a weaker line rather than letting it grow past about 25.
+   - Correct what has turned out wrong in older sections; mark it instead of quietly deleting it.
+4. Never write keys, passwords, addresses or e-mail addresses here.
+
+---
+
 ## 1. Where everything is
 
 | What | Where |
@@ -24,6 +90,10 @@ Plain words are used on purpose. Terms are explained the first time.
 | Updates | `app/src/lib/update.ts`, `app/src/components/UpdateCard.tsx` |
 | Releasing | `docs/RELEASING.md`, `docs/VERSIONING.md` |
 | The plan and the decisions (rows 49 to 54 are from this session) | `kona-space-app.md` |
+| The skills that ship with Kona, and each person's starting tree | `app/src-tauri/skills/`, `default-tree.json`, `docs/SKILLS.md` |
+| The Skills tab, the tree and the skill dialog | `app/src/components/SkillsTab.tsx`, `SkillTree.tsx`, `SkillEditor.tsx`, `app/src-tauri/src/skills.rs` |
+| The "?" beside a heading | `app/src/components/Help.tsx` |
+| The default office | `art/build-standard.mjs` makes `app/src/office/standard.json` |
 
 Data on disk, per project: `<project>\.kona\role-kits.json` (skills and connectors per role), `.kona\skills\<name>\SKILL.md`, `.kona\role-plugins\` (built once per kit, pruned after 14 days), `.kona\workflows\<id>.json`, `.kona\brain\workflow-<id>.md`, `.kona\tickets\T-nnnn.md`. Per computer: `%APPDATA%\Kona\role-profiles.json` (personality, job, model, permissions), `%APPDATA%\Kona\skills` (the shelf of skills to copy from).
 
@@ -239,3 +309,107 @@ Checked: every file of `app/src` against the imports from `main.tsx`, every expo
 - **Old text, kept as history:** sections 2.1 to 2.9 of this file still describe the first pipeline (`office.mjs`, `walls.mjs`); they have a banner saying it was replaced in 0.26.0, and three rows of section 7 ("Room layout", "Kibby inside the rooms", "Decor on every wall") name the old scripts too. `docs/AUDIT.md` is the audit of 0.16.0.
 - **Not a problem:** the 14 Brain starter notes (loaded by `import.meta.glob`), `typescript` (used by `npm run build`), `art/out` (the generated sheets and frames the app copies and the owner can redraw), no Rust warnings, no unused locals.
 - **Big and safe to rebuild:** `app/src-tauri/target` is about 9.4 GB of build output (ignored by git). `cargo clean` frees it; the next build takes several minutes.
+
+---
+
+## 9. Roles as people (the talk of 2026-11-02)
+
+What was found and decided, so it is not found again. Details: decisions 59 to 64 in `kona-space-app.md`; tickets T-0004 to T-0013.
+
+- **Rooms were only used for clicking and for names.** Once a person is a cat you click, and a screen is a piece you click, nothing needs a room: rooms became decoration, the floor became a style (two colours and a pattern) from Kona's own palette, and every wall became one colour. The old per-room data still reads (it becomes styles with the same colours).
+- **"Everything must be openable" is a rule of the map.** A person needs a desk and a screen needs a piece, or nothing can open it. So an office is refused on Save without them (`missingPieces`), and a saved office that lacks them gets them put back when it opens (`ensurePages`).
+- **Kibby was easier than feared.** The drawing order for a walker (`kibbySlot`) already worked for any tile; free walking was one change to `Scene.walkable`.
+- **A test was worth a few cents.** Whether Claude Code offers its question tool in Kona's mode was a guess until one Haiku session in a scratch folder showed it does (row 64).
+- **Mistakes of the session.** A shell heredoc with quotes and backslashes broke twice; writing a script file with the Write tool and running it was reliable. Some files are CRLF (`App.tsx`, `sessions.ts`): a script that edits them must read and write the line endings as they are. `python -` in a shell waits for input forever on this PC: do not use it.
+- **Not looked at, when this was written.** The real window. The pictures, the tests and the type checks were all done, but no one had seen the bubbles, the sheet, the editor's 3D button or the question card in Kona itself. The sheet and the editor have been seen since (section 10).
+
+---
+
+## 10. What was found in the session of 2026-11-02 (roles as people, the editor, the skills)
+
+Each row: what was seen, the cause, the rule to keep. The strongest rows are in the benchmark at the top.
+
+### 10.1 Working with the owner
+
+| Seen | Cause | Keep |
+|---|---|---|
+| "I thought I already told you", about explanations on the page | The rule was in section 3.4 of this file and in the owner's taste notes, but new screens were built without reading them | Read the benchmark first. A rule stated once holds for every later screen |
+| "Where is the b-tree skill graph????????" | My redesign of the Skills tab quietly dropped something agreed earlier | List what a screen has before replacing it |
+| "The b-tree isn't actually a b-tree I actually need" | I guessed at the word twice: first a flat list called Tree, and only then real levels (job, branch, skill, files) | Show a small picture of what you understood before building |
+| "I still can't get a comprehend" after each fix | I answered confusion with more words on the page. Three views also showed the same skills | One view you work in directly. Remove before adding |
+| Three identical lines in one opened skill | The note was drafted from the description, so the title row, the description and the box all said the same | Look at the opened state. Do not store a copy of text that exists; only a change is kept as a note, which also stops paying tokens twice |
+| "A hint should be the one already exist and save" | I emptied the box and added an example inside it | A box shows the real text, saves by itself and says "Saved" |
+| "A new skill can't be like this" | The dialog treated a skill as one text file | Check what the thing really is (a folder) before drawing its form |
+| "WHAT IS THIS?" about a line I wrote | I named `CLAUDE.md` as if the owner knew it | Explain a term the first time. Answer that first, then recommend |
+| "We are still in discussion, so don't change anything" | The owner works in stages | Talk, then questions in a form, then plan mode, then tickets, then build, in that order, and only when told |
+| "Summarize everything so we don't lose any detail" | Long talks lose detail, also through compaction | Write agreed things down at once: the Decisions table and tickets |
+| "Why doesn't it use our own dropdown?" | I used a system `<select>` | Kona's own `Select` and `SmartSearch` everywhere |
+
+### 10.2 Screens
+
+| Seen | Cause | Keep |
+|---|---|---|
+| The plan was blank after See in 3D and Back | The draw effect did not depend on the view mode, and the canvas was new | Add `mode` to the effect's list. Try going there and back on anything that switches views |
+| Icons not centred | Each icon sat by its own numbers | `path()` centres them automatically (`Icon.tsx`). Check at the real size |
+| The search box was only 24 pixels high | Children of a scrolling flex column can shrink | `shrink-0` on them (`[&>*]:shrink-0`), then measure it |
+| "Could not open the folder (os error 3)" in Skills | A project without a skills folder was treated as an error | A folder that is not there yet is an empty state in words |
+| Bubbles overlapped in a crowded room | They were placed separately | Position in screen pixels and lift the later ones |
+| Text being typed in a branch's line was wiped | The save comes back a moment later and reset the box | Do not overwrite a box that has the focus (`typing` ref in `SkillTree.tsx`) |
+| "Add the 4 for Sen" could lose skills | A loop saved from a kit read once, so each save overwrote the last | Keep one action on the core side (`apply_default_tree`) rather than a loop of saves on the screen |
+| A row's note in the pixel font was hard to read | Every button gets the pixel font | `font-sans tracking-normal` for long text inside a button |
+| After giving a skill, the Files panel did not refresh | It only read on mount | `key={saves}` so it looks again |
+| Closing the skill dialog would lose a lot of writing | Esc and a click outside just closed it, which was fine for a small form | A dialog that holds real work asks first |
+
+### 10.3 The office
+
+| Seen | Cause | Keep |
+|---|---|---|
+| A window landed between two walls, buried | "Nearest wall" with no thought of which side is free | Wall things go on a free side (`attachCells`, `sideFree`), with a live preview and a warning (`attachProblem`) |
+| "Without any clue where it will land is kinda dumb" | No preview | Anything placed shows where it lands before the click |
+| Doorways drew nothing in 3D, and wide gaps were dead data | The rule only knew a one-tile gap | A doorway is a gap of up to 4 floor tiles with a wall at each end (`doorwayAxis`, `engine/doorway.ts`); posts per gap, in plan and in 3D |
+| Warnings on the standard office after that rule | Gaps run through floor tiles | `doorwayAxis` walks through floor tiles up to the limit |
+| "Kibby buried in that post" | Doorway posts were not in his checks | Posts count as things he walks around (`scene.ts`), with a test |
+| Kibby hitched back to idle at each tile | The walk ended at each tile and chose again | Keep walking when there is a next tile (`choose()` in `kibby.ts`). The old test counted stops, so it now counts tiles by position (`x % 8 == 4`) |
+| A white strip with no depth, a drawer drawn wrong from one side, things beside a computer | Several parts of one piece painted in call order | `L.near(...)` orders them for the camera, in `furniture.ts`; look from all four sides |
+| The default map made no sense as a place | It grew by small edits | It is generated by `art/build-standard.mjs`, and reads as one plan |
+| "Kona does not know (voice booth)" on the real Norbit office | A saved office held pieces that had been retired | `parseMap` drops `RETIRED_KINDS` silently, with a test. Removing a kind always means old saves still open |
+| A flow board looked like the standing chart, and close to the booth | Only the shape was different, and only from one side | Distinct from all sides; a test measures the colour distance |
+| Screens with no sign they can be opened | Nothing marked them | A faint icon over each piece that opens a screen, which the owner liked |
+
+### 10.4 Skills and Claude (real conversations, 2026-11-02)
+
+| Seen | Cause | Keep |
+|---|---|---|
+| Sora used the skill but did not open its template | The skill only said "the template has both forms" | Each file is pointed at as an order: "Open `templates/x.md`". After the change it was opened. `cargo test` checks the wording |
+| I warned that a colon in a description might stop Claude reading it | A guess: I had not tried it | Claude read it correctly. The rule stays as a caution, because the top of the file is meant to be YAML, but the warning was wrong. Test first |
+| Choosing worked at once | A clear "Use when ..." line. Sora took `incident-response`, Kenn `support-reply`, with no permission card | Keep the "Use when" lines exact, with the words people really use |
+| The session sees only that person's skills plus those inside Claude Code | `--setting-sources` and `--plugin-dir` work as planned | 40 skills in the folder cost nothing extra; about 280 to 500 tokens a person |
+| The cost of a test | Four conversations on Sonnet came to about $0.39 by Kona's estimate; the first turn costs the most | A real test is cheap against a wrong guess. Say what it will cost first |
+| The old skills were thin | 12 skills of about 150 words, one file each, and "a place to copy from" | Forty folders, written fresh, in the program, as the default for a new project. Details in `docs/SKILLS.md` |
+| Licences | Only some GitHub skill collections say their licence clearly; many local skills state none | Read for ideas. Write fresh. Name the sources |
+| A built-in copy nobody changed should follow Kona, one the owner changed should not | A plain copy cannot tell the two apart | A fingerprint of what Kona wrote (`.kona/builtin-skills.json`). Only an identical copy is replaced |
+| Claude searched for a template with Glob before reading it | It works out the skill's folder first | Fine; it found it. Keep the paths relative to the skill |
+
+### 10.5 Tools, testing and this PC
+
+| Seen | Cause | Keep |
+|---|---|---|
+| The window test showed old skill text | `tauri dev` did not rebuild for a change in `skills/`, and `cargo test` builds a different program | `touch src/lib.rs`, wait, and compare `target/debug/app.exe`'s time with the file's |
+| The window jumped back to the welcome page, and a script failed | A code change can reload the whole page | Scripts first check where the window is. Do not assume a screen stayed open |
+| A test left a skill and a branch on Nokka in Norbit | I tested on the owner's project, and the reload stopped my script halfway | Use a throwaway project. If a real one is used, restore it at once and say so |
+| A button was not found by its text | Its text includes the hint under it ("+ TemplateA form to fill in") | Match with `startsWith`, or use `aria-label` |
+| Rust did not compile, and the dev window died | `"..\evil"` in a test string | `../evil`, or `\\`; use the Edit tool for such lines |
+| A heredoc with quotes and backslashes broke, and `python -` hung twice | Shell quoting | Write the script with the Write tool, then run it |
+| `App.tsx` would not match a multi-line replace | CRLF | Read and keep each file's own line endings |
+| "t?.closest is not a function" in a test | My made-up window events, not a real bug | Use `Input.dispatchMouseEvent`, and do not chase errors the test itself caused |
+| Removing a temp file with a relative path was refused by a safety check | It resolved to the root of the drive | Keep temp files in the scratchpad, with full paths |
+| A test held the first part of a server address, and decisions carried tomorrow's date | I wrote them from memory; the secret scan before the commit and `date` caught them | Before a commit, scan what is being added for addresses, keys and e-mail addresses, and take the date from the PC |
+| `git rm` refused a file with changes | It had local changes | Look at the file first, then `git rm -qf` if it is meant to go |
+| `gh` is not found in the shell | It is not on the PATH | `D:\toolchain\gh\bin`, or read the web page instead |
+
+### 10.6 Still not checked at the end of this session
+
+- Real touchpad gestures (two fingers, pinch): only made-up events so far.
+- Saving the office editor in the real window, kept off to protect the owner's own office.
+- The other 9 people and the other 38 skills in a real conversation.
+- Pressing "Default map" replaces a project's saved office: save a copy first.

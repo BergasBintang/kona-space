@@ -1,7 +1,7 @@
 // The Costs place: what the open project's sessions cost, from Kona's own ledger. It is always one project; to see another, open it.
 // Pick a period and how to group it (role, ticket, account, model, day or session). Dollars are an estimate at list price, never a bill (decision 25).
 import { useEffect, useMemo, useState } from "react";
-import { costRows, listTickets, samePlace, type Account, type CostRow, type Project, type Role } from "../lib/api";
+import { costRows, listTickets, roleLabel, samePlace, type Account, type CostRow, type Project, type Role } from "../lib/api";
 import { dollars } from "../lib/sessions";
 import { Glyph } from "./ui";
 import { Help } from "./Help";
@@ -63,7 +63,7 @@ export function Costs({ project, roles, accounts }: { project: Project | null; r
   // the ledger holds every project; this screen keeps only the open project's rows
   const shown = useMemo(() => (rows === null || !project ? null : rows.filter((r) => r.folder && samePlace(project.folder, r.folder))), [rows, project]);
 
-  const roleName = (id: string | null | undefined) => roles.find((r) => r.id === id)?.name ?? (id ? "A removed role" : "No role");
+  const roleName = (id: string | null | undefined) => { const r = roles.find((x) => x.id === id); return r ? roleLabel(r) : id ? "A removed role" : "No role"; };
   const accountName = (id: string | null | undefined) => accounts.find((a) => a.id === (id ?? "main"))?.label ?? "A removed account";
 
   const lines = useMemo<Line[]>(() => {

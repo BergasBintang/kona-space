@@ -2,6 +2,32 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.27.0, 2026-11-02
+
+Roles become people you click and talk to, each with their own skills. Forty skills and a skill tree come with Kona for every new project, and the office is simpler to edit.
+
+- **People.** Each role has a name (Kiki, Nokka, Jiro, Kit, Sen, Bejo, Yuzu, Nobo, Kenn, Sora, Kupa), shown as "Kiki, Product". A person does one thing at a time in a project; a second conversation with them is refused with a plain message.
+- **A sheet for each person.** Click a person in the office. Tabs: Chat, History, Skills, Tools, Set up. The first message starts the conversation. The History tab lists their earlier conversations, each with Resume; Set up uses the full width in two columns; New conversation puts the open one away. The start form, the Sessions page, the Roles page and the room lists are gone.
+- **Editor with icons.** Select, Erase, Undo, Redo, Save, Close, Zoom, Center, Edit and the turn buttons are icons. One list of Things with a picture for each (floors as small swatches, walls, doorway, what hangs on a wall, furniture). A "+" strip on each edge of the plan adds a row or column. "Use the standard office" is "Default map".
+- **A new default office.** Rebuilt so that things sit with what they belong to: Library next to the Archive, Planning (Kiki, Nokka, the cork board, the flow board) next to Engineering (four desks, the branch board), the Server room next to Ops (Sora, the gear console), the Storage room with the leftovers bin, Admin with the cash desk, and a Lobby with Kupa's desk, the key cabinet and the front door, next to Support. A hall joins the top rooms, a corridor leads from it to the front door, and every gap in a wall has its two posts. It is made by `art/build-standard.mjs`. A project that already has its own saved office keeps it; "Default map" in the editor switches it to the new one.
+- **Board and Workflows are two separate pages**, each opened by its own piece (the cork board and the flow board); the tab switcher between them is gone, and so are the room names under page titles.
+- **Kibby** no longer stands still for a moment between two tiles when he is not stopping, and he never stands inside a door post. The keyboard of the server terminal is a real box and is hidden by the screen when seen from behind.
+- **Tools for each project.** In a person's empty chat, the list "Tools this session needs" has a "Not needed" button on each tool, and "Add a tool" from Kona's fixed list; the choice is kept for that person in that project. Over each piece of the office that opens a screen sits a faint picture of what the screen is about (a bulb, a folder, a server, a coin, a key, a gear, a crate, a flow chart, a ticket card, a branch).
+- **Tools for each person.** A Tools tab checks the programs they need for the project (Git, Node.js ...). Hide what the project does not use, add one with a search, and add, change or remove tools of your own (a program name and a version flag).
+- **Forty skills come with Kona,** inside the program. Each is a real folder with its steps, and often templates and checklists. A new project starts with all of them, and with a starting tree for each of the eleven people. An older project keeps what it has and can take the tree with one button. When a new Kona has better text, a copy you never changed is updated, and one you changed is left alone.
+- **A real skill tree.** The Skills tab is the tree: the job, branches you make for each kind of work, the skills under each branch, and the files of each skill. Each has a line on when to take it, and the person is told the same tree at the start of every conversation. Move a skill between branches, or change its line.
+- **Make a skill as a folder.** The dialog for a new or changed skill shows the steps and any templates, references, examples and scripts, and saves it all at once.
+- **Explanations behind a round "?".** On every screen, the text explaining a section moved behind a "?" beside its heading.
+- **Smaller things.** The pickers use Kona's own list instead of the system one. On a touchpad, two fingers move the map and a pinch zooms it. The pulled-out drawer and the things beside a computer on a desk are drawn right from every side.
+- **A bubble over each cat**: Working, Questioning or Finish.
+- **A voice for each person**, with a starting voice for each. The Voice screen is gone.
+- **A question card** for Claude's multiple-choice questions.
+- **Click people and pieces, not rooms.** Eight pieces of furniture and two boards open the screens that have no person.
+- **One wall colour** (`#d8cdb6`, three shades). No brick, no wall colour for each room.
+- **Floor styles** instead of rooms: 24 styles from Kona's palette. An old saved office reads as styles with the same colours.
+- **Edit the office:** one view (a plan, or "See in 3D"), a bigger list with pictures, unique things greyed out once placed, and no saving while a person or a screen has no piece (a saved office that lacks them gets them put back when it opens).
+- **Kibby** walks on any free floor.
+
 ## 0.26.1, 2026-10-31
 
 A clearer font, a floor fix, and a tidier editor.

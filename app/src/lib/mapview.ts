@@ -25,11 +25,15 @@ export function clampCenter(c: Pt, [x0, y0, x1, y1]: Box): Pt {
   return { x: Math.min(x1, Math.max(x0, c.x)), y: Math.min(y1, Math.max(y0, c.y)) };
 }
 
-/** What a turn of the mouse wheel does: up and down moves the map up and down, with Shift left and right. `delta` is in CSS pixels; the result is in drawing pixels. */
+/** What the wheel or a touchpad does to the place of the map. A touchpad sends both directions at once (two fingers slide up, down, left, right, or round), so both move the map; a mouse
+ *  wheel sends only up and down, and with Shift its turn moves the map left and right. `delta` is in CSS pixels; the result is in drawing pixels. */
 export function wheelPan(deltaX: number, deltaY: number, shift: boolean, k: number): Pt {
-  const d = shift ? deltaX || deltaY : deltaY; // some mice report a Shift wheel as deltaX, some keep deltaY
-  return shift ? { x: d / k, y: 0 } : { x: 0, y: d / k };
+  if (shift) return { x: (deltaX || deltaY) / k, y: 0 }; // some mice report a Shift wheel as deltaX, some keep deltaY
+  return { x: deltaX / k, y: deltaY / k };
 }
+
+/** A pinch on a touchpad reaches the page as a wheel turn with Ctrl held and small deltas (a mouse notch is 100): make them count for more, so a pinch of normal size is a few steps. */
+export const pinchBoost = (deltaY: number): number => (Math.abs(deltaY) < 40 ? deltaY * 4 : deltaY);
 
 /** The CSS pixels of the drawing's top left corner, put on a whole screen pixel so no pixel of the drawing is cut. */
 export function origin(size: number, centre: number, k: number, dpr: number): number {

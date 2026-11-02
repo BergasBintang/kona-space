@@ -1,14 +1,20 @@
 // The commands the Rust core offers, with their shapes (see src-tauri/src/lib.rs).
 import { invoke } from "@tauri-apps/api/core";
+import type { Branch } from "./skilltree.ts";
 
 export type Project = { id: string; name: string; folder: string; github?: string | null; account?: string | null };
 export type AddResult = { project: Project; hidden_folder: boolean; git_ignored: boolean };
-export type Role = { id: string; name: string; group: string; model: string; mode: string; brief: string; persona?: string; needs: string[]; own_copy?: boolean };
-export type RoleProfile = { persona: string; brief: string; model: string; mode: string };
-export type RoleKit = { skills: string[]; mcp: string[] };
-export type SkillInfo = { name: string; description: string; source: "project" | "computer"; tokens: number };
+export type Role = { id: string; /** the person's own name: Kiki */ person: string; /** the job: Product */ name: string; group: string; model: string; mode: string; brief: string; persona?: string; voice: VoiceSettings; needs: string[]; own_copy?: boolean };
+/** "Kiki, Product": the person and the job (decision 62). */
+export const roleLabel = (r: { person?: string; name: string }) => (r.person ? `${r.person}, ${r.name}` : r.name);
+/** How a person talks to the owner in chat (decision 63). The tone, in the owner's words, is the role's `persona`. */
+export type VoiceSettings = { language: string; verbosity: string; humor: string; emoji: boolean; address: string; plain: boolean };
+export type RoleProfile = { persona: string; brief: string; model: string; mode: string; voice: VoiceSettings };
+/** What one person may use in one project: their skills, their connectors, and for each skill a note on when to use it. */
+export type RoleKit = { skills: string[]; mcp: string[]; notes: Record<string, string>; /** tools (ids of the fixed list) this project asks of this person, and tools hidden for this project */ tools_add?: string[]; tools_skip?: string[]; /** the tree the person chooses by: the job, then a branch for each kind of work, then skills */ branches?: Branch[] };
+export type SkillInfo = { name: string; description: string; source: "project" | "computer" | "builtin"; tokens: number; /** the people (role ids) a built-in skill is written for */ roles?: string[]; /** how many files its folder holds: SKILL.md and what comes with it */ files?: number };
 export type McpInfo = { name: string; source: string; kind: string };
-export type ToolInfo = { id: string; name: string; install: string };
+export type ToolInfo = { id: string; name: string; install: string; builtin: boolean; program: string; flag: string };
 export type ToolStatus = { id: string; name: string; installed: boolean; version?: string | null; install: string };
 export type Hint = { id: string; because: string };
 export type Account = { id: string; label: string; config_dir?: string | null };
@@ -60,6 +66,8 @@ export const addProject = (folder: string, name?: string, github?: string, accou
 export const setProjectAccount = (id: string, account: string) => invoke<Project>("set_project_account", { id, account });
 export const removeProject = (id: string) => invoke<void>("remove_project", { id });
 export const listTools = () => invoke<ToolInfo[]>("list_tools");
+export const saveTool = (tool: { id: string; name: string; program: string; flag: string; install: string }) => invoke<ToolInfo>("save_tool", { tool });
+export const deleteTool = (id: string) => invoke<void>("delete_tool", { id });
 export const checkTools = (ids: string[]) => invoke<ToolStatus[]>("check_tools", { ids });
 export const projectHints = (folder: string) => invoke<Hint[]>("project_hints", { folder });
 export const listTickets = (projectId: string) => invoke<TicketView[]>("list_tickets", { projectId });
@@ -118,6 +126,18 @@ export const startWorkflow = (folder: string, workflow: Workflow) => invoke<Tick
 export const kibbySay = (projectId: string, accountId: string, history: { who: string; text: string }[], message: string) => invoke<string>("kibby_say", { projectId, accountId, history, message });
 export const skillCatalog = (folder: string) => invoke<SkillInfo[]>("skill_catalog", { folder });
 export const computerSkills = (accountId: string | null, folder: string) => invoke<SkillInfo[]>("computer_skills", { accountId, folder });
+export const readSkill = (folder: string, name: string) => invoke<string>("read_skill", { folder, name });
+export const writeSkill = (folder: string, name: string, text: string, create: boolean) => invoke<SkillInfo>("write_skill", { folder, name, text, create });
+/** A file beside a skill's SKILL.md; text is null for what cannot be changed on a screen (a picture, a very large file). */
+export type SkillFile = { path: string; bytes: number; text: string | null };
+export const readSkillFiles = (folder: string, name: string) => invoke<SkillFile[]>("read_skill_files", { folder, name });
+/** Keep a skill's whole folder: its SKILL.md, the files written and the files removed, all at once. */
+export const saveSkillFolder = (folder: string, name: string, text: string, create: boolean, writes: { path: string; text: string }[], deletes: string[]) => invoke<SkillInfo>("save_skill_folder", { folder, name, text, create, writes, deletes });
+export const deleteSkill = (folder: string, name: string) => invoke<void>("delete_skill", { folder, name });
+/** What Kona gives a person to start with (nothing is written). */
+export const defaultRoleKit = (roleId: string) => invoke<RoleKit | null>("default_role_kit", { roleId });
+/** Give a person their starting tree in this project; it joins what they already have. */
+export const applyDefaultTree = (folder: string, roleId: string) => invoke<RoleKit>("apply_default_tree", { folder, roleId });
 export const importSkill = (accountId: string | null, folder: string, name: string) => invoke<SkillInfo>("import_skill", { accountId, folder, name });
 export const skillFolder = (folder: string) => invoke<string>("skill_folder", { folder });
 export const roleKits = (folder: string) => invoke<Record<string, RoleKit>>("role_kits", { folder });

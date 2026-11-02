@@ -6,8 +6,8 @@ import type { Place } from "../lib/places";
 import type { Project } from "../lib/api";
 import type { Plan } from "../lib/sessions";
 
-export function TopBar({ project, onHome, place, onPlace, attention, leftBehind, plan, accountLabel, limitLine, version }: {
-  project: Project | null; onHome: () => void; place: Place; onPlace: (p: Place) => void;
+export function TopBar({ project, onHome, place, onPlace, onAttention, attention, leftBehind, plan, accountLabel, limitLine, version }: {
+  project: Project | null; onHome: () => void; place: Place; onPlace: (p: Place) => void; onAttention: () => void;
   attention: number; leftBehind: number; plan: Plan | undefined; accountLabel: string | null; limitLine: string; version: string;
 }) {
   return (
@@ -26,7 +26,7 @@ export function TopBar({ project, onHome, place, onPlace, attention, leftBehind,
       <div className="flex-1" />
 
       {attention > 0 && (
-        <Button variant="quiet" small onClick={() => onPlace("sessions")} aria-label={`${attention} waiting on you`}><Glyph state="waiting" size={16} />{attention} waiting on you</Button>
+        <Button variant="quiet" small onClick={onAttention} aria-label={`${attention} waiting on you`}><Glyph state="waiting" size={16} />{attention} waiting on you</Button>
       )}
       {leftBehind > 0 && (
         <Button variant="quiet" small onClick={() => onPlace("leftovers")} aria-label={`${leftBehind} left behind`}><Glyph state="left" size={16} />{leftBehind} left behind</Button>

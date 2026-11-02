@@ -11,7 +11,7 @@ export function Help({ title, children }: { title: string; children: ReactNode }
   return (
     <>
       <button ref={opener} type="button" onClick={() => setOpen(true)} aria-label={`About ${title}`} aria-haspopup="dialog" title="What is this?"
-        className="inline-flex h-6 w-6 shrink-0 items-center justify-center border border-line-strong text-[13px] leading-none font-bold text-text-secondary transition-colors hover:bg-surface-3 hover:text-text">?</button>
+        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-line-strong text-[13px] leading-none font-bold text-text-secondary transition-colors hover:bg-surface-3 hover:text-text">?</button>
       {open && <HelpDialog title={title} onClose={close}>{children}</HelpDialog>}
     </>
   );

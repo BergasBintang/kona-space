@@ -46,7 +46,7 @@ export function Ask({ question, result, onOpen, onAskClaude, onWeb, onWrite, onC
       {result.state !== "found" && (
         <section className="flex flex-col gap-3 border border-dashed border-line-strong p-5" aria-label="What to do next">
           <div className="flex items-center gap-2.5"><h3 className="m-0 text-[16px] leading-6 font-bold">{result.state === "partly" ? "None of these fit?" : "What would you like to do?"}</h3><Help title="What these buttons do"><p className="m-0">Asking Claude starts a session in plan-only mode and uses your plan.</p><p className="m-0">Searching the web opens your browser with these words, after you confirm.</p></Help></div>
-          <p className="m-0 text-[13px] leading-5 text-text-tertiary">Kona does nothing on its own. {result.state === "none" ? "This question is on the wanted list in the Report, so the gap is not forgotten." : ""}</p>
+          {result.state === "none" && <p className="m-0 text-[13px] leading-5 text-text-tertiary">This question is on the wanted list in the Report.</p>}
           <div className="flex flex-wrap gap-2.5">
             <Button variant="quiet" onClick={onAskClaude}>Ask Claude in a session</Button>
             <Button variant="quiet" onClick={onWeb}>Search the web…</Button>

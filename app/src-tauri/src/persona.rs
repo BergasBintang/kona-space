@@ -72,6 +72,14 @@ commit messages, pull request text, ticket or note text, commands, paths, querie
 warnings, error messages, or numbers. It never changes a fact or a piece of advice, never hides a problem, and never makes you agree more or flatter.";
 
 impl Persona {
+    /// The voice of one person (decision 63): their tone in words and their settings, under the person's own name. It is the same paragraph as the shared voice, with the same scope clause.
+    pub fn for_role(person: &str, tone: &str, v: &crate::roles::VoiceSettings, enabled: bool) -> Persona {
+        Persona {
+            enabled, name: person.to_string(), language: v.language.clone(), verbosity: v.verbosity.clone(), humor: v.humor.clone(), emoji: v.emoji, address: v.address.clone(), plain: v.plain,
+            voice: tone.to_string(), lines: plain_lines(),
+        }
+    }
+
     /// The paragraph given to Claude. None when the voice is off.
     pub fn prompt(&self) -> Option<String> {
         if !self.enabled {
@@ -151,5 +159,22 @@ impl Voice {
         fs::write(&self.file, serde_json::to_string_pretty(&p).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
         *self.cur.lock().unwrap() = p.clone();
         Ok(p)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::roles::VoiceSettings;
+
+    #[test]
+    fn a_persons_voice_names_them_keeps_the_scope_clause_and_follows_their_settings() {
+        let v = VoiceSettings { language: "English".into(), verbosity: "detailed".into(), humor: "light".into(), emoji: false, address: "Boss".into(), plain: true };
+        let p = Persona::for_role("Kiki", "Warm and curious.", &v, true).prompt().unwrap();
+        assert!(p.contains("Warm and curious.") && p.contains("use Kiki") && p.contains("Call the owner Boss") && p.contains("A light touch of humor") && p.contains("full explanations"));
+        assert!(p.contains("never applies to code"), "the voice never reaches code, files or tickets");
+        let quiet = Persona::for_role("Bejo", "Serious.", &VoiceSettings::default(), true).prompt().unwrap();
+        assert!(quiet.contains("No jokes.") && quiet.contains("No emoji.") && quiet.contains("Keep replies short"));
+        assert!(Persona::for_role("Bejo", "Serious.", &VoiceSettings::default(), false).prompt().is_none(), "switched off, there is no paragraph");
     }
 }

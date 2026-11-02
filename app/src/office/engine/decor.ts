@@ -1,5 +1,5 @@
 // Things on a wall: windows, a door, boards. A thing is painted on the face of a wall tile (a plane of the plan) and only when that face looks towards the camera, which for a tall
-// brick wall is when it is one of the two back walls of the current side. So every outer wall of the building can carry its windows, seen from whichever side the camera is on.
+// wall is when it is one of the two back walls of the current side. So every outer wall of the building can carry its windows, seen from whichever side the camera is on.
 // A wall is painted in "t" (how far along the wall, in tiles) and "z" (how high, in pixels).
 // It is painted INTO the picture of each wall tile it covers (see walls.ts), clipped to that tile's own face, so it is always drawn with its wall: a thing on a wall can never end up
 // in front of or behind the wrong piece, whatever the side of the building.
@@ -60,6 +60,12 @@ export const ARTS: Record<string, Art> = {
 };
 Object.setPrototypeOf(ARTS, null); // looked up with a name from a saved map: no inherited names
 
+/** The boards on a wall that exist once in an office (the two that open a screen): the editor greys them out once they are hung. */
+export const UNIQUE_ARTS = ["cork", "branches"];
+
+/** The two boards on a wall that open a screen, like the pieces of the group "pages" in furniture.ts (a Place of lib/places.ts). The staff board is only decoration. */
+export const WALL_PAGES: Record<string, string> = { cork: "board", branches: "worktrees" };
+
 /** Something on a wall, ready to be painted: the wall tiles it covers, and how to paint it on one of them. */
 export type DecorPlan = {
   /** the wall tiles it covers, as [i, j] */
@@ -101,4 +107,14 @@ export function decorPlan(iso: Iso, a: Attach): DecorPlan | null {
       kind.draw(w, t0, t1);
     },
   };
+}
+
+/** Where a board hangs on the screen, as a box [x0, y0, x1, y1] in the picture's own pixels, or null when its face looks away from the camera. It is the place to click. */
+export function decorRect(iso: Iso, a: Attach): [number, number, number, number] | null {
+  if (!decorPlan(iso, a)) return null;
+  const n = FACE_N[a.face], alongI = n[1] !== 0, span = Math.max(1, a.span ?? 1), t0 = alongI ? a.i : a.j;
+  const plane = alongI ? a.j + (n[1] > 0 ? 1 : 0) : a.i + (n[0] > 0 ? 1 : 0);
+  const pt = (t: number, z: number): [number, number] => iso.P(alongI ? t : plane, alongI ? plane : t, z);
+  const pts = [pt(t0, 8), pt(t0 + span, 8), pt(t0, 29), pt(t0 + span, 29)];
+  return [Math.min(...pts.map((p) => p[0])), Math.min(...pts.map((p) => p[1])), Math.max(...pts.map((p) => p[0])), Math.max(...pts.map((p) => p[1]))];
 }

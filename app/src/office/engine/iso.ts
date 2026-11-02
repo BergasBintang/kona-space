@@ -1,7 +1,7 @@
 // The camera. The building is drawn from four sides (a quarter turn each). In the camera's own space u runs down-right on the screen and v runs down-left; a tile of
 // the plan (i, j) is a tile of that space (u, v), and `rot` / `unrot` say which. A tile is 32 x 16 pixels, a unit of height is a step of 4 pixels.
 export const TILE_W = 32, TILE_H = 16, STEP = 4;
-export const WALL = 8 * STEP; // a tall brick wall (the back of the building)
+export const WALL = 8 * STEP; // a tall wall (the back of the building)
 export const LOW = 2 * STEP; // a low wall (everything else: a cut-away, so a wall hides little)
 export const OY = WALL + 10; // room above the highest wall
 

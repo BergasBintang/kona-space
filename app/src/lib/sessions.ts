@@ -9,7 +9,25 @@ export type Item =
   | { kind: "assistant"; id: string; text: string }
   | { kind: "tool"; id: string; toolUseId: string; name: string; summary: string; status: "running" | "done" | "error" | "denied"; preview?: string }
   | { kind: "permission"; id: string; requestId: string; toolName: string; description: string; command?: string; where?: string; input: unknown; status: "asking" | "allowed" | "denied"; servers?: { label: string; host: string; user: string; checked: boolean }[]; suggestions?: unknown[] }
+  | { kind: "question"; id: string; requestId: string; input: unknown; questions: Question[]; status: "asking" | "answered" | "skipped"; answers?: Record<string, string> }
   | { kind: "note"; id: string; text: string; tone: "info" | "problem" };
+
+/** One of Claude's multiple-choice questions (its AskUserQuestion tool): the question, a short header, the options, and whether more than one may be picked. */
+export type Question = { question: string; header?: string; options: { label: string; description?: string }[]; multiSelect?: boolean };
+
+/** The questions of an AskUserQuestion request, or null when the request is not a well-formed one (then it is shown as an ordinary card, never lost). */
+export function questionsOf(input: any): Question[] | null {
+  const list = input?.questions;
+  if (!Array.isArray(list) || list.length === 0 || list.length > 4) return null;
+  const out: Question[] = [];
+  for (const q of list) {
+    if (typeof q?.question !== "string" || !q.question.trim() || !Array.isArray(q.options) || q.options.length < 1 || q.options.length > 8) return null;
+    const options = q.options.filter((o: any) => typeof o?.label === "string" && o.label.trim()).map((o: any) => ({ label: String(o.label), description: typeof o.description === "string" ? o.description : undefined }));
+    if (options.length === 0) return null;
+    out.push({ question: q.question, header: typeof q.header === "string" ? q.header : undefined, options, multiSelect: q.multiSelect === true });
+  }
+  return out;
+}
 
 export type PlanWindow = { utilization: number; resetsAt: number };
 
@@ -59,6 +77,7 @@ export type Action =
   | { type: "select"; id: string }
   | { type: "user-sent"; sessionId: string; text: string; images: string[] }
   | { type: "permission-answered"; sessionId: string; requestId: string; allowed: boolean }
+  | { type: "question-answered"; sessionId: string; requestId: string; answers: Record<string, string> | null }
   | { type: "forget"; id: string }
   | { type: "brain-question"; sessionId: string; question: string | null };
 
@@ -81,13 +100,13 @@ export function summarize(name: string, input: any): string {
   }
 }
 
-/** Plain-words title for the "may I run this?" card. */
-export function permissionTitle(toolName: string): string {
-  if (toolName === "Bash" || toolName === "PowerShell") return "Claude wants to run a command";
-  if (["Write", "Edit", "MultiEdit", "NotebookEdit"].includes(toolName)) return "Claude wants to change a file";
-  if (toolName === "Read") return "Claude wants to read a file";
-  if (toolName === "WebFetch" || toolName === "WebSearch") return "Claude wants to look something up on the web";
-  return `Claude wants to use ${toolName}`;
+/** Plain-words title for the "may I run this?" card; `who` is the person it is about ("Kiki"), "Claude" when there is none. */
+export function permissionTitle(toolName: string, who = "Claude"): string {
+  if (toolName === "Bash" || toolName === "PowerShell") return `${who} wants to run a command`;
+  if (["Write", "Edit", "MultiEdit", "NotebookEdit"].includes(toolName)) return `${who} wants to change a file`;
+  if (toolName === "Read") return `${who} wants to read a file`;
+  if (toolName === "WebFetch" || toolName === "WebSearch") return `${who} wants to look something up on the web`;
+  return `${who} wants to use ${toolName}`;
 }
 
 function update(state: State, id: string, f: (s: Session) => Session): State {
@@ -115,6 +134,12 @@ export function reducer(state: State, a: Action): State {
         run: "working",
         items: s.items.map((it) => (it.kind === "permission" && it.requestId === a.requestId ? { ...it, status: a.allowed ? "allowed" : "denied" } : it)),
       }));
+    case "question-answered":
+      return update(state, a.sessionId, (s) => ({
+        ...s,
+        run: "working",
+        items: s.items.map((it) => (it.kind === "question" && it.requestId === a.requestId ? { ...it, status: a.answers ? "answered" : "skipped", answers: a.answers ?? undefined } : it)),
+      }));
     case "event": return onEvent(state, a.sessionId, a.record);
   }
 }
@@ -123,8 +148,8 @@ function onEvent(state: State, sessionId: string, r: any): State {
   const type: string = r?.type ?? "";
 
   if (type === "kona/started") {
-    const session: Session = { id: sessionId, folder: r.folder, workDir: r.workDir ?? r.folder, roleId: r.roleId ?? null, accountId: r.accountId ?? "main", voice: !!r.voice, ticketId: r.ticketId ?? null, brainQuestion: null, endedLine: r.lines?.ended ?? "This session has ended.", model: r.model, mode: r.mode, title: "", run: "ready", items: [...(r.lines?.started ? [{ kind: "note" as const, id: nextId("n"), tone: "info" as const, text: r.lines.started }] : []), ...(r.resumed ? [{ kind: "note" as const, id: nextId("n"), tone: "info" as const, text: "This is an earlier session you resumed. Claude remembers it; the earlier messages are not shown here." }] : [])], draft: "", costTotal: 0, costLast: 0, turns: 0 };
-    return { ...state, sessions: { ...state.sessions, [sessionId]: session }, order: [...state.order, sessionId], selected: sessionId };
+    const session: Session = { id: sessionId, folder: r.folder, workDir: r.workDir ?? r.folder, roleId: r.roleId ?? null, accountId: r.accountId ?? "main", voice: !!r.voice, ticketId: r.ticketId ?? null, brainQuestion: null, endedLine: "This session has ended.", model: r.model, mode: r.mode, title: "", run: "ready", items: [{ kind: "note" as const, id: nextId("n"), tone: "info" as const, text: `Started in ${String(r.folder ?? "").replace(/[\\/]+$/, "").split(/[\\/]/).pop() || "the project"}.` }, ...(r.resumed ? [{ kind: "note" as const, id: nextId("n"), tone: "info" as const, text: "This is an earlier session you resumed. Claude remembers it; the earlier messages are not shown here." }] : [])], draft: "", costTotal: 0, costLast: 0, turns: 0 };
+    return { ...state, sessions: { ...state.sessions, [sessionId]: session }, order: [...state.order.filter((x) => x !== sessionId), sessionId], selected: sessionId };
   }
   if (type === "rate_limit_event") {
     const w = r.rate_limit_info?.unifiedWindows ?? {};
@@ -165,6 +190,8 @@ function onEvent(state: State, sessionId: string, r: any): State {
         const q = r.request;
         if (q?.subtype !== "can_use_tool") return s;
         const input = q.input ?? {};
+        const questions = q.tool_name === "AskUserQuestion" ? questionsOf(input) : null;
+        if (questions) return { ...push(s, { kind: "question", id: nextId("q"), requestId: r.request_id, input, questions, status: "asking" }), run: "waiting" };
         return {
           ...push(s, {
             kind: "permission", id: nextId("p"), requestId: r.request_id, toolName: q.tool_name, description: q.description ?? "",

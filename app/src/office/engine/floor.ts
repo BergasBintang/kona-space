@@ -1,11 +1,11 @@
-// The floor: one picture of one tile for each colour (33 x 17 px), copied onto every tile of a room, rugs on top of it, and the edge of the building (the slab it stands on).
+// The floor: one picture of one tile for each colour (33 x 17 px), copied onto every tile of its style, rugs on top of it, and the edge of the building (the slab it stands on).
 // When a tile has grout every pixel on its rim is grout, so the tile next to it, copied over the first, puts grout in exactly the same pixels and a line is never cut.
 import { Img } from "./img.ts";
 import { mix } from "./palette.ts";
 import { OUT } from "./palette.ts";
 import type { Iso } from "./iso.ts";
 import type { Rug } from "./furniture.ts";
-import type { OfficeMap, RoomDef } from "./types.ts";
+import type { FloorStyle, OfficeMap } from "./types.ts";
 
 const TILE_PIC_X = 16;
 const tiles = new Map<string, Img>();
@@ -26,15 +26,15 @@ export function makeTile(colour: string, grout: string | null = null): Img {
   return t;
 }
 
-/** which of a room's two colours the tile (i, j) of the plan takes (the same on every side of the building) */
-export const tileColour = (r: RoomDef, i: number, j: number): 0 | 1 =>
+/** which of a style's two colours the tile (i, j) of the plan takes (the same on every side of the building) */
+export const tileColour = (r: FloorStyle, i: number, j: number): 0 | 1 =>
   (r.pattern === "checker" || r.pattern === "tiles" ? (i + j) & 1 : r.pattern === "stripeI" ? i & 1 : r.pattern === "carpet" ? 0 : j & 1) as 0 | 1;
 
 const hash = (i: number, j: number, n: number) => ((i * 73856093) ^ (j * 19349663) ^ (n * 83492791)) >>> 0;
 
-/** The ground of the building seen from one side: the slab it stands on, the floor of every room and the rugs. Returns the picture and a function that says whether a tile of the
+/** The ground of the building seen from one side: the slab it stands on, the floor of every tile and the rugs. Returns the picture and a function that says whether a tile of the
  * camera's grid has ground (a floor or a wall). */
-export function drawGround(map: OfficeMap, iso: Iso, rugs: Rug[], roomOf: Map<string, RoomDef>): Img {
+export function drawGround(map: OfficeMap, iso: Iso, rugs: Rug[], styleOf: Map<string, FloorStyle>): Img {
   const img = new Img(iso.width, iso.height), { PR } = iso;
   const ground = (u: number, v: number) => {
     if (u < 0 || v < 0 || u >= iso.U || v >= iso.V) return false;
@@ -50,7 +50,7 @@ export function drawGround(map: OfficeMap, iso: Iso, rugs: Rug[], roomOf: Map<st
   for (let j = 0; j < map.rows; j++) for (let i = 0; i < map.cols; i++) {
     const id = map.floor[j][i];
     if (id == null || map.walls[j][i]) continue; // a wall covers the floor under it
-    const r = roomOf.get(id);
+    const r = styleOf.get(id);
     if (!r) continue;
     const n = tileColour(r, i, j), [u, v] = iso.cell(i, j), [x, y] = PR(u, v);
     img.blit(makeTile(r.floor[n], r.pattern === "tiles" ? r.grout ?? mix(r.floor[n], "#000000", 0.12) : null), x - TILE_PIC_X, y);

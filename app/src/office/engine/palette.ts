@@ -12,10 +12,6 @@ export const M: Record<string, Material> = {
 export const MATERIALS = Object.keys(M);
 
 export const OUT = "#33241a"; // the outline of everything
-export const CAP = "#f3e9d2"; // the top of a low wall
-export const BRICK: [string, string] = ["#9a5a46", "#8a4e3d"]; // the faces of a tall brick wall
-export const CAPC: [string, string, string] = ["#efdcb8", "#d9c39a", "#bfa97f"]; // the top of a tall wall and the band under it
-export const NEUTRAL_WALL = "#d8cdb6"; // a wall that belongs to no room
 export const SEE = ["#9fd0e8", "#b8dff0"]; // glass
 
 const parse = (hex: string) => [1, 3, 5].map((k) => parseInt(hex.slice(k, k + 2), 16));
@@ -24,4 +20,8 @@ export const mix = (a: string, b: string, t: number): string => {
   return "#" + x.map((v, n) => Math.round(v + (y[n] - v) * t).toString(16).padStart(2, "0")).join("");
 };
 export const shade = (hex: string): Material => [hex, mix(hex, "#000000", 0.18), mix(hex, "#000000", 0.34)];
+/** The one colour of every wall in the office, tall or low, in every room (decision 59). It is fixed: it is not chosen and it is not read from a saved map. */
+export const WALL_COLOUR = "#d8cdb6";
+/** The three shades of it a block needs to look like a block: [the top, the face towards +v, the face towards +u]. The top is lighter, the face towards +u is darker. */
+export const WALL_SHADES: Material = [mix(WALL_COLOUR, "#ffffff", 0.4), WALL_COLOUR, mix(WALL_COLOUR, "#000000", 0.2)];
 Object.setPrototypeOf(M, null); // looked up with a name from a saved map: no inherited names

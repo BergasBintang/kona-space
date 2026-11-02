@@ -2,7 +2,7 @@
 // core. Agents raise and update cards through the built-in tool server, so the board polls every two seconds while it is open.
 // Agents may move a card up to Review; only the owner moves one to Done (the core and the tool server both enforce that for agents).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createTicket, listTickets, removeTicket, updateTicket, worktreeStatus, type Project, type Role, type TicketView, type WorktreeStatus } from "../lib/api";
+import { createTicket, listTickets, removeTicket, roleLabel, updateTicket, worktreeStatus, type Project, type Role, type TicketView, type WorktreeStatus } from "../lib/api";
 import { dollars, type State } from "../lib/sessions";
 import { Button, Glyph, RoleMark } from "./ui";
 import { Select } from "./pick";
@@ -47,7 +47,7 @@ function Card({ t, role, live, active, waits, onOpen }: { t: TicketView; role?: 
       {t.branch && <span className="truncate font-mono text-[12px] leading-4 text-text-tertiary" title={t.branch}>{t.branch}</span>}
       {t.next && <span className="line-clamp-2 text-[13px] leading-[18px] text-text-secondary">Next: {t.next}</span>}
       <div className="flex items-center justify-between gap-2 text-[13px] leading-5 text-text-tertiary">
-        <span className="flex min-w-0 items-center gap-2">{role ? (<><RoleMark roleId={role.id} size={22} /><span className="truncate">{role.name}</span></>) : <span>No role</span>}</span>
+        <span className="flex min-w-0 items-center gap-2">{role ? (<><RoleMark roleId={role.id} size={22} /><span className="truncate">{roleLabel(role)}</span></>) : <span>No role</span>}</span>
         {t.cost > 0 && <span className="shrink-0 font-mono">{dollars(t.cost)}</span>}
       </div>
     </div>
@@ -124,7 +124,7 @@ function Drawer({ project, roles, ticket, state, guardDone, onClose, onSaved, on
         </label>
         <div className="grid grid-cols-2 gap-4">
           <Select label="Column" value={draft.status} onChange={(v) => set({ status: v })} options={COLUMNS.filter((c) => !fresh || c.id === "backlog" || c.id === "ready").map((c) => ({ value: c.id, label: c.name, hint: c.says }))} />
-          <Select label="Role" value={draft.role} onChange={(v) => set({ role: v })} options={[{ value: "", label: "No role" }, ...roles.map((r) => ({ value: r.id, label: r.name, hint: r.group }))]} />
+          <Select label="Role" value={draft.role} onChange={(v) => set({ role: v })} options={[{ value: "", label: "No role" }, ...roles.map((r) => ({ value: r.id, label: roleLabel(r), hint: r.group }))]} />
         </div>
         <div className="flex flex-col gap-2">
           <Select label="Where its sessions work" value={draft.own_copy} onChange={(v) => set({ own_copy: v })} options={[
@@ -153,11 +153,13 @@ function Drawer({ project, roles, ticket, state, guardDone, onClose, onSaved, on
               <span className="text-[13px] leading-5 font-bold text-text-secondary">Next step</span>
               <input value={draft.next} onChange={(e) => set({ next: e.target.value })} aria-label="Next step" className={`h-11 ${field}`} placeholder="What should happen next." />
             </label>
-            <label className="flex cursor-pointer items-center gap-3">
+            <div className="flex items-center gap-3">
+              <label className="flex cursor-pointer items-center gap-3">
               <input type="checkbox" checked={draft.waiting} onChange={(e) => set({ waiting: e.target.checked })} className="h-4 w-4 accent-[var(--color-accent)]" />
               <span className="font-bold">Waiting on you</span>
-              <span className="text-[13px] leading-5 text-text-secondary">A flag on the card. Agents set it when they need an answer.</span>
-            </label>
+              </label>
+              <Help title="Waiting on you"><p className="m-0">A flag on the card. Agents set it when they need an answer.</p></Help>
+            </div>
 
             <div className="flex flex-col gap-2">
               <span className="text-[13px] leading-5 font-bold text-text-secondary">Sessions</span>
@@ -184,7 +186,7 @@ function Drawer({ project, roles, ticket, state, guardDone, onClose, onSaved, on
       <div className="flex flex-col gap-3 border-t border-line-subtle px-6 py-4">
         {!fresh && (
           <div className="flex items-center justify-between gap-3">
-            <Button onClick={start} disabled={!canStart || busy}>{role ? `Start session as ${role.name}` : "Start session"}</Button>
+            <Button onClick={start} disabled={!canStart || busy}>{role ? `Start session as ${roleLabel(role)}` : "Start session"}</Button>
             <span className="text-right text-[13px] leading-5 text-text-tertiary">{why}</span>
           </div>
         )}

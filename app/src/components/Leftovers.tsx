@@ -2,7 +2,7 @@
 // the scratch files Claude keeps for each session. Kona only stops or deletes after the owner confirms, and shows exactly what first.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { ignoreLeftover, sessionTemp, sessionTempClean, stopLeftover, type LeftoverItem, type LeftoverOverview, type Role, type TempInfo } from "../lib/api";
+import { ignoreLeftover, roleLabel, sessionTemp, sessionTempClean, stopLeftover, type LeftoverItem, type LeftoverOverview, type Role, type TempInfo } from "../lib/api";
 import type { State } from "../lib/sessions";
 import { Button, Glyph } from "./ui";
 import { Confirm } from "./Confirm";
@@ -50,7 +50,7 @@ export function Leftovers({ state, roles, overview, onRefresh }: { state: State;
     const s = state.sessions[sid];
     if (!sid) return "a session that could not be told";
     if (!s) return `session ${sid.slice(0, 8)}`;
-    const role = roles.find((r) => r.id === s.roleId)?.name;
+    const role = (() => { const r = roles.find((x) => x.id === s.roleId); return r ? roleLabel(r) : undefined; })();
     return `${s.title ? `“${s.title}”` : `session ${sid.slice(0, 8)}`}${role ? ` as ${role}` : ""}`;
   };
 

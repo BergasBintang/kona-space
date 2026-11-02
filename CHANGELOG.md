@@ -2,6 +2,15 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.27.1, 2026-11-03
+
+The Brain gets a smaller header and tabs in its title bar, names on its map no longer overlap, the message box grows, and the office no longer shakes when a person's chat opens.
+
+- **The office stays still** when you open a person who already has a chat. Before, the chat scrolled itself in a way that also moved the office behind the page.
+- **The Brain page.** Map, Notes and Report are tabs in the title bar, like a person's sheet. The question box and New note sit in one row, with the note count and the "Write a note when a session ends" switch under it. The big "Brain" heading is gone, because the title bar says it. The content scrolls under a header that stays put. The tabs no longer show a count.
+- **Names on the Brain map never overlap.** Each name goes under its dot, or above, or beside it, wherever there is room. A name with no room is left off and shows when you point at the dot. The dot you pick always shows its name.
+- **The message box grows** from two lines up to six as you type, then scrolls.
+
 ## 0.27.0, 2026-11-02
 
 Roles become people you click and talk to, each with their own skills. Forty skills and a skill tree come with Kona for every new project, and the office is simpler to edit.

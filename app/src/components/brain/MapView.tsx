@@ -4,6 +4,7 @@
 // every group; drag it to move, scroll or the buttons to zoom, Fit all to come back.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Brain } from "../../lib/brain/engine.ts";
+import { placeNames, type Box } from "../../lib/brain/labels.ts";
 import { Button } from "../ui";
 import { Chip, LAYER_WORD } from "./NoteView";
 
@@ -31,17 +32,25 @@ export function MapView({ brain, onOpen }: { brain: Brain; onOpen: (id: string) 
     return { id: c.id, label: c.label, cx, cy, r, n: c.members.length };
   }), [brain, pos]);
 
+  const radius = useCallback((id: string) => 6 + Math.min(10, Math.sqrt(strength.get(id) ?? 0) * 1.6), [strength]);
+
+  const groupNames = useMemo<Box[]>(() => regions.map((g) => { const w = (g.label.length + 5) * 6.6, y = g.cy - g.r + 16; return [g.cx - w / 2, y - 11, g.cx + w / 2, y + 3]; }), [regions]);
+  const place = useCallback((chosen: string | null) => placeNames({ pos, radius, order: [...labelled], chosen, letters: (id) => (brain.notes.get(id)?.title ?? "").slice(0, 28).length, taken: groupNames }), [pos, radius, labelled, brain, groupNames]);
+  const base = useMemo(() => place(null), [place]);
+  const labelAt = useMemo(() => (sel ? place(sel) : base).names, [place, base, sel]);
+
   // the group circles and the names under the dots can reach past the drawing area, so the first view is the box around all of it
   const fit = useMemo<View>(() => {
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     const add = (x: number, y: number, rx: number, ry = rx) => { x0 = Math.min(x0, x - rx); x1 = Math.max(x1, x + rx); y0 = Math.min(y0, y - ry); y1 = Math.max(y1, y + ry); };
     for (const g of regions) add(g.cx, g.cy, g.r);
-    for (const [id, p] of pos) add(p.x, p.y, labelled.has(id) ? 90 : 24, 40);
+    for (const [, p] of pos) add(p.x, p.y, 24);
+    for (const b of base.boxes) add((b[0] + b[2]) / 2, (b[1] + b[3]) / 2, (b[2] - b[0]) / 2, (b[3] - b[1]) / 2);
     if (!Number.isFinite(x0)) return { x: 0, y: 0, w: W };
     let w = x1 - x0 + 40, h = y1 - y0 + 40;
     if (w / h < W / H) w = (h * W) / H; else h = (w * H) / W;
     return { x: (x0 + x1) / 2 - w / 2, y: (y0 + y1) / 2 - h / 2, w };
-  }, [regions, pos, labelled]);
+  }, [regions, pos, base]);
 
   const svgRef = useRef<SVGSVGElement>(null);
   const [view, setView] = useState<View | null>(null);
@@ -107,8 +116,9 @@ export function MapView({ brain, onOpen }: { brain: Brain; onOpen: (id: string) 
             const p = pos.get(id);
             const n = brain.notes.get(id)!;
             if (!p) return null;
-            const r = 6 + Math.min(10, Math.sqrt(strength.get(id) ?? 0) * 1.6);
+            const r = radius(id);
             const on = sel === id;
+            const at = labelAt.get(id);
             const dim = sel && !on && !linked.has(id);
             const fill = n.layer === "project" ? "var(--color-accent)" : n.layer === "starter" ? "var(--color-text-secondary)" : "var(--color-surface-1)";
             return (
@@ -117,7 +127,7 @@ export function MapView({ brain, onOpen }: { brain: Brain; onOpen: (id: string) 
                 <circle cx={p.x} cy={p.y} r={r + 8} fill="transparent" />
                 <circle cx={p.x} cy={p.y} r={r} fill={fill} stroke={n.layer === "memory" ? "var(--color-text-secondary)" : "none"} strokeWidth="2" strokeDasharray={n.layer === "memory" ? "3 2" : undefined} />
                 {on && <circle cx={p.x} cy={p.y} r={r + 5} fill="none" stroke="var(--color-text)" strokeWidth="2" />}
-                {(on || labelled.has(id)) && <text x={p.x} y={p.y + r + 14} textAnchor="middle" fontSize="12" fontWeight="700" fill="currentColor">{n.title.slice(0, 28)}</text>}
+                {at && <text x={at.x} y={at.y} textAnchor={at.anchor} fontSize="12" fontWeight="700" fill="currentColor" stroke="var(--color-surface-1)" strokeWidth="3" paintOrder="stroke" strokeLinejoin="round">{n.title.slice(0, 28)}</text>}
                 <title>{n.title}</title>
               </g>
             );

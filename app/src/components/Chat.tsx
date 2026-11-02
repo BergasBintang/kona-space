@@ -1,6 +1,6 @@
 // The chat with one person (decision 62): the header (who it is, how they are doing, the ticket, the cost), the transcript with the cards that ask you something, and the message box.
 // A person has one conversation at a time. Before the first message there is no session: the empty chat says who this is, and the first message starts it (App.tsx).
-import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Badge, Button, Glyph, RoleMark, type GlyphState } from "./ui";
 import { Help } from "./Help";
@@ -165,10 +165,11 @@ function Thinking({ who }: { who: string }) {
 }
 
 function Transcript({ s, who, onAnswer, onQuestion }: { s: Session; who: string; onAnswer: (it: Extract<Item, { kind: "permission" }>, allow: boolean, remember?: unknown[]) => void; onQuestion: (it: Extract<Item, { kind: "question" }>, answers: Record<string, string> | null) => void }) {
-  const end = useRef<HTMLDivElement>(null);
-  useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [s.items.length, s.draft, s.run]);
+  const box = useRef<HTMLDivElement>(null);
+  // scroll the transcript itself: scrollIntoView also scrolls every box around it, which moved the office behind the page while the sheet slid in
+  useEffect(() => { const el = box.current; if (el) el.scrollTop = el.scrollHeight; }, [s.items.length, s.draft, s.run]);
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-8 pt-6 pb-3">
+    <div ref={box} className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-8 pt-6 pb-3">
       {s.items.length === 0 && !s.draft && (
         <p className="m-0 max-w-[560px] text-text-tertiary">Ask {who} about this folder. Press Enter to send. Paste a picture to send it along.</p>
       )}
@@ -194,7 +195,6 @@ function Transcript({ s, who, onAnswer, onQuestion }: { s: Session; who: string;
       })}
       {s.draft && <div className="flex max-w-[calc(980px*var(--k))] flex-col gap-1"><span className="font-pixel text-[13px] leading-4 font-bold text-text-tertiary">{who}</span><Markdown chat text={s.draft} wiki={false} /></div>}
       {s.run === "working" && <Thinking who={who} />}
-      <div ref={end} />
     </div>
   );
 }
@@ -212,6 +212,23 @@ export function Composer({ run, who, onSend, busyHint }: { run: RunState | null;
   const [text, setText] = useState("");
   const [images, setImages] = useState<Attached[]>([]);
   const file = useRef<HTMLInputElement>(null);
+  const area = useRef<HTMLTextAreaElement>(null);
+  // the box starts two lines tall and grows with the text up to six lines (24px each), then scrolls
+  const fitBox = () => {
+    const el = area.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(Math.max(el.scrollHeight, 48), 144)}px`;
+  };
+  useLayoutEffect(fitBox, [text]);
+  useEffect(() => { // a window of another width wraps the text differently, and a tab that was hidden measures again when it shows
+    const el = area.current;
+    if (!el) return;
+    let width = el.clientWidth;
+    const watch = new ResizeObserver(() => { if (el.clientWidth !== width) { width = el.clientWidth; fitBox(); } });
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, []);
   const blocked = run === "working" || run === "waiting" || run === "ended" || run === "starting" || !!busyHint;
   const canSend = !blocked && (text.trim().length > 0 || images.length > 0);
 
@@ -242,9 +259,9 @@ export function Composer({ run, who, onSend, busyHint }: { run: RunState | null;
           </div>
         )}
         <textarea
-          value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onKey} onPaste={onPaste} rows={2} disabled={run === "ended"}
+          ref={area} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onKey} onPaste={onPaste} rows={2} disabled={run === "ended"}
           placeholder={`Message ${who}. Press Enter to send, or paste a picture.`}
-          className="w-full resize-none border-0 bg-transparent text-[15px] leading-6 text-text outline-none placeholder:text-text-tertiary"
+          className="w-full resize-none overflow-y-auto border-0 bg-transparent text-[15px] leading-6 text-text outline-none placeholder:text-text-tertiary"
           aria-label={`Message to ${who}`}
         />
         <div className="flex items-center justify-between">

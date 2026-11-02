@@ -24,7 +24,7 @@ import { Board } from "./components/Board";
 import { Workflows } from "./components/Workflows";
 import { Worktrees } from "./components/Worktrees";
 import { Leftovers } from "./components/Leftovers";
-import { BrainPlace } from "./components/brain/Brain";
+import { BRAIN_TABS, BrainPlace, type BrainTab } from "./components/brain/Brain";
 import { Servers } from "./components/Servers";
 import { Settings } from "./components/Settings";
 import { Glyph } from "./components/ui";
@@ -57,6 +57,7 @@ export default function App() {
   const NO_ACCOUNT = "This project has no account yet. Click the Kona mark and choose one.";
   const [person, setPerson] = useState<string | null>(null); // the person whose sheet is open (a role id): what a click on a cat opens
   const [tab, setTab] = useState<PersonTab>("chat");
+  const [brainTab, setBrainTab] = useState<BrainTab>("map");
   const [personError, setPersonError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<Record<string, true>>({}); // sessions the owner put away with New conversation: they stay in the list of what ran, but are not shown with the person
   const [kits, setKits] = useState<Record<string, RoleKit>>({}); // what each role may use in the open project (its skills and connectors)
@@ -360,7 +361,7 @@ export default function App() {
       case "files": return <Files project={project} />;
       case "settings": return <Settings projects={projects} version={version} onProjects={(next) => { setProjects(next); if (projectId && !next.some((p) => p.id === projectId)) { setProjectId(next[0]?.id ?? null); remember("kona.project", next[0]?.id ?? ""); } }} />;
       case "servers": return <Servers project={project} roles={roles} />;
-      case "brain": return <BrainPlace project={project} onAsk={askClaude} />;
+      case "brain": return <BrainPlace project={project} tab={brainTab} onTab={setBrainTab} onAsk={askClaude} />;
       case "leftovers": return <Leftovers state={state} roles={roles} overview={lo} onRefresh={() => { void leftoverOverview().then(setLo); }} />;
       case "worktrees": return <Worktrees project={project} onChanged={() => {}} />;
       case "board": return <Board project={project} roles={roles} state={state} onStart={startTicket} onOpenSession={(id) => openPerson(state.sessions[id]?.roleId ?? "secretary")} />;
@@ -385,7 +386,8 @@ export default function App() {
       : <Office map={officeMap} looks={looks} sheetOpen={place !== "office" || person !== null} names={names} onOpen={openPlace} onOpenPerson={openPerson} onKibbySay={sayToKibby} onEdit={() => setEditing(true)} />;
     if (place !== "office") {
       const info = PLACES.find((x) => x.id === place);
-      sheet = <Sheet key="sheet" title={info?.label ?? place} onClose={closeSheet} guard={sheetGuard}>{pageOf(place)}</Sheet>;
+      const brainTabs = place === "brain" ? { tabs: BRAIN_TABS, active: brainTab, onTab: (id: string) => setBrainTab(id as BrainTab), keepDraftOnTab: true } : {};
+      sheet = <Sheet key="sheet" title={info?.label ?? place} {...brainTabs} onClose={closeSheet} guard={sheetGuard}>{pageOf(place)}</Sheet>;
     } else if (person && personRole) {
       sheet = (
         <Sheet key={`person-${person}`} title={roleLabel(personRole)} tabs={PERSON_TABS} active={tab} onTab={(id) => setTab(id as PersonTab)} keepDraftOnTab onClose={closeSheet} guard={sheetGuard}>

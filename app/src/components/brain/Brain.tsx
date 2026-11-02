@@ -1,6 +1,6 @@
 // The Brain place (feature F7): the project's notes as a graph, with a question box that says plainly whether the answer is in it.
 // Layers: the project's own notes (editable), the starter notes that ship with Kona, and Claude's memory for the project (read only).
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { loadBrain, wantedAdd, wantedList, wantedRemove, type BrainData, type Project, type Wanted } from "../../lib/api";
 import { Brain as Engine, type SearchResult } from "../../lib/brain/engine.ts";
@@ -16,13 +16,14 @@ import { Chip, LAYER_WORD, NoteView } from "./NoteView";
 import { Report } from "./Report";
 import { Help } from "../Help";
 
-type Tab = "map" | "notes" | "report";
+export type BrainTab = "map" | "notes" | "report";
+/** The pages of the Brain, shown as tabs in the sheet's title bar (App.tsx holds which one is open). */
+export const BRAIN_TABS: { id: BrainTab; label: string }[] = [{ id: "map", label: "Map" }, { id: "notes", label: "Notes" }, { id: "report", label: "Report" }];
 
-export function BrainPlace({ project, onAsk }: { project: Project; onAsk: (question: string) => Promise<void> }) {
+export function BrainPlace({ project, tab, onTab, onAsk }: { project: Project; tab: BrainTab; onTab: (t: BrainTab) => void; onAsk: (question: string) => Promise<void> }) {
   const [data, setData] = useState<BrainData | null>(null);
   const [wanted, setWanted] = useState<Wanted[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("map");
   const [layer, setLayer] = useState<Layer | "all">("all");
   const [q, setQ] = useState("");
   const [asked, setAsked] = useState<{ question: string; result: SearchResult } | null>(null);
@@ -32,6 +33,10 @@ export function BrainPlace({ project, onAsk }: { project: Project; onAsk: (quest
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [auto, setAuto] = useState(autoNoteOn());
+  // a tab pressed in the title bar leaves an open note or answer; a tab this page picks itself (after saving a note) keeps it
+  const own = useRef(tab);
+  const goTab = (t: BrainTab) => { own.current = t; onTab(t); };
+  useEffect(() => { if (tab !== own.current) { setOpen(null); setAsked(null); } own.current = tab; }, [tab]);
 
   const load = useCallback(() => {
     loadBrain(project.id).then((d) => { setData(d); setError(null); }).catch((e) => setError(String(e)));
@@ -43,9 +48,7 @@ export function BrainPlace({ project, onAsk }: { project: Project; onAsk: (quest
   const raw = useMemo<RawNote[]>(() => [...(data?.notes ?? []).map((n) => ({ ...n, layer: n.layer as Layer })), ...starterNotes], [data]);
   const brain = useMemo(() => new Engine(raw), [raw]);
   const counts = useMemo(() => { const c: Record<string, number> = { project: 0, starter: 0, memory: 0 }; for (const n of brain.notes.values()) c[n.layer]++; return c; }, [brain]);
-  const report = useMemo(() => brain.report(Date.now(), wanted.length), [brain, wanted.length]);
-  const needsLook = Object.values(report.counts).reduce((a, b) => a + b, 0);
-
+    
   const ask = async () => {
     // a question that holds a key or a password is never shown back or saved as typed
     const question = redact(q.trim()).text;
@@ -61,7 +64,7 @@ export function BrainPlace({ project, onAsk }: { project: Project; onAsk: (quest
     const answered = id && draftTitle ? wanted.find((w) => w.question === draftTitle) : undefined;
     if (answered) void wantedRemove(project.id, answered.question).then(setWanted);
     setDraftTitle("");
-    load(); setOpen(id); setTab("notes"); setNotice(id ? "Saved." : "Deleted.");
+    load(); setOpen(id); goTab("notes"); setNotice(id ? "Saved." : "Deleted.");
   };
 
   const noteList = [...brain.notes.values()].filter((n) => layer === "all" || n.layer === layer).sort((a, b) => (b.mtime ?? 0) - (a.mtime ?? 0) || a.title.localeCompare(b.title));
@@ -101,41 +104,27 @@ export function BrainPlace({ project, onAsk }: { project: Project; onAsk: (quest
   } else body = <Report brain={brain} wanted={wanted} onOpen={openNote} onWrite={writeNote} onDrop={(question) => { void wantedRemove(project.id, question).then(setWanted); }} />;
 
   return (
-    <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-      <div className="flex w-full flex-col gap-5 px-8 pt-8 pb-10">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex flex-col gap-2">
-            <h1 className="m-0 text-[30px] leading-[38px] font-bold">Brain</h1>
-            <p className="m-0 text-text-secondary">{project.name}: {counts.project} of your notes, {counts.starter} starter notes{data?.memory_dir ? `, ${counts.memory} from Claude's memory` : ""}.</p>
-          </div>
-          <Button variant="quiet" small onClick={() => writeNote("")}>New note</Button>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <label className="flex cursor-pointer items-center gap-3">
-            <input type="checkbox" checked={auto} onChange={(e) => { setAuto(e.target.checked); setAutoNote(e.target.checked); }} className="h-4 w-4 accent-[var(--color-accent)]" />
-            <span className="font-bold">Write a note when a session ends</span>
-          </label>
-          <Help title="Write a note when a session ends"><p className="m-0">One cheap Haiku call per session, using your plan. The conversation is cleaned of secrets first.</p><p className="m-0">You can also press Write a note in any session.</p></Help>
-        </div>
-
+    <main className="flex min-w-0 flex-1 flex-col">
+      <div className="flex shrink-0 flex-col gap-3 border-b border-line-subtle px-8 pt-4 pb-4">
         <form className="flex gap-3" onSubmit={(e) => { e.preventDefault(); void ask(); }} role="search">
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ask the brain, for example: what is a worktree?" aria-label="Ask the brain" className="h-12 min-w-0 flex-1 border border-line-strong bg-inset px-4 text-[15px] text-text placeholder:text-text-tertiary" />
           <Button type="submit" disabled={!q.trim() || data === null}>Ask</Button>
+          <Button variant="quiet" onClick={() => writeNote("")}>New note</Button>
         </form>
-
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+          <p className="m-0 text-[14px] leading-5 text-text-secondary">{project.name}: {counts.project} of your notes, {counts.starter} starter notes{data?.memory_dir ? `, ${counts.memory} from Claude's memory` : ""}.</p>
+          <div className="flex items-center gap-3">
+            <label className="flex cursor-pointer items-center gap-3">
+              <input type="checkbox" checked={auto} onChange={(e) => { setAuto(e.target.checked); setAutoNote(e.target.checked); }} className="h-4 w-4 accent-[var(--color-accent)]" />
+              <span className="font-bold">Write a note when a session ends</span>
+            </label>
+            <Help title="Write a note when a session ends"><p className="m-0">One cheap Haiku call per session, using your plan. The conversation is cleaned of secrets first.</p><p className="m-0">You can also press Write a note in any session.</p></Help>
+          </div>
+        </div>
         {notice && <div role="status" className="flex items-start gap-2.5 border border-line-subtle bg-surface-2 px-4 py-3 text-[14px] leading-5"><Glyph state="done" size={16} /> {notice}</div>}
         {busy && <p className="m-0 text-[13px] text-text-tertiary">Starting a session…</p>}
-
-        {open === null && !asked && (
-          <div role="tablist" aria-label="Brain views" className="flex gap-1 border-b border-line-subtle">
-            {([["map", "Map", brain.notes.size], ["notes", "Notes", brain.notes.size], ["report", "Report", needsLook]] as const).map(([id, word, n]) => (
-              <button key={id} role="tab" aria-selected={tab === id} type="button" onClick={() => setTab(id)} className={`-mb-px h-11 border-b-2 px-4 text-[15px] ${tab === id ? "border-accent font-bold text-text" : "border-transparent text-text-secondary hover:text-text"}`}>{word} <span className="ml-1 font-mono text-[12px] text-text-tertiary">{n}</span></button>
-            ))}
-          </div>
-        )}
-        {body}
       </div>
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-8 pt-6 pb-10">{body}</div>
 
       {web && (
         <Confirm title="Search the web for this?" confirmLabel="Open my browser" onConfirm={() => { void openUrl(`https://duckduckgo.com/?q=${encodeURIComponent(web)}`); setWeb(null); }} onCancel={() => setWeb(null)}>

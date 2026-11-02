@@ -309,7 +309,7 @@ export function OfficeEditor({ names, map, hasOwn, broken, guard, onSave, onRese
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-ground" aria-label="Edit the office">
       <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-line-subtle bg-surface-1 px-5 py-2">
         <h2 className="m-0 text-[20px] leading-7 font-bold">Edit the office</h2>
-        <span className="text-[13px] leading-5 text-text-tertiary">{dirty ? "Not saved yet" : hasOwn ? "This project's own office" : "The standard office"}</span>
+        <span className="text-[13px] leading-5 text-text-tertiary">{dirty ? "Not saved yet" : hasOwn ? "This project's own office" : "The default map"}</span>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <Button variant="quiet" small onClick={() => { setMode((m) => (m === "plan" ? "3d" : "plan")); setSel(-1); setHover(null); }} aria-pressed={mode === "3d"}>{mode === "plan" ? "See in 3D" : "Back to the plan"}</Button>
           <IconButton icon="undo" label="Undo (Ctrl+Z)" onClick={doUndo} disabled={undo.current.length === 0 || mode === "3d"} />
@@ -444,8 +444,8 @@ export function OfficeEditor({ names, map, hasOwn, broken, guard, onSave, onRese
         </Confirm>
       )}
       {asks === "reset" && (
-        <Confirm title="Use the standard office again?" confirmLabel="Use the standard office" danger busy={busy} onConfirm={() => void reset()} onCancel={() => setAsks(null)}>
-          <p className="m-0">This project's own office is forgotten and the standard office is shown again. The file is removed from the project's <b>.kona</b> folder. This cannot be undone.</p>
+        <Confirm title="Go back to the default map?" confirmLabel="Use the default map" danger busy={busy} onConfirm={() => void reset()} onCancel={() => setAsks(null)}>
+          <p className="m-0">This project's own office is forgotten and the default map is shown again. The file is removed from the project's <b>.kona</b> folder. This cannot be undone.</p>
         </Confirm>
       )}
     </div>

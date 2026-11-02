@@ -407,10 +407,42 @@ Each row: what was seen, the cause, the rule to keep. The strongest rows are in 
 | `git rm` refused a file with changes | It had local changes | Look at the file first, then `git rm -qf` if it is meant to go |
 | `gh` is not found in the shell | It is not on the PATH | `D:\toolchain\gh\bin`, or read the web page instead |
 
-### 10.6 Still not checked at the end of this session
+### 10.6 Checked on the built 0.27.0 at the end of the session (real window, throwaway project, Haiku)
 
-- Real touchpad gestures (two fingers, pinch): only made-up events so far.
-- Saving the office editor in the real window, kept off to protect the owner's own office.
-- The other 9 people and the other 38 skills in a real conversation.
-- Pressing "Default map" replaces a project's saved office: save a copy first.
-- The smoke test on the built 0.27.0 (`tests/smoke.mjs`), which needs your Kona closed. Installing 0.27.0 over an older Kona, through Check now, has not been tried either.
+| Checked | Result |
+|---|---|
+| Bubbles | Working, Questioning and Finish show over the cat, and Finish goes once the chat is read |
+| Voice | Setting Bahasa Indonesia gave replies in Indonesian |
+| One thing at a time | A second start is refused by the core, and Start on the Board says the person is busy |
+| Question card | The card appears, the pick goes back, Claude answers with it |
+| Save in the editor | Erasing a desk makes Save refuse and say why, Undo clears it, a moved desk saves and survives a reload, and Default map asks first and removes the file |
+| The update | The installed Kona became 0.27.0 and restarted. How it was started (the card or the installer) was not confirmed |
+
+Also found: the smoke test still clicked rooms that no longer exist, so it had been failing unnoticed since people became clickable. Rewritten; `tests/editor.mjs` still has the old labels and has not been updated. **Run the smoke test after changing how things are clicked, not only at a release.** And the dialog behind "Default map" still said "standard office", so a word change must be searched for everywhere it appears.
+
+I told the owner that Norbit has a saved office to back up. It has none (`.kona/office-map.json` is not there). Look at the disk before warning about it.
+
+Real touchpad gestures (two fingers, pinch): the owner tried them and they work.
+
+Still not checked: the skills nobody has picked yet in a real conversation (29 of the 40).
+
+### 10.7 All eleven people, one real job each (built 0.27.0, throwaway project, Sonnet)
+
+Each chose the skill below by itself. "Opened" means it also opened a file beside SKILL.md.
+
+| Person | The job | Skill chosen | Opened |
+|---|---|---|---|
+| Kiki | A vague loyalty idea | `shape-an-idea`, then asked one question on a card | Not yet (the template comes at the end) |
+| Nokka | A checkout page | `design-a-screen` | `references/states.md` |
+| Jiro | A real bug in a real file | `find-root-cause`, then fixed the cause | It has one file, for when stuck; not needed |
+| Kit | An API for partners | `design-an-api` | `templates/contract.md` |
+| Sen | What to test before shipping | `test-plan` | Both of its files |
+| Bejo | Picture uploads, not built yet | `threat-model` | `references/ways-to-attack.md` |
+| Yuzu | Words for a landing page | `landing-copy` | It has no other file |
+| Nobo | A page to be found on Google | `seo-brief` | `templates/brief.md` |
+| Kupa | A broken Pay button | `route-the-work`, then showed three tickets first and raised none yet, as the skill says | `references/the-people.md` |
+| Sora, Kenn | Section 10.4 | `incident-response`, `support-reply` | Their templates |
+
+- **The one miss teaches something.** Asked "how would you go about it?" in an empty folder, Jiro answered from his own head and took no skill. Given a real bug in a real file, he took the skill. Test with a real job, not a question about a job.
+- **Being honest held up.** When Jiro was refused a command, he said he had not clicked the button and told the owner how to check. Kiki's plan-only mode did not get in the way of skills.
+- **Test scripts must be strict.** A card for a web search was allowed by accident, because the script matched words elsewhere on the page. It did no harm here, but read only the card's own text before allowing anything.

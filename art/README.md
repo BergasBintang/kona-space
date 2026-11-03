@@ -11,6 +11,7 @@ Pixel art for Kona (ticket T-0001, decisions 44, 45 and 57 in `kona-space-app.md
 - `node build-cats.mjs` writes `out/cats.png` (a sprite sheet: a row per role and look, a column per frame; the cat has four looks, one block of rows each), `out/cats.json` (the frame size, order, roles and number of looks), Kibby's sheet `out/kibby.png` with `out/kibby.json`, and a 5x preview. `node to-app.mjs` copies them into `app/src/office`.
 - `cat.mjs` is the cat and the role icons, `kibby.mjs` is Kibby, `lib.mjs` is a small pixel canvas for these scripts (no packages).
 - `node build-frames.mjs` writes the tiled frames (paper, teal and red, large 18 x 18 and small 12 x 12, each in normal, hover and pressed looks) and a 4x preview of each. They are for buttons, cards and dialogs: the corners stay, the edges repeat, the middle is empty. In CSS: `border: 12px solid transparent; background-clip: padding-box; border-image: url(frame-paper-normal.png) 6 / 12px repeat; image-rendering: pixelated;`.
+- `node build-devices.mjs` writes the device frames of the mockup previewer (ticket T-0014, decisions 75 and 76) to `out/devices`: small phone, phone, tablet, laptop (with a base) and desktop monitor (with a stand), the two phones and the tablet also on their side. Each frame is a 9-slice for `border-image` drawn at one fixed size and shown at 2 CSS pixels per art pixel (only the screen scales), `devices.json` holds the slices, the screen sizes and where each detail goes, and `devices-preview.png` shows them all. They are copied by hand to `app/src/assets/devices/` (without the preview).
 - `node build-logo.mjs` writes the logo and the app icon.
 - `node render-map.mjs [map.json] [side 0 to 3] [out.png] [scale]` draws a map of the office to a picture with the same engine the app uses (the standard office by default), to look at a change without opening Kona.
 
@@ -22,7 +23,7 @@ The first pipeline (a script that drew the office with thin walls, `office.mjs`,
 
 ## The pieces that open a screen
 
-Since 2026-11-02 each screen that has no person is opened by one piece of the office (decision 61): the brain stand, archive drawers, server terminal, cash desk, key cabinet, gear console, leftovers bin and flow board, and the cork and branch boards on a wall. They are in `app/src/office/engine/furniture.ts` with `opens` and `unique`, each with its own height, outline and main colour so none looks like another (a test checks it). A contact sheet of all of them from the four sides is one small script away (draw the objects of the standard map by `ref`, as `render-map.mjs` does).
+Since 2026-11-02 each screen that has no person is opened by one piece of the office (decision 61): the brain stand, archive drawers, server terminal, cash desk, key cabinet, gear console, leftovers bin, flow board and (since 2026-11-04, decision 75) the big screen that opens the mockups, and the cork and branch boards on a wall. They are in `app/src/office/engine/furniture.ts` with `opens` and `unique`, each with its own height, outline and main colour so none looks like another (a test checks it). A contact sheet of all of them from the four sides is one small script away (draw the objects of the standard map by `ref`, as `render-map.mjs` does).
 
 ## Rules that still hold
 

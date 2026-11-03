@@ -2,6 +2,19 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.32.0, 2026-11-04
+
+Mockups: a big screen in the office opens a sheet where the pages that people drew for a project can be clicked through, in drawn devices.
+
+- **A big screen in the Lounge.** A new piece of the office, on the wall behind the meeting table, opens the Mockups sheet. An office saved before this version gets the screen back by itself, with a notice.
+- **Cards.** Each folder of `.kona/mockups` in a project is a card. A click opens its page in a device; the pages of a mockup link to each other like a real site, and you move between them by clicking inside it. A card with no start page says so.
+- **Five drawn devices.** Small phone (320 px wide), phone (390), tablet (768), laptop (1024) and desktop (1440); the two phones and the tablet turn on their side. The page runs at the true size of the device (its width, its height and its media queries are the device's, never the window's) and the whole device is shown smaller to fit the sheet. Zoom in with two buttons, or with Ctrl and the mouse wheel, up to twice the true size; drag the sheet to move; one button goes back to the fit.
+- **Live pages.** A mockup runs its own scripts, so forms, menus and a wrong password can be tried. It cannot reach the web, Kona or anything outside its card. Start again puts the page back to its beginning; the page also loads again by itself when one of its files changes. Pictures, fonts and video are files next to the page (a video plays and can be moved around in).
+- **Light and dark.** A sun and moon button switches the page between its two looks without loading it again; the next page of the card follows.
+- **Esc goes back one step.** In a mockup it returns to the cards (also when the page has the keyboard); on the cards it closes the sheet.
+- **The Kona mark is off while a sheet is open.** One slip of the pointer no longer takes you from the page you are working in back to the welcome page.
+- **Good to know.** On a screen scaled to a fraction (125 percent, for example) a page may see a pixel or two more than the device's width, never less; at 100 or 200 percent it is exact. Nothing is read from anywhere but the card's own folder.
+
 ## 0.31.1, 2026-11-03
 
 A tidier file reader, and the slide sheet reaches the top bar.

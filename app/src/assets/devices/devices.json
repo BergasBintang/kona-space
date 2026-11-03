@@ -1,0 +1,364 @@
+{
+  "note": "Art pixels are shown at k x k CSS pixels (k = 2) so they stay square. slice is in art pixels [top, right, bottom, left]; widthCss is the same in CSS pixels. The page runs at screen.w x screen.h CSS pixels, then the whole device is scaled; the bezel keeps its size. screenRadius is in art pixels: clip the screen to it and put `backdrop` behind. details are placed in the middle of one side of the bezel. A base (laptop) is a left cap, a repeating middle and a right cap; a stand (monitor) is one fixed picture centred under the frame.",
+  "devices": [
+    {
+      "id": "phone-s",
+      "label": "Small phone",
+      "screen": {
+        "w": 320,
+        "h": 568
+      },
+      "turns": true,
+      "k": 2,
+      "material": "dark",
+      "backdrop": "#14100b",
+      "screenRadius": 4,
+      "frames": {
+        "upright": {
+          "image": "phone-s-upright.png",
+          "size": [
+            15,
+            21
+          ],
+          "slice": [
+            10,
+            7,
+            10,
+            7
+          ],
+          "widthCss": [
+            20,
+            14,
+            20,
+            14
+          ],
+          "screen": {
+            "w": 320,
+            "h": 568
+          },
+          "details": [
+            {
+              "image": "phone-s-speaker-top.png",
+              "side": "top",
+              "size": [
+                12,
+                2
+              ]
+            }
+          ]
+        },
+        "turned": {
+          "image": "phone-s-turned.png",
+          "size": [
+            21,
+            15
+          ],
+          "slice": [
+            7,
+            10,
+            7,
+            10
+          ],
+          "widthCss": [
+            14,
+            20,
+            14,
+            20
+          ],
+          "screen": {
+            "w": 568,
+            "h": 320
+          },
+          "details": [
+            {
+              "image": "phone-s-speaker-left.png",
+              "side": "left",
+              "size": [
+                2,
+                12
+              ]
+            }
+          ]
+        }
+      },
+      "css": "border-style: solid; border-color: transparent; border-width: 20px 14px 20px 14px; border-image: url(phone-s-upright.png) 10 7 10 7 / 20px 14px 20px 14px repeat; image-rendering: pixelated;"
+    },
+    {
+      "id": "phone",
+      "label": "Phone",
+      "screen": {
+        "w": 390,
+        "h": 844
+      },
+      "turns": true,
+      "k": 2,
+      "material": "dark",
+      "backdrop": "#14100b",
+      "screenRadius": 5,
+      "frames": {
+        "upright": {
+          "image": "phone-upright.png",
+          "size": [
+            15,
+            21
+          ],
+          "slice": [
+            10,
+            7,
+            10,
+            7
+          ],
+          "widthCss": [
+            20,
+            14,
+            20,
+            14
+          ],
+          "screen": {
+            "w": 390,
+            "h": 844
+          },
+          "details": [
+            {
+              "image": "phone-speaker-top.png",
+              "side": "top",
+              "size": [
+                12,
+                2
+              ]
+            }
+          ]
+        },
+        "turned": {
+          "image": "phone-turned.png",
+          "size": [
+            21,
+            15
+          ],
+          "slice": [
+            7,
+            10,
+            7,
+            10
+          ],
+          "widthCss": [
+            14,
+            20,
+            14,
+            20
+          ],
+          "screen": {
+            "w": 844,
+            "h": 390
+          },
+          "details": [
+            {
+              "image": "phone-speaker-left.png",
+              "side": "left",
+              "size": [
+                2,
+                12
+              ]
+            }
+          ]
+        }
+      },
+      "css": "border-style: solid; border-color: transparent; border-width: 20px 14px 20px 14px; border-image: url(phone-upright.png) 10 7 10 7 / 20px 14px 20px 14px repeat; image-rendering: pixelated;"
+    },
+    {
+      "id": "tablet",
+      "label": "Tablet",
+      "screen": {
+        "w": 768,
+        "h": 1024
+      },
+      "turns": true,
+      "k": 2,
+      "material": "dark",
+      "backdrop": "#14100b",
+      "screenRadius": 3,
+      "frames": {
+        "upright": {
+          "image": "tablet-upright.png",
+          "size": [
+            23,
+            23
+          ],
+          "slice": [
+            11,
+            11,
+            11,
+            11
+          ],
+          "widthCss": [
+            22,
+            22,
+            22,
+            22
+          ],
+          "screen": {
+            "w": 768,
+            "h": 1024
+          },
+          "details": [
+            {
+              "image": "tablet-camera-top.png",
+              "side": "top",
+              "size": [
+                4,
+                4
+              ]
+            }
+          ]
+        },
+        "turned": {
+          "image": "tablet-turned.png",
+          "size": [
+            23,
+            23
+          ],
+          "slice": [
+            11,
+            11,
+            11,
+            11
+          ],
+          "widthCss": [
+            22,
+            22,
+            22,
+            22
+          ],
+          "screen": {
+            "w": 1024,
+            "h": 768
+          },
+          "details": [
+            {
+              "image": "tablet-camera-left.png",
+              "side": "left",
+              "size": [
+                4,
+                4
+              ]
+            }
+          ]
+        }
+      },
+      "css": "border-style: solid; border-color: transparent; border-width: 22px 22px 22px 22px; border-image: url(tablet-upright.png) 11 11 11 11 / 22px 22px 22px 22px repeat; image-rendering: pixelated;"
+    },
+    {
+      "id": "laptop",
+      "label": "Laptop",
+      "screen": {
+        "w": 1024,
+        "h": 640
+      },
+      "turns": false,
+      "k": 2,
+      "material": "light",
+      "backdrop": "#1b1712",
+      "screenRadius": 1,
+      "frames": {
+        "upright": {
+          "image": "laptop-upright.png",
+          "size": [
+            15,
+            17
+          ],
+          "slice": [
+            7,
+            7,
+            9,
+            7
+          ],
+          "widthCss": [
+            14,
+            14,
+            18,
+            14
+          ],
+          "screen": {
+            "w": 1024,
+            "h": 640
+          },
+          "details": [
+            {
+              "image": "laptop-camera-top.png",
+              "side": "top",
+              "size": [
+                4,
+                4
+              ]
+            }
+          ]
+        }
+      },
+      "base": {
+        "image": "laptop-base.png",
+        "size": [
+          21,
+          9
+        ],
+        "capLeft": 10,
+        "capRight": 10,
+        "overhangArt": 8,
+        "notch": {
+          "image": "laptop-notch.png",
+          "size": [
+            16,
+            3
+          ]
+        }
+      },
+      "css": "border-style: solid; border-color: transparent; border-width: 14px 14px 18px 14px; border-image: url(laptop-upright.png) 7 7 9 7 / 14px 14px 18px 14px repeat; image-rendering: pixelated;"
+    },
+    {
+      "id": "monitor",
+      "label": "Desktop",
+      "screen": {
+        "w": 1440,
+        "h": 900
+      },
+      "turns": false,
+      "k": 2,
+      "material": "light",
+      "backdrop": "#1b1712",
+      "screenRadius": 1,
+      "frames": {
+        "upright": {
+          "image": "monitor-upright.png",
+          "size": [
+            17,
+            23
+          ],
+          "slice": [
+            8,
+            8,
+            14,
+            8
+          ],
+          "widthCss": [
+            16,
+            16,
+            28,
+            16
+          ],
+          "screen": {
+            "w": 1440,
+            "h": 900
+          },
+          "details": []
+        }
+      },
+      "stand": {
+        "image": "monitor-stand.png",
+        "size": [
+          36,
+          18
+        ]
+      },
+      "css": "border-style: solid; border-color: transparent; border-width: 16px 16px 28px 16px; border-image: url(monitor-upright.png) 8 8 14 8 / 16px 16px 28px 16px repeat; image-rendering: pixelated;"
+    }
+  ]
+}

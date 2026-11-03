@@ -162,6 +162,13 @@ export const signInAccount = async (id: string) => { try { return await invoke<v
 export const listDir = (path: string) => invoke<Entry[]>("list_dir", { path });
 export const readFile = (path: string) => invoke<FileView>("read_file", { path });
 
+// The mockup previewer (decision 75): a mockup is a card, a folder of `.kona/mockups`; its pages are loaded from `${mockBase}/${projectId}/${card}/${file}`.
+export type MockCard = { id: string; name: string; entry: string | null; files: number; modified: number | null };
+export type MockFile = { path: string; size: number; modified: number | null };
+export const mockBase = () => invoke<string>("mock_base");
+export const mockCards = (projectId: string) => invoke<MockCard[]>("mock_cards", { projectId });
+export const mockFiles = (projectId: string, card: string) => invoke<MockFile[]>("mock_files", { projectId, card });
+
 /** The same place, written the same way, whatever the case or slashes. */
 export const samePlace = (a: string, b: string) => a.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase() === b.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
 export const baseName = (p: string) => p.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || p;

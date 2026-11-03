@@ -17,6 +17,7 @@ import { AddProject } from "./components/AddProject";
 import { PERSON_TABS, PersonSheet, type PersonTab } from "./components/PersonSheet";
 import type { Attached } from "./components/Chat";
 import { Files } from "./components/Files";
+import { Mockups } from "./components/Mockups";
 import { Accounts } from "./components/Accounts";
 import { Kit } from "./components/Kit";
 import { Costs } from "./components/Costs";
@@ -359,6 +360,7 @@ export default function App() {
     switch (which) {
       case "accounts": return <Accounts accounts={accounts} onChanged={setAccounts} />;
       case "files": return <Files project={project} />;
+      case "mockups": return <Mockups project={project} />;
       case "settings": return <Settings projects={projects} version={version} onProjects={(next) => { setProjects(next); if (projectId && !next.some((p) => p.id === projectId)) { setProjectId(next[0]?.id ?? null); remember("kona.project", next[0]?.id ?? ""); } }} />;
       case "servers": return <Servers project={project} roles={roles} />;
       case "brain": return <BrainPlace project={project} tab={brainTab} onTab={setBrainTab} onAsk={askClaude} />;
@@ -401,7 +403,7 @@ export default function App() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <TopBar project={project} onHome={() => leave(() => { setAdding(false); setGreeted(false); })} place={place}
+      <TopBar project={project} onHome={() => leave(() => { setAdding(false); setGreeted(false); })} sheetOpen={sheet !== null} place={place}
         onPlace={(p) => leave(() => { setAdding(false); setPerson(null); setPlace(p); })} onAttention={() => leave(() => { const w = state.order.map((id) => state.sessions[id]).find((s) => s.run === "waiting" && project && samePlace(s.folder, project.folder)); if (w) openPerson(w.roleId ?? "secretary"); })} attention={attention} leftBehind={leftTotal} plan={state.plans[current?.accountId ?? accountOf(project) ?? lastAccount]}
         limitLine={PLAIN_LINES.limit} accountLabel={project ? accounts.find((a) => a.id === (current?.accountId ?? accountOf(project)))?.label ?? null : null} version={version} />
       <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">

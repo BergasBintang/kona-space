@@ -14,7 +14,7 @@ Every line was paid for with a correction or a wasted hour. Before showing the o
 
 1. Something the owner said once still holds. Before building a screen, read this list and search the Decisions table for what was already agreed.
 2. When a redesign replaces a screen, list what the old one had first. Nothing agreed may disappear without saying so.
-3. If a word could mean two things (they said "b-tree"), show a small picture of what you understood before building it. A wrong guess costs more than one question.
+3. If a word could mean two things (they said "b-tree"), show a small picture of what you understood before building it. A wrong guess costs more than one question. Before saying a new idea overlaps something that exists, say what you think it is for and ask.
 4. When the owner says "I don't understand", take things away. More explaining text makes it worse.
 5. A question gets answered first, in plain words ("WHAT IS THIS?" means explain it). While the owner says "we are discussing", change nothing.
 
@@ -36,12 +36,12 @@ Every line was paid for with a correction or a wasted hour. Before showing the o
 **Saying it works**
 
 15. Tests passing does not mean it works. Say what was seen in the real window and what was not. Anything Claude has to use (a skill, a tool, a prompt) is proven only by a real conversation in a throwaway project.
-16. Never warn about a risk that can be tested in a minute. Test it, then report the result.
+16. Never warn about a risk that can be tested in a minute. Test it, then report the result. A "not tested" list holds only what cannot be tested here, and before saying a test covered a case, look at the real condition (the path, the drive, the number).
 17. A running window can be older than the code. `cargo test` does not update it, and `tauri dev` does not rebuild for files outside the Rust code (touch `src/lib.rs`). Check the program's time before believing a window test.
 
 **The owner's data**
 
-18. Never test on the owner's project: add a throwaway one, remove it afterwards, and delete its folder and its Claude transcripts. If a real project must be touched, save a copy of its data first and say so.
+18. Never test on the owner's project (a test that clicks picks by an exact match and checks that the throwaway project is the one open): add a throwaway one, remove it afterwards, and delete its folder and its Claude transcripts. If a real project must be touched, save a copy of its data first and say so.
 19. Reloading the window throws away what the owner has open. Do not reload or drive it while they may be in the office editor with unsaved work.
 
 **Shipping**
@@ -53,6 +53,8 @@ Every line was paid for with a correction or a wasted hour. Before showing the o
 
 22. Long scripts: write the file with the Write tool, then run it. No heredocs with quotes or backslashes, and never `python -`. Keep each file's own line endings.
 23. A Rust compile error kills the dev window. A backslash in a Rust test string is the usual cause.
+24. Open choices go to the owner through the question tool, the recommended answer first. Ask only what has not been said.
+25. A piece placed in the office is looked at in the picture of the real office, from all four sides, and nothing stands beside a doorway (a test checks it).
 
 ---
 
@@ -520,3 +522,45 @@ Each chose the skill below by itself. "Opened" means it also opened a file besid
 | "Show the text" sat lower than the words beside it | Turning a 20 px text link into a 32 px `Button` inside a row that lines its items up from the top | Where a `tiny` Button sits in a line of text, the row centres its items and the button takes a negative margin so the line keeps its height. Better still: view switches live in the title row with Find and the zoom, not in a line of facts |
 | The file info row was three facts nobody acts on | Path, size and date were always on the page, a row of vertical space in a short window | The facts moved into a dialog behind an info icon (with Copy path and Show in Explorer), and the name shows the path on hover. A read-only fact that no one needs at every glance does not need a row |
 | The slide sheet left a strip of office above it | It was set 88 px below the top bar so the office buttons stayed visible | The sheet starts at the top bar (owner's word, 2026-11-03). A page that covers the office has no use for office buttons |
+
+## 14. What was found in the session of 2026-11-04 (0.32.0: the mockup previewer)
+
+What the owner said is printed by `node tests/owner-said.mjs` in `app/`. The decisions are rows 74 to 76 of `kona-space-app.md`; the tickets are T-0014 to T-0027.
+
+### 14.1 Working with the owner
+
+| Seen | Cause | Keep |
+|---|---|---|
+| I said the mockup previewer would overlap the file reader, and proposed a "Run" button in the reader | It sounded like "an html page opens in a frame", so I filed it under the reader. The owner meant a sheet of its own, with its own piece of furniture and purpose, for the app's own mockups in device frames | Before saying a new idea overlaps something that exists, say what you think it is for and what it would show, and ask. A new place is not a mode of an old one |
+| A research copy (a public page kept only for investigation) was taken as the case for reversing a live site | The owner meant the project's own sites, and said "just look at the file" | When the owner points at a project, open it and read it before arguing, and say which example is which |
+| The landing page and the LMS were taken for two sites with no connection, so I invented a layer of cards | I read an "under construction" page and a link I had not found as "no link". The owner said the link is only hidden for now | A link missing in the code is not a link missing in the plan. Check again, or ask, before building a structure on it. The cards stayed, but one card is one mockup, and its pages link to each other |
+| "Use AskUser for this" | Three open choices in a text list are easy to skip or to answer in half | Open choices go through the question tool: the recommended answer first, each with a plain description. Ask only what the owner has not already said |
+| "Critical" screen sizes: the owner pointed at a note in the Norbit project to say what the word means | I would have guessed a list of device widths | When a word is defined in the owner's own project, read that first. The list (320, 390, 768, 1024, 1440) came from there, and from what broke in it |
+| The owner dropped a tool's screenshots and said "the frames should have been made by us" | Copying another tool's art or text is not an option here (benchmark 20) | The frames are drawn by script in `art/build-devices.mjs`, in Kona's own look. Ideas from other repositories (the calculation rules of a drawing skill) are taken as ideas and written fresh |
+| "Why don't you tested it?" after a list of things not tested | Several of them took a minute: a very large file, another drive, what the command message really is (benchmark 16 broken again). One was wrong: I wrote that another drive was covered, but this PC's temp folder is on the same drive as Kona | A "not tested" list holds only what cannot be tested here. Before saying a test covered a case, look at the real condition (print the path, the drive, the number) |
+| The big screen stood in front of the doorway to the hall; the owner saw it in a screenshot | I placed it by tile numbers; `checkMap` does not look at the tiles beside a doorway | A test now fails when anything stands next to a doorway (and I checked that it fails on the old place). After placing a piece, look at the picture of the real office, not only at the checks |
+
+### 14.2 The previewer and its sandbox
+
+| Seen | Cause | Keep |
+|---|---|---|
+| A page in the sandboxed frame has `__TAURI_INTERNALS__` and `ipc` | WebView2 injects them into every frame | A real `invoke` from the frame was seen leaving the frame and doing nothing (no project added). Check every command's own input; never rely on that |
+| My first rule against reading another card did not work | It needed the `Referer` header, and WebView2 sends none for a page's own requests (only `Origin: null`) | A protection is a protection only after a test shows it holds. It was removed; the limit is written down (a page can read another card of its own project by its exact address, and has no way to send it anywhere) |
+| Windows hands the mock handler `mock://localhost/...` though the page uses `http://mock.localhost/...` | wry maps one to the other | Read the path only; never test the host of the request |
+| A test of the content policy needs a built program | `devCsp` is null, so the policy is not applied in `tauri dev` | `npm run tauri build -- --debug --no-bundle` (about a minute) applies the real policy; a release build with LTO adds nothing for this |
+| The page saw 569 for 568 and 769 for 768 | This PC's display is scaled to 120 percent. The page's viewport is a whole number of SCREEN pixels, and a frame that does not start and end on screen pixels is a pixel off either way | The frame sits on whole screen pixels and is sized just under the pixels it needs (`phys` in `Mockups.tsx`). The page then sees the device's size or at most two screen pixels more, never less, so `min-width` breakpoints such as 768 apply; at 100 or 200 percent it is exact. A `max-width: 768px` rule does not apply at 768 on a fractional scale. The test says so and checks it |
+| Esc inside the page closed the whole sheet instead of going back | A key event made by hand on `window` closed the sheet although my listener was a capture listener (seen); the sheet's own listener evidently ran first for an event that starts at `window` | Do not make a key event to reach your own handler: call the handler. The real Esc still goes through a capture listener (and not while a dialog is open) |
+| The page cannot be told the theme from outside | It has an opaque origin: the window cannot reach into it | Kona puts a small helper into every page it serves (`HELPER` in `mock.rs`): the theme (first from the address, then by a message), Ctrl and the wheel, Esc, "ready". `prefers-color-scheme` inside the frame follows the frame's `color-scheme` (seen) |
+| The window's own zoom of a page (a 100/scale trick) would have laid the page out at another width | A page must be laid out at the device's size and then scaled, or `vh` and media queries follow the window | The frame is exactly the device's CSS size and only a `transform: scale` shrinks it |
+| Device frames at a fixed size, and the screen scales | Pixel art must not be stretched | A 9-slice for `border-image` at 2 CSS pixels per art pixel; the bezel keeps its size, only the screen scales. A laptop's base is a 3-slice with the middle filled |
+
+### 14.3 Tools, testing and this PC
+
+| Seen | Cause | Keep |
+|---|---|---|
+| A test opened the owner's real project (Norbit) in my test window, twice | It picked "the nearest part that holds the name", which matched the list around all the cards, so it clicked the first Open | Nothing was written (checked by file times), but it must not happen (benchmark 18). A test that clicks must pick by an exact, unique match and then check that the throwaway project is the one open (its name in the top bar) |
+| The tests of the sheet need the real window | The sheet cannot be reached until the furniture is there | `tests/mockups.mjs` (the sheet) and `tests/mock-sandbox.mjs` (the sandbox) drive a built program over the debug port, with the owner's own Kona closed, on a throwaway project they add and remove |
+| A PowerShell command with `$` run from Git Bash lost its variables | Bash expands `$o` before PowerShell sees it | Write a `.ps1` file with the Write tool and run it (benchmark 22) |
+| The build failed on a function with the same name as mine | `project_folder` already existed in `lib.rs` | Search for a name before adding it to a big file |
+| The owner's screen recording was a good test video | H.264 with AAC, 1080p, 19.5 s, 20.7 MB, its index at the END of the file, so the browser reads the end first (a range request) | Its path is given to the test by `MOCK_TEST_VIDEO`; the file is copied into the throwaway project and deleted with it, never changed and never kept in the repo |
+| A release build is about 6 minutes and leaves little free memory; a debug build with the real policy is about a minute | LTO and one code unit in the release profile | Say the cost first. Use the debug build for tests of the window; the release build is for the release |

@@ -1,4 +1,5 @@
-// The top bar, always in view: the Kona mark with a chevron (back to the welcome page, the only way to another project), the name of the open project,
+// The top bar, always in view: the Kona mark with a chevron (back to the welcome page, the only way to another project; dimmed and off while a sheet is open, so one slip of the
+// pointer cannot leave the page the owner is working in; the sheet's own X closes it), the name of the open project,
 // what is waiting on you, the account of the project and the two plan bars. It replaces the sidebar (decision 44).
 import { Button, Glyph, PlanBar } from "./ui";
 import { KonaMark } from "./KonaMark";
@@ -6,13 +7,13 @@ import type { Place } from "../lib/places";
 import type { Project } from "../lib/api";
 import type { Plan } from "../lib/sessions";
 
-export function TopBar({ project, onHome, place, onPlace, onAttention, attention, leftBehind, plan, accountLabel, limitLine, version }: {
-  project: Project | null; onHome: () => void; place: Place; onPlace: (p: Place) => void; onAttention: () => void;
+export function TopBar({ project, onHome, sheetOpen, place, onPlace, onAttention, attention, leftBehind, plan, accountLabel, limitLine, version }: {
+  project: Project | null; onHome: () => void; sheetOpen: boolean; place: Place; onPlace: (p: Place) => void; onAttention: () => void;
   attention: number; leftBehind: number; plan: Plan | undefined; accountLabel: string | null; limitLine: string; version: string;
 }) {
   return (
     <header className="flex min-h-[72px] shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b-2 border-line-strong bg-surface-1 px-5 py-2">
-      <button type="button" onClick={onHome} title="Back to the welcome page" aria-label="Kona, back to the welcome page" className="px-btn px-btn-paper flex items-center gap-1.5 px-2">
+      <button type="button" onClick={onHome} disabled={sheetOpen} title={sheetOpen ? "Close the open page first" : "Back to the welcome page"} aria-label={sheetOpen ? "Kona, back to the welcome page (close the open page first)" : "Kona, back to the welcome page"} className="px-btn px-btn-paper flex items-center gap-1.5 px-2">
         <svg width="20" height="20" viewBox="0 0 16 16" aria-hidden="true" className="shrink-0 text-text-secondary">
           <path d="M10 3 L5 8 L10 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter" />
         </svg>

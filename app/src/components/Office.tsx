@@ -188,7 +188,7 @@ function Living({ scene, looks, names, places, k, sheetOpen, chatting, onTalk, c
 }
 
 /** The small picture over each piece of the office that opens a screen: what that screen is about (the pieces are faint at rest, so the office does not turn into a sign board). */
-const CLUE: Record<string, IconName> = { brain: "bulb", files: "folder", servers: "server", costs: "coin", accounts: "key", settings: "gear", leftovers: "crate", workflows: "flow", board: "board", worktrees: "branch" };
+const CLUE: Record<string, IconName> = { brain: "bulb", files: "folder", servers: "server", costs: "coin", accounts: "key", settings: "gear", leftovers: "crate", workflows: "flow", board: "board", worktrees: "branch", mockups: "deviceMonitor" };
 
 export const Office = memo(function Office({ map, looks = NO_LOOKS, names = NO_NAMES, sheetOpen, onOpen, onOpenPerson, onSay, onEdit }: {
   map: OfficeMap; looks?: Record<string, Look>; /** what each role is called */ names?: Record<string, string>; sheetOpen: boolean; onOpen: (p: Place) => void; onOpenPerson: (role: string) => void; /** one reply from an office boy */ onSay: (who: Who, history: Turn[], message: string) => Promise<string>; onEdit?: () => void;

@@ -216,7 +216,7 @@ test("the dots of a carpet stay on the carpet tile they belong to, on every side
 });
 
 // The screens that have no worker are opened by a piece of the office (a piece of furniture, or a board on a wall). The workers' screens are opened by their cats.
-const SCREENS = ["accounts", "board", "brain", "costs", "files", "leftovers", "servers", "settings", "workflows", "worktrees"];
+const SCREENS = ["accounts", "board", "brain", "costs", "files", "leftovers", "mockups", "servers", "settings", "workflows", "worktrees"];
 
 test("every screen without a worker has exactly one piece that opens it, and the standard office holds each once", () => {
   const furniture = Object.entries(KINDS).filter(([, k]) => k.opens).map(([kind, k]) => [kind, k.opens!] as const), walls = Object.entries(WALL_PAGES);
@@ -227,6 +227,24 @@ test("every screen without a worker has exactly one piece that opens it, and the
   for (const [art] of walls) assert.equal(STANDARD.attach.filter((a) => a.kind === "art" && a.art === art).length, 1, `${art} hangs once in the standard office`);
 });
 
+test("nothing stands in front of a doorway: the tiles on both sides of every doorway are free", () => {
+  const doorway = new Set(STANDARD.attach.filter((a) => a.kind === "doorway").map((a) => `${a.i},${a.j}`));
+  const taken = new Map<string, string>();
+  for (const o of STANDARD.objects) {
+    if (o.kind === "rug") continue;
+    const f = footprintOf(o);
+    if (f) for (let i = f[0]; i < f[0] + f[2]; i++) for (let j = f[1]; j < f[1] + f[3]; j++) taken.set(`${i},${j}`, o.kind);
+  }
+  for (const key of doorway) {
+    const [i, j] = key.split(",").map(Number);
+    for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const n = `${i + di},${j + dj}`;
+      if (doorway.has(n) || STANDARD.walls[j + dj]?.[i + di] !== false) continue; // another tile of the doorway, a wall, or off the map
+      assert.equal(taken.get(n), undefined, `${taken.get(n)} stands on ${n}, in front of the doorway at ${key}`);
+    }
+  }
+});
+
 test("the pieces that open a screen look different from every other piece and from each other, on every side", () => {
   
   const opens = (k: number) => KINDS[STANDARD.objects[k].kind].opens;
@@ -235,7 +253,7 @@ test("the pieces that open a screen look different from every other piece and fr
     const hash = (k: number) => createHash("sha1").update(Buffer.concat(s.items.filter((t) => t.ref === k && t.img).map((t) => Buffer.concat([Buffer.from(`${t.img!.w}x${t.img!.h}`), Buffer.from(t.img!.d.buffer, t.img!.d.byteOffset, t.img!.d.byteLength)])))).digest("hex");
     const mean = (k: number) => { let n = 0; const sum = [0, 0, 0]; for (const t of s.items.filter((x) => x.ref === k && x.img)) for (let q = 0; q < t.img!.d.length; q += 4) if (t.img!.d[q + 3]) { n++; for (let c = 0; c < 3; c++) sum[c] += t.img!.d[q + c]; } return sum.map((v) => v / n); };
     const pages = STANDARD.objects.map((_, k) => k).filter((k) => opens(k));
-    assert.equal(pages.length, 8, "eight pieces of furniture open a screen");
+    assert.equal(pages.length, 9, "nine pieces of furniture open a screen");
     STANDARD.objects.forEach((o, k) => { if (o.kind === "rug") return; const h = hash(k), other = seen.get(h); if (other && opens(k)) assert.fail(`view ${view}: ${o.kind} looks exactly like ${other}`); seen.set(h, o.kind); });
     for (const a of pages) for (const b of pages) if (a < b) assert.ok(Math.hypot(...mean(a).map((v, c) => v - mean(b)[c])) >= 12, `view ${view}: ${STANDARD.objects[a].kind} and ${STANDARD.objects[b].kind} are too much alike in colour`);
   }

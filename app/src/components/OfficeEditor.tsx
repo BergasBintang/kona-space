@@ -43,7 +43,7 @@ const DECOR: { id: string; label: string; kind: "window" | "door" | "art"; art?:
 /** What each screen without a person is for, in a few words (shown when the owner hovers over the part that opens it). */
 const SCREEN_USE: Record<string, string> = {
   board: "the tickets, by what stage they are in", workflows: "the step-by-step jobs", worktrees: "the branches and the own copies of a folder", brain: "the notes of the project", files: "the files of the project",
-  leftovers: "the work left behind by sessions that ended", servers: "the servers Kona may reach", costs: "what the sessions cost", accounts: "the Claude accounts", settings: "Kona's settings",
+  leftovers: "the work left behind by sessions that ended", servers: "the servers Kona may reach", costs: "what the sessions cost", accounts: "the Claude accounts", settings: "Kona's settings", mockups: "the mockups that people drew, to click through",
 };
 /** The words for a part that must be in the office: a short line on what it is for and what is lost without it. */
 const screenNeed = (page: string) => `Opens the ${PLACES.find((p) => p.id === page)?.label ?? page} screen: ${SCREEN_USE[page] ?? "a page of Kona"}. Without it nothing in the office opens that screen, so the office cannot be saved.`;

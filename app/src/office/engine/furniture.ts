@@ -220,6 +220,14 @@ const fixed: Record<string, Spec> = {
     L.b(0.25, 0.25, 0.5, 0.5, 16, M.metal); L.b(0.125, 0.125, 0.75, 0.75, 4, shade("#76808c"), 16); L.fy(0.75, 0.375, 0.625, 4, 12, "#97a1ad");
     L.b(0.25, 0.25, 0.25, 0.25, 4, M.white, 20); L.b(0.5, 0.375, 0.25, 0.25, 4, M.crate, 20); L.b(0.125, 0.75, 0.25, 0.125, 4, M.white);
   } },
+  "big screen": { label: "Big screen", w: 2, d: 1, h: 24, draw: (L) => { // a wide orange screen on a black foot, showing a phone and a laptop: the mockups
+    const O = shade("#e0803c");
+    L.b(0.125, 0.25, 1.75, 0.5, 4, M.black); L.b(0.875, 0.375, 0.25, 0.25, 4, M.black, 4); // the foot and the post
+    L.b(0.125, 0.375, 1.75, 0.125, 20, O, 4);
+    L.fy(0.5, 0.25, 1.75, 7, 22, "#fbf1dc"); // the screen
+    L.fy(0.5, 0.375, 0.75, 9, 20, "#33241a"); L.fy(0.5, 0.4375, 0.6875, 11, 19, "#8ed8c9"); // a phone
+    L.fy(0.5, 0.9375, 1.625, 12, 20, "#33241a"); L.fy(0.5, 1.0, 1.5625, 13, 19, "#7fb1e0"); L.fy(0.5, 0.875, 1.6875, 10, 11, "#33241a"); // a laptop
+  } },
 };
 
 const BOOKS = ["#d9786a", "#8ed8c9", "#f3c978", "#7fb1e0", "#b793d0", "#e8b25a"];
@@ -284,7 +292,7 @@ export const KINDS: Record<string, Kind> = {
   // the pieces that open a screen, one for each screen that has no worker (the two on walls, the cork board and the branch board, are in decor.ts: WALL_PAGES)
   "brain stand": fixedKind("brain stand", "pages", "brain"), "archive drawers": fixedKind("archive drawers", "pages", "files"),
   "server terminal": fixedKind("server terminal", "pages", "servers"), "cash desk": fixedKind("cash desk", "pages", "costs"), "key cabinet": fixedKind("key cabinet", "pages", "accounts"),
-  "gear console": fixedKind("gear console", "pages", "settings"), "leftovers bin": fixedKind("leftovers bin", "pages", "leftovers"),
+  "gear console": fixedKind("gear console", "pages", "settings"), "leftovers bin": fixedKind("leftovers bin", "pages", "leftovers"), "big screen": fixedKind("big screen", "pages", "mockups"),
   "flow board": {
     label: "Flow board", group: "pages", opens: "workflows", unique: true, defaults: {}, params: [], size: (o) => swap(o, 2, 1), // a pale blue board of boxes joined by arrows, one of them branching; a blue rail on top and a stripe on the back, so it is not taken for a chart
     make: (S, ref, o) => S.piece(ref, o.i, o.j, 2, 1, (o.facing ?? 0) as Facing, "flow board", 20, (L) => {

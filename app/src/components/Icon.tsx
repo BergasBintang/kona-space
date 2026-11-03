@@ -20,6 +20,8 @@ const path = (draw: Draw) => {
 };
 const rect = (p: (x: number, y: number) => void, x0: number, y0: number, x1: number, y1: number) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) p(x, y); };
 const line = (p: (x: number, y: number) => void, x0: number, y0: number, x1: number, y1: number) => { const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)); for (let k = 0; k <= n; k++) p(x0 + ((x1 - x0) * k) / (n || 1), y0 + ((y1 - y0) * k) / (n || 1)); };
+/** the outline of a rectangle */
+const box = (p: (x: number, y: number) => void, x0: number, y0: number, x1: number, y1: number) => { for (let x = x0; x <= x1; x++) { p(x, y0); p(x, y1); } for (let y = y0; y <= y1; y++) { p(x0, y); p(x1, y); } };
 const art = (rows: string[]): Draw => (p) => rows.forEach((r, y) => [...r].forEach((c, x) => { if (c === "#") p(x, y); }));
 const flip = (d: Draw): Draw => (p) => d((x, y) => p(N - 1 - x, y));
 
@@ -113,6 +115,20 @@ const ICONS = {
   redo: flip(undo),
   turnLeft: flip(turnRight),
   turnRight,
+  // the toolbar of the mockup previewer: back to the cards, a device that turns on its side, light and dark, and the five devices
+  back: (p) => { for (let k = 0; k < 2; k++) { line(p, 9 + k, 3, 4 + k, 8); line(p, 4 + k, 8, 9 + k, 13); } rect(p, 6, 7, 13, 8); },
+  rotate: (p) => { turnRight(p); box(p, 4, 4, 7, 9); }, // the round arrow with a small device in it
+  sun: (p) => {
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (Math.hypot(x + 0.5 - 8, y + 0.5 - 8) <= 3.3) p(x, y);
+    rect(p, 7, 0, 8, 2); rect(p, 7, 13, 8, 15); rect(p, 0, 7, 2, 8); rect(p, 13, 7, 15, 8);
+    for (const [x, y] of [[2, 2], [3, 3], [13, 2], [12, 3], [2, 13], [3, 12], [13, 13], [12, 12]]) p(x, y);
+  },
+  moon: (p) => { for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (Math.hypot(x + 0.5 - 8, y + 0.5 - 8) <= 6.2 && Math.hypot(x + 0.5 - 11, y + 0.5 - 5.5) > 5) p(x, y); },
+  deviceSmallPhone: (p) => { box(p, 5, 3, 10, 12); rect(p, 7, 5, 8, 5); },
+  devicePhone: (p) => { box(p, 4, 1, 11, 14); rect(p, 6, 3, 9, 3); rect(p, 6, 12, 9, 12); },
+  deviceTablet: (p) => { box(p, 2, 1, 13, 14); rect(p, 7, 12, 8, 12); },
+  deviceLaptop: (p) => { box(p, 2, 3, 13, 10); rect(p, 0, 12, 15, 12); rect(p, 1, 13, 14, 13); },
+  deviceMonitor: (p) => { box(p, 1, 1, 14, 10); rect(p, 7, 11, 8, 12); rect(p, 4, 13, 11, 13); },
   save: (p) => { // a floppy disk: the outline, the shutter at the top and the label at the bottom
     for (let k = 2; k <= 13; k++) { p(k, 2); p(k, 13); p(2, k); p(13, k); }
     rect(p, 5, 2, 10, 5); rect(p, 4, 8, 11, 8); rect(p, 4, 8, 4, 13); rect(p, 11, 8, 11, 13);

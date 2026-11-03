@@ -105,9 +105,9 @@ row("rack", 2, 5, 13); put("cooling unit", 6, 13); row("rack", 2, 5, 18, 2); put
 rug("Slate", 11, 14, 3, 3); person("devops", 12, 14); put("deploy console", 14, 13); put("gear console", 10, 17, 3); put("cabinet", 10, 13);
 // Storage: crates and shelves, the leftovers bin by the side wall
 put("crates", 22, 13); put("crates", 25, 13); put("shelf", 26, 13); put("shelf", 27, 13); put("leftovers bin", 27, 17, 1); put("crates", 22, 18, 2);
-// Lounge: a meeting table with four chairs on a rug, two sofa corners, a water cooler, a whiteboard
+// Lounge: a meeting table with four chairs on a rug, the big screen (the mockups) on the wall behind the table (clear of the doorway to the hall at x 36 and 37), two sofa corners, a water cooler, a whiteboard
 rug("Cream", 33, 14, 5, 4); put("meeting table", 34, 15); put("chair", 34, 14, 0); put("chair", 35, 14, 0); put("chair", 34, 16, 2); put("chair", 35, 16, 2);
-put("chart", 30, 13); put("sofa", 39, 13, 0); put("armchair", 41, 13, 0); put("water cooler", 43, 13); put("sofa", 39, 17, 2); put("armchair", 42, 17, 2);
+put("chart", 30, 13); put("big screen", 33, 13); put("sofa", 39, 13, 0); put("armchair", 41, 13, 0); put("water cooler", 43, 13); put("sofa", 39, 17, 2); put("armchair", 42, 17, 2);
 // Admin: the cash desk and the accounts desk on the back wall, a chair, cabinets
 put("cash desk", 3, 20); put("accounts desk", 5, 20); put("chair", 5, 21, 2); put("chair", 3, 21, 2); put("cabinet", 7, 20); put("cabinet", 8, 20); rug("Sage", 2, 23, 3, 2);
 // Lobby: the front door has the key cabinet and the coat hooks beside it; Kupa's desk faces the door; a waiting corner with a sofa and a low table; cabinets

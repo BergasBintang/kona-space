@@ -9,6 +9,7 @@ mod job;
 mod kibby;
 mod leftovers;
 mod mcp;
+mod mock;
 mod needs;
 mod office_map;
 mod persona;
@@ -728,6 +729,28 @@ fn read_file(projects: State<'_, Projects>, path: String) -> Result<FileView, St
     files::read_file(&projects, &path)
 }
 
+fn folder_of_project(projects: &Projects, project_id: &str) -> Result<std::path::PathBuf, String> {
+    projects.all().into_iter().find(|p| p.id == project_id).map(|p| std::path::PathBuf::from(p.folder)).ok_or_else(|| "That project does not exist".to_string())
+}
+
+/// The address a mockup page is loaded from: this plus `/<project id>/<card>/<file>` (the mock scheme, see mock.rs)
+#[tauri::command]
+fn mock_base() -> String {
+    mock::base().to_string()
+}
+
+/// The cards (mockups) of a project: the folders of `.kona/mockups`
+#[tauri::command]
+fn mock_cards(projects: State<'_, Projects>, project_id: String) -> Result<Vec<mock::Card>, String> {
+    Ok(mock::list_cards(&folder_of_project(&projects, &project_id)?))
+}
+
+/// The files of one card, for the sheet to notice a change
+#[tauri::command]
+fn mock_files(projects: State<'_, Projects>, project_id: String, card: String) -> Result<Vec<mock::MockFile>, String> {
+    mock::list_files(&folder_of_project(&projects, &project_id)?, &card)
+}
+
 /// Run as the board's tool server (see mcp.rs) instead of opening the window.
 pub fn mcp_board(args: &[String]) {
     mcp::run(args);
@@ -740,6 +763,16 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        // the mockup pages are served by mock.rs from `.kona/mockups/<card>/`, read only, each answer sandboxed by its own policy header
+        .register_asynchronous_uri_scheme_protocol("mock", |ctx, request, responder| {
+            let app = ctx.app_handle().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                let projects = app.state::<Projects>();
+                let lookup = |id: &str| projects.all().into_iter().find(|p| p.id == id).map(|p| std::path::PathBuf::from(p.folder));
+                let range = request.headers().get("range").and_then(|v| v.to_str().ok());
+                responder.respond(mock::serve(&lookup, request.method().as_str(), request.uri().path(), range).into_response());
+            });
+        })
         .setup(|app| {
             // %APPDATA%\Kona\kona.db (the plan's place for the app's own data)
             let base = app.path().app_data_dir().ok().and_then(|p| p.parent().map(|d| d.join("Kona"))).ok_or("no app data folder")?;
@@ -766,7 +799,7 @@ pub fn run() {
             app.manage(backup::SettingsStore::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![read_skill_files, save_skill_folder, default_role_kit, apply_default_tree, check_claude, save_tool, delete_tool, read_skill, write_skill, delete_skill, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, cost_rows, set_project_github, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, office_say, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, workflow_list, workflow_save, workflow_delete, office_map_load, office_map_save, office_map_reset, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
+        .invoke_handler(tauri::generate_handler![read_skill_files, save_skill_folder, default_role_kit, apply_default_tree, check_claude, save_tool, delete_tool, read_skill, write_skill, delete_skill, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, cost_rows, set_project_github, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, office_say, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, workflow_list, workflow_save, workflow_delete, office_map_load, office_map_save, office_map_reset, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file, mock_base, mock_cards, mock_files])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

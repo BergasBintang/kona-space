@@ -2,6 +2,16 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.30.0, 2026-11-03
+
+You can see how big a chat's memory has grown and make it smaller, links in replies open, lists count properly, and the map zooms smoothly.
+
+- **The memory of a chat.** From 100,000 tokens a chat shows "Memory: getting long" (and "long" from 250,000) in its header, with the exact size on hover. Every step Claude takes reads the whole chat again, so a long chat costs more for each step. The Compact button (two arrows that meet) makes it smaller with Claude Code's own /compact: it keeps what matters, and what is on your screen stays until you end the conversation and start a new one. After an hour without a step the header adds "Rested over an hour: the next message costs more", because the cache has gone cold.
+- **Icons.** End session, New conversation and Resume are icons now (a stop, a speech bubble with a plus, a play), each with its name on hover. The cost reads "$0.0000 (estimated)".
+- **Links in replies open.** A link to a web page opens in your browser. Before, it was only shown.
+- **Numbered lists count properly.** A list with blank lines between its items showed 1, 1, 1; it now shows 1, 2, 3, and a list that begins at 3 starts at 3.
+- **The map zoom glides.** The first step from the whole building to a closer view was a jump to twice the size; the size now changes smoothly over a fraction of a second and settles on a whole number, so the pixels stay sharp. It holds still if Windows is set to reduce motion.
+
 ## 0.29.0, 2026-11-03
 
 Bako joins the office, web pages open as pages in the file reader, and the cats no longer hold a card.

@@ -1,8 +1,10 @@
 // A small reader for the notes and for what Claude writes: headings (each with an id, so a link or the outline can jump to it), paragraphs, lists (nested, and checklists),
 // quotes and callouts (> [!WARNING], > **Note:**), tables (sortable, see MdTable), code blocks with Copy, ```mermaid diagrams drawn as pictures (see GraphView), `code`, **bold**,
 // *italic*, [text](address) and [[links]]. A link to a note that exists opens it; one that does not is shown struck-through in red with the words "no such note" (a link that
-// goes nowhere is a warning, not a stop). A link to another file or heading ([text](docs/other.md), [text](#part)) is followed when the place gives a `go`; a web address is only shown.
+// goes nowhere is a warning, not a stop). A link to another file or heading ([text](docs/other.md), [text](#part)) is followed when the place gives a `go`; a web address (http, https)
+// opens in the owner's browser. Numbered items keep counting across a blank line between them, and start at the number the first one carries.
 import type { ReactNode } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { frontMatter } from "../../lib/brain/parse.ts";
 import { parseTable } from "../../lib/brain/table.ts";
 import { parseCallout, type CalloutKind } from "../../lib/brain/callout.ts";
@@ -53,7 +55,9 @@ function inline(text: string, resolve: (raw: string) => string | null, open: (id
       const href = m[7];
       if (go && !/^([a-z][a-z0-9+.-]*:|\/\/)/i.test(href)) { // a file or a heading of this place: followed
         out.push(<button key={`${key}-${i++}`} type="button" title={href} onClick={() => go(href)} style={{ fontFamily: "var(--font-sans)", letterSpacing: "normal", fontWeight: 700 }} className="text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent">{m[6]}</button>);
-      } else out.push(<span key={`${key}-${i++}`} title={href} className="underline decoration-text-tertiary underline-offset-2">{m[6]}</span>); // shown, not followed: a web link must not take the window away from Kona
+      } else if (/^https?:\/\//i.test(href)) { // a web address opens in the owner's own browser, never inside Kona's window
+        out.push(<button key={`${key}-${i++}`} type="button" title={`Open ${href} in your browser`} onClick={() => { void openUrl(href); }} style={{ fontFamily: "var(--font-sans)", letterSpacing: "normal", fontWeight: "inherit" }} className="text-left text-text underline decoration-text-tertiary underline-offset-2 hover:decoration-text">{m[6]}</button>);
+      } else out.push(<span key={`${key}-${i++}`} title={href} className="underline decoration-text-tertiary underline-offset-2">{m[6]}</span>); // any other address (mailto:, a file: path) is shown, not followed
     } else out.push(<em key={`${key}-${i++}`} className="italic">{m[8] ?? m[9]}</em>);
     last = at + m[0].length;
   }
@@ -111,7 +115,7 @@ export function Markdown({ text, resolve = () => null, open = () => {}, wiki = t
       i++;
     } else if (ITEM.test(l)) {
       // the depth of an item is its place among the indents seen so far, so two or four spaces both work; an indented line under an item continues it
-      const items: { depth: number; ordered: boolean; text: string }[] = [];
+      const items: { depth: number; ordered: boolean; num: number; text: string }[] = [];
       const indents: number[] = [];
       while (i < lines.length) {
         const m = ITEM.exec(lines[i]);
@@ -119,19 +123,24 @@ export function Markdown({ text, resolve = () => null, open = () => {}, wiki = t
           const ind = m[1].replace(/\t/g, "    ").length;
           while (indents.length && ind < indents[indents.length - 1]) indents.pop();
           if (!indents.length || ind > indents[indents.length - 1]) indents.push(ind);
-          items.push({ depth: indents.length - 1, ordered: /\d/.test(m[2]), text: m[3] });
+          items.push({ depth: indents.length - 1, ordered: /\d/.test(m[2]), num: parseInt(m[2], 10), text: m[3] });
           i++;
         } else if (/^\s{2,}\S/.test(lines[i]) && !/^\s*```/.test(lines[i])) { items[items.length - 1].text += " " + lines[i++].trim(); }
-        else break;
+        else if (lines[i].trim() === "") { // a blank line between two items does not end the list, or "1. 1. 1." would be drawn for 1, 2, 3
+          let j = i + 1;
+          while (j < lines.length && lines[j].trim() === "") j++;
+          if (j < lines.length && ITEM.test(lines[j])) i = j; else break;
+        } else break;
       }
-      const count: number[] = [];
+      const count: (number | undefined)[] = [];
       blocks.push(
         <ul key={k++} className="m-0 flex list-none flex-col gap-1.5 p-0">
           {items.map((it, j) => {
-            count.length = it.depth + 1; count[it.depth] = it.ordered ? (count[it.depth] ?? 0) + 1 : 0; // a bullet between two numbered runs starts the numbering again
+            const prev = count[it.depth];
+            count.length = it.depth + 1; count[it.depth] = it.ordered ? (prev === undefined ? it.num : prev + 1) : undefined; // the first number is kept ("3." starts at 3), then it counts on; a bullet between two numbered runs starts the numbering again
             const task = /^\[([ xX])\]\s+/.exec(it.text);
             const marker = task ? <Tick done={task[1] !== " "} />
-              : it.ordered ? <span className="w-6 shrink-0 text-right text-text-tertiary">{count[it.depth]}.</span>
+              : it.ordered ? <span className="min-w-6 shrink-0 text-right text-text-tertiary">{count[it.depth]}.</span>
               : <span aria-hidden="true" className={`mt-[10px] ml-1.5 mr-0.5 size-1.5 shrink-0 ${it.depth === 0 ? "bg-text-tertiary" : "border border-text-tertiary"}`} />;
             return (
               <li key={j} className="flex gap-2.5 leading-6" style={{ marginLeft: it.depth * 24 }}>

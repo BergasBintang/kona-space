@@ -1,6 +1,7 @@
 // What the screen knows about each session, built from the messages Claude Code streams (see src-tauri/src/session.rs).
 // The messages are forwarded unchanged; this file turns them into things to draw. Unknown records are ignored, because
 // the stream format is not documented and can change (risk 4 in the plan).
+import { kilo } from "./memory.ts";
 
 export type RunState = "starting" | "ready" | "working" | "waiting" | "ended";
 
@@ -50,6 +51,8 @@ export type Session = {
   costTotal: number; // dollars so far, an estimate at list price
   costLast: number; // dollars the last turn added
   turns: number;
+  context?: number; // the memory: tokens Claude read for its last step (unknown until the first reply of this run)
+  lastAt?: number; // when the conversation last moved (a message, a reply), in milliseconds; the cache goes cold an hour after it
 };
 
 /** The two plan bars of one account, and when they were last read. Each account has its own limits. */
@@ -76,6 +79,7 @@ export type Action =
   | { type: "event"; sessionId: string; record: any }
   | { type: "select"; id: string }
   | { type: "user-sent"; sessionId: string; text: string; images: string[] }
+  | { type: "compacting"; sessionId: string }
   | { type: "permission-answered"; sessionId: string; requestId: string; allowed: boolean }
   | { type: "question-answered"; sessionId: string; requestId: string; answers: Record<string, string> | null }
   | { type: "forget"; id: string }
@@ -126,7 +130,9 @@ export function reducer(state: State, a: Action): State {
       return { ...state, sessions: rest, order, selected: state.selected === a.id ? order[0] ?? null : state.selected };
     }
     case "user-sent":
-      return update(state, a.sessionId, (s) => ({ ...push(s, { kind: "user", id: nextId("u"), text: a.text, images: a.images }), title: s.title || a.text.replace(/\s+/g, " ").trim().slice(0, 48), run: "working", draft: "" }));
+      return update(state, a.sessionId, (s) => ({ ...push(s, { kind: "user", id: nextId("u"), text: a.text, images: a.images }), title: s.title || a.text.replace(/\s+/g, " ").trim().slice(0, 48), run: "working", draft: "", lastAt: Date.now() }));
+    case "compacting": // the owner asked for the memory to be made smaller: Claude Code is sent /compact, and the chat shows one line, not the command
+      return update(state, a.sessionId, (s) => ({ ...push(s, { kind: "note", id: nextId("n"), tone: "info", text: "Making the memory smaller…" }), run: "working", lastAt: Date.now() }));
     case "brain-question": return update(state, a.sessionId, (s) => ({ ...s, brainQuestion: a.question }));
     case "permission-answered":
       return update(state, a.sessionId, (s) => ({
@@ -174,7 +180,14 @@ function onEvent(state: State, sessionId: string, r: any): State {
           if (b.type === "text" && b.text?.trim()) next = push(next, { kind: "assistant", id: `${r.uuid ?? nextId("a")}-${i}`, text: b.text });
           if (b.type === "tool_use") next = push(next, { kind: "tool", id: `t-${b.id}`, toolUseId: b.id, name: b.name, summary: summarize(b.name, b.input), status: "running" });
         });
-        return { ...next, draft: blocks.some((b) => b.type === "text") ? "" : next.draft };
+        const u = r.message?.usage; // what Claude read for this step: the new part, the part read from the cache and the part written to it
+        const context = u && !r.isSidechain ? (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) : 0;
+        return { ...next, draft: blocks.some((b) => b.type === "text") ? "" : next.draft, context: context > 0 ? context : next.context, lastAt: Date.now() };
+      }
+      case "system": { // Claude Code says when it has made the memory smaller (what the owner asked for, or what it did by itself)
+        if (r.subtype !== "compact_boundary") return s;
+        const before = r.compact_metadata?.pre_tokens;
+        return { ...push(s, { kind: "note", id: nextId("n"), tone: "info", text: typeof before === "number" ? `Memory made smaller: it was ${kilo(before)} tokens.` : "Memory made smaller." }), context: undefined };
       }
       case "user": {
         const blocks: any[] = Array.isArray(r.message?.content) ? r.message.content : [];
@@ -203,7 +216,7 @@ function onEvent(state: State, sessionId: string, r: any): State {
       }
       case "result": {
         const total = typeof r.total_cost_usd === "number" ? r.total_cost_usd : s.costTotal;
-        let next: Session = { ...s, run: "ready", draft: "", costTotal: total, costLast: r.kona_turn_cost_usd ?? 0, turns: s.turns + 1 };
+        let next: Session = { ...s, run: "ready", draft: "", costTotal: total, costLast: r.kona_turn_cost_usd ?? 0, turns: s.turns + 1, lastAt: Date.now() };
         if (r.is_error) next = push(next, { kind: "note", id: nextId("n"), tone: "problem", text: typeof r.result === "string" && r.result ? r.result : "Claude stopped with an error." });
         return next;
       }

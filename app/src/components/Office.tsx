@@ -201,6 +201,8 @@ export const Office = memo(function Office({ map, looks = NO_LOOKS, names = NO_N
   const [view, setView] = useState(savedView);
   const [scale, setScale] = useState<number | null>(savedScale); // screen pixels for each pixel of the drawing; null until the player zooms: the whole building fits
   const [ctr, setCtr] = useState<Pt | null>(null); // the drawing point in the middle of the window; null: the middle of the building
+  const [anim, setAnim] = useState<{ sc: number; centre: Pt } | null>(null); // a zoom on its way from one whole number to the next
+  const glide = useRef(0); // the frame request of that glide
   const scene = useMemo(() => sceneOf(map, view), [map, view]);
   const { width: W, height: H, hits: HITS } = scene;
   const [CX0, CY0, CX1, CY1] = scene.content;
@@ -240,9 +242,10 @@ export const Office = memo(function Office({ map, looks = NO_LOOKS, names = NO_N
 
   const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1; // screen pixels for each CSS pixel: the percent view and Windows scaling both change it
   const content: [number, number, number, number] = [CX0, CY0, CX1, CY1];
-  const sc = scale ?? fitScale(size.w, size.h - 4, dpr, content);
-  const k = sc / dpr; // CSS pixels for each pixel of the drawing: a whole number of screen pixels, so every pixel stays square and sharp
-  const centre = clampCenter(ctr ?? { x: (CX0 + CX1) / 2, y: (CY0 + CY1) / 2 }, content);
+  const sc = scale ?? fitScale(size.w, size.h - 4, dpr, content); // where the zoom is going: always a whole number
+  const shownSc = anim?.sc ?? sc; // what is drawn right now: between two whole numbers only while a zoom glides, and for a fraction of a second
+  const k = shownSc / dpr; // CSS pixels for each pixel of the drawing: a whole number of screen pixels once the zoom has settled, so every pixel stays square and sharp
+  const centre = clampCenter(anim?.centre ?? ctr ?? { x: (CX0 + CX1) / 2, y: (CY0 + CY1) / 2 }, content);
   const left = origin(size.w, centre.x, k, dpr);
   const top = origin(size.h, centre.y, k, dpr);
   const secretary = scene.cats.find((c) => c.role === "secretary");
@@ -257,12 +260,27 @@ export const Office = memo(function Office({ map, looks = NO_LOOKS, names = NO_N
     for (let t = 0; t < times; t++) n = stepScale(n, dir);
     if (n === l.sc) return;
     const el = box.current;
+    let off = { x: 0, y: 0 };
     if (el && x !== undefined && y !== undefined) {
-      const r = el.getBoundingClientRect(), off = { x: x - (r.x + r.width / 2), y: y - (r.y + r.height / 2) };
+      const r = el.getBoundingClientRect();
+      off = { x: x - (r.x + r.width / 2), y: y - (r.y + r.height / 2) };
       setCtr(clampCenter(zoomAround(l.centre, off, l.k, n / dpr), l.content));
     }
     zoomTo(n);
+    // glide to it: the size changes smoothly (a doubling in one jump is too harsh), and the point under the pointer stays where it is all the way
+    cancelAnimationFrame(glide.current);
+    if (reducedMotion()) { setAnim(null); return; }
+    const from = l.k * dpr, a = { x: l.centre.x + off.x / l.k, y: l.centre.y + off.y / l.k }, t0 = performance.now(), ms = 200 + 40 * Math.min(3, Math.abs(Math.log2(n / from)));
+    const frame = (now: number) => {
+      const t = Math.min(1, (now - t0) / ms), e = 1 - (1 - t) ** 3; // fast at first, then slowing down
+      if (t >= 1) { setAnim(null); return; }
+      const s = from * (n / from) ** e, kk = s / dpr;
+      setAnim({ sc: s, centre: { x: a.x - off.x / kk, y: a.y - off.y / kk } });
+      glide.current = requestAnimationFrame(frame);
+    };
+    glide.current = requestAnimationFrame(frame);
   };
+  useEffect(() => () => cancelAnimationFrame(glide.current), []);
   const home = () => setCtr(clampCenter(secretary ? { x: secretary.x + 14, y: secretary.y + 10 } : { x: (CX0 + CX1) / 2, y: (CY0 + CY1) / 2 }, content)); // the secretary's cat is 28 x 20
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;

@@ -4,6 +4,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type
 import { invoke } from "@tauri-apps/api/core";
 import { Badge, Button, Glyph, RoleMark, type GlyphState } from "./ui";
 import { Help } from "./Help";
+import { IconButton } from "./Icon";
+import { isRested, kilo, memoryOf } from "../lib/memory";
 import { Markdown } from "./brain/Markdown";
 import { Needs } from "./Needs";
 import { roleLabel, type Project, type Role, type RoleKit } from "../lib/api";
@@ -20,11 +22,15 @@ const RUN_BADGE: Record<RunState, { state: GlyphState; label: string }> = {
 export type Attached = { mediaType: string; data: string; url: string };
 
 /** The top of the chat: who it is, how they are doing, what ticket they are on, what it cost, and the buttons. `s` is null before the first message. */
-export function PersonHeader({ role, s, onNote, onEnd, onNew }: {
-  role: Role; s: Session | null; onNote?: () => void; onEnd?: () => void; onNew?: () => void;
+export function PersonHeader({ role, s, onNote, onEnd, onNew, onCompact }: {
+  role: Role; s: Session | null; onNote?: () => void; onEnd?: () => void; onNew?: () => void; onCompact?: () => void;
 }) {
   const b = s ? RUN_BADGE[s.run] : null;
   const live = !!s && s.run !== "ended";
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(t); }, []); // the rest of an hour is noticed without a click
+  const memory = s && live ? memoryOf(s.context) : null;
+  const rested = !!s && !!memory && isRested(s.lastAt, now);
   return (
     <div className="flex items-center justify-between gap-4 px-8 pt-[18px] pb-[14px]">
       <div className="flex min-w-0 items-center gap-3.5">
@@ -39,15 +45,21 @@ export function PersonHeader({ role, s, onNote, onEnd, onNew }: {
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-3">
+        {memory && s && (
+          <div className="flex flex-col items-end" title={`${kilo(s.context ?? 0)} tokens: what ${role.person || role.name} reads again with every step`}>
+            <span className="flex items-center gap-2 text-[13px] leading-5 font-bold text-text"><Glyph state={memory.state} size={14} />Memory: {memory.word}</span>
+            {rested && <span className="text-[13px] leading-5 text-text-tertiary">Rested over an hour: the next message costs more</span>}
+          </div>
+        )}
+        {memory && onCompact && <IconButton icon="compress" label="Make the memory smaller" disabled={s?.run !== "ready"} title={s?.run === "ready" ? "Make the memory smaller: it keeps what matters" : "Wait until they have finished"} onClick={onCompact} />}
         {s && (
           <div className="mr-1 flex flex-col items-end">
-            <span className="font-mono text-[14px] font-bold">{dollars(s.costTotal)} so far</span>
-            <span className="text-[13px] leading-5 text-text-tertiary">An estimate, not your bill</span>
+            <span className="font-mono text-[14px] font-bold">{dollars(s.costTotal)} <span className="font-sans font-normal text-text-tertiary">(estimated)</span></span>
           </div>
         )}
         {onNote && s && s.turns > 0 && s.run !== "working" && <Button variant="ghost" small onClick={onNote}>Write a note</Button>}
-        {live && onEnd && <Button variant="quiet" small onClick={onEnd}>End session</Button>}
-        {s && onNew && <Button variant="quiet" small onClick={onNew}>New conversation</Button>}
+        {live && onEnd && <IconButton icon="stop" label="End session" onClick={onEnd} />}
+        {s && onNew && <IconButton icon="newChat" label="New conversation" onClick={onNew} />}
       </div>
     </div>
   );
@@ -323,9 +335,15 @@ export function Chat({ s, role, dispatch, onNote, onSaveAnswer, onNew }: {
     dispatch({ type: "user-sent", sessionId: s.id, text, images: images.map((i) => i.url) });
     await invoke("send_message", { sessionId: s.id, text, images: images.map((i) => ({ media_type: i.mediaType, data: i.data })) });
   };
+  // Claude Code's own /compact keeps what matters and drops the rest (tested in the stream mode Kona uses: 18,899 tokens became 1,466 and it still remembered the talk)
+  const compact = async () => {
+    dispatch({ type: "compacting", sessionId: s.id });
+    try { await invoke("send_message", { sessionId: s.id, text: "/compact", images: [] }); }
+    catch (e) { dispatch({ type: "event", sessionId: s.id, record: { type: "kona/stderr", text: `Could not make the memory smaller: ${String(e)}` } }); }
+  };
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col">
-      <PersonHeader role={role} s={s} onNote={onNote} onEnd={() => void invoke("stop_session", { sessionId: s.id })} onNew={onNew} />
+      <PersonHeader role={role} s={s} onNote={onNote} onEnd={() => void invoke("stop_session", { sessionId: s.id })} onNew={onNew} onCompact={compact} />
       <div className="mx-8 h-px bg-line-subtle" />
       <Transcript s={s} who={who} onAnswer={answer} onQuestion={question} />
       {s.brainQuestion && s.run === "ready" && lastAnswer && onSaveAnswer && (

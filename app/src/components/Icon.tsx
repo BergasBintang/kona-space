@@ -165,6 +165,35 @@ const ICONS = {
   },
   branch: (p) => { line(p, 8, 14, 8, 8); line(p, 8, 8, 4, 3); line(p, 8, 8, 12, 3); rect(p, 3, 1, 5, 2); rect(p, 11, 1, 13, 2); rect(p, 7, 14, 9, 15); },
   plus: (p) => { rect(p, 7, 3, 8, 12); rect(p, 3, 7, 12, 8); },
+  // the buttons of a conversation: end it, start a new one, open an old one again
+  stop: (p) => { // a ring with a square in it: stop
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const d = Math.hypot(x + 0.5 - 8, y + 0.5 - 8); if (d >= 5.6 && d <= 7.5) p(x, y); }
+    rect(p, 5, 5, 10, 10);
+  },
+  newChat: (p) => { // a speech bubble with a plus in it: a new conversation
+    for (let k = 1; k <= 14; k++) { p(k, 1); p(k, 11); } for (let k = 1; k <= 11; k++) { p(1, k); p(14, k); }
+    rect(p, 3, 12, 5, 12); rect(p, 3, 13, 4, 13); p(3, 14);
+    rect(p, 7, 3, 8, 9); rect(p, 4, 5, 11, 6);
+  },
+  compress: art([ // two arrows that meet in the middle: make the memory smaller
+    "................",
+    ".......##.......",
+    ".......##.......",
+    "....########....",
+    ".....######.....",
+    "......####......",
+    ".......##.......",
+    "................",
+    "................",
+    ".......##.......",
+    "......####......",
+    ".....######.....",
+    "....########....",
+    ".......##.......",
+    ".......##.......",
+    "................",
+  ]),
+  play: (p) => { for (let y = 0; y < 12; y++) rect(p, 4, 2 + y, 4 + Math.ceil(Math.min(y + 1, 12 - y) * 1.4) - 1, 2 + y); }, // a triangle that points on: pick it up again
 } satisfies Record<string, Draw>;
 
 export type IconName = keyof typeof ICONS;

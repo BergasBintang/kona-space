@@ -32,3 +32,30 @@ test("a request that is not a well-formed question is still shown as an ordinary
   assert.ok(s.items.some((x) => x.kind === "permission") && s.run === "waiting");
   assert.deepEqual(questionsOf({ questions: [{ question: "Pick", options: [{ label: "A" }, { label: "" }, { label: "B", description: "b" }], multiSelect: true }] })?.[0].options.map((o) => o.label), ["A", "B"]);
 });
+
+// what Claude Code really sent in the test of 2026-11-03 (stream-json, a throwaway folder): a step's usage, then /compact with its boundary record, then the step after it
+const step = (read: number, wrote: number, fresh = 3) => ({ type: "assistant", uuid: `u${read}`, message: { content: [{ type: "text", text: "ok" }], usage: { input_tokens: fresh, cache_read_input_tokens: read, cache_creation_input_tokens: wrote } } });
+const boundary = { type: "system", subtype: "compact_boundary", compact_metadata: { trigger: "manual", pre_tokens: 245_000, post_tokens: 1_466 } };
+
+test("the memory is what Claude read for its last step, and it is cleared when Claude Code says it made it smaller", () => {
+  let st = reducer(started(), { type: "event", sessionId: "s1", record: step(120_000, 800) });
+  assert.equal(st.sessions.s1.context, 120_803);
+  st = reducer(st, { type: "event", sessionId: "s1", record: step(120_803, 900) });
+  assert.equal(st.sessions.s1.context, 121_706, "the newest step wins");
+  st = reducer(st, { type: "compacting", sessionId: "s1" });
+  assert.equal(st.sessions.s1.run, "working");
+  assert.ok(st.sessions.s1.items.some((x) => x.kind === "note" && /smaller/.test(x.text)));
+  st = reducer(st, { type: "event", sessionId: "s1", record: boundary });
+  assert.equal(st.sessions.s1.context, undefined, "unknown until the next reply tells the real size");
+  assert.ok(st.sessions.s1.items.some((x) => x.kind === "note" && x.text.includes("245k")));
+  st = reducer(st, { type: "event", sessionId: "s1", record: { type: "result", subtype: "success", result: "", is_error: false } });
+  assert.equal(st.sessions.s1.run, "ready");
+  assert.ok(!st.sessions.s1.items.some((x) => x.kind === "note" && x.tone === "problem"), "an empty result of /compact is not an error");
+  st = reducer(st, { type: "event", sessionId: "s1", record: step(15_427, 4_098) });
+  assert.equal(st.sessions.s1.context, 19_528);
+});
+
+test("a step of a helper (a side chain) does not change the memory of the conversation", () => {
+  const st = reducer(started(), { type: "event", sessionId: "s1", record: { ...step(50_000, 0), isSidechain: true } });
+  assert.equal(st.sessions.s1.context, undefined);
+});

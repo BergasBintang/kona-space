@@ -1,7 +1,7 @@
 // Kona's small parts: the state glyphs, a badge, buttons, the plan bar and a role's cat. See docs/DESIGN.md and decisions 46 and 48.
 // A state is always a glyph plus a word, never colour alone. Everything here is pixel art: the glyphs are drawn on a 16 x 16 grid with hard
 // edges, buttons use the tiled frames in assets/frames (index.css), and a role is shown as its own cat.
-import type { ButtonHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, Ref } from "react";
 import catSheet from "../office/cats.png";
 import cats from "../office/cats.json";
 import kibbySheet from "../office/kibby.png";
@@ -62,8 +62,9 @@ export function Badge({ state, label }: { state: GlyphState; label?: string }) {
 }
 
 type Variant = "primary" | "quiet" | "ghost" | "danger";
-export function Button({ variant = "primary", small = false, className = "", ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; small?: boolean }) {
-  const size = small ? "h-10 px-2 text-[14px]" : "h-12 px-3 text-[16px]";
+export function Button({ variant = "primary", small = false, tiny = false, className = "", ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; small?: boolean; tiny?: boolean; ref?: Ref<HTMLButtonElement> }) {
+  // `tiny` is for the plain actions (ghost) that sit in a line of small text: Open, Copy, Check again
+  const size = tiny ? "h-8 px-1.5 text-[13px]" : small ? "h-10 px-2 text-[14px]" : "h-12 px-3 text-[16px]";
   const look: Record<Variant, string> = {
     primary: "px-btn px-btn-teal",
     quiet: "px-btn px-btn-paper",

@@ -4,7 +4,7 @@
 // or add one from Kona's list (the Tools tab of a person's sheet); the choice is kept for this person in this project (role-kits.json, beside the skills).
 import { useEffect, useMemo, useState } from "react";
 import { checkTools, listTools, projectHints, roleLabel, saveRoleKit, type Hint, type Project, type Role, type RoleKit, type ToolInfo, type ToolStatus } from "../lib/api";
-import { Glyph } from "./ui";
+import { Button, Glyph } from "./ui";
 import { SmartSearch } from "./pick";
 
 /** `editable`: the Tools tab, where a tool can be hidden or added. Otherwise a plain check (the empty chat), with `onEdit` as a way to the Tools tab. `refresh` changes when the list of tools Kona knows has changed. */
@@ -68,8 +68,8 @@ export function Needs({ project, role, kit, onKit, editable = false, refresh = 0
         <span className="flex items-center gap-2"><span className={canEdit ? "text-[16px] leading-6 font-bold" : "text-[13px] leading-5 font-bold text-text-secondary"}>{heading}</span>{help}</span>
         <span className="flex items-center gap-3 text-[13px] leading-5 text-text-tertiary">
           {status === null ? "Looking…" : missing === 0 ? "All here" : `${missing} missing`}
-          <button type="button" onClick={() => setAgain((n) => n + 1)} className="font-bold text-text-secondary hover:text-text">Check again</button>
-          {!canEdit && onEdit && <button type="button" onClick={onEdit} className="font-bold text-text-secondary hover:text-text">Change the list</button>}
+          <Button variant="ghost" tiny onClick={() => setAgain((n) => n + 1)}>Check again</Button>
+          {!canEdit && onEdit && <Button variant="ghost" tiny onClick={onEdit}>Change the list</Button>}
         </span>
       </div>
       <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
@@ -85,7 +85,7 @@ export function Needs({ project, role, kit, onKit, editable = false, refresh = 0
             {!r.installed && (
               <div className="ml-[26px] flex items-center gap-3">
                 <code className="min-w-0 truncate bg-inset px-2 py-1 font-mono text-[13px] text-text-secondary" title={r.install}>{r.install}</code>
-                {r.install.startsWith("winget") && <button type="button" onClick={() => copy(r.id, r.install)} className="shrink-0 text-[13px] font-bold text-text-secondary hover:text-text">{copied === r.id ? "Copied" : "Copy"}</button>}
+                {r.install.startsWith("winget") && <Button variant="ghost" tiny onClick={() => copy(r.id, r.install)}>{copied === r.id ? "Copied" : "Copy"}</Button>}
               </div>
             )}
           </li>

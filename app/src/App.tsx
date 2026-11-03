@@ -27,7 +27,7 @@ import { Leftovers } from "./components/Leftovers";
 import { BRAIN_TABS, BrainPlace, type BrainTab } from "./components/brain/Brain";
 import { Servers } from "./components/Servers";
 import { Settings } from "./components/Settings";
-import { Glyph } from "./components/ui";
+import { Button, Glyph } from "./components/ui";
 import { autoNoteOn, buildDigest, writeSessionNote } from "./lib/brain/summary.ts";
 import { localDate, redact } from "./lib/brain/text.ts";
 import { loadZoom, stepZoom } from "./lib/zoom";
@@ -412,7 +412,7 @@ export default function App() {
           <div role="status" className="absolute right-6 bottom-6 z-20 flex max-w-[440px] items-start gap-3 px-card px-shadow p-2">
             <Glyph state="done" size={20} />
             <span className="text-[14px] leading-5 text-text-secondary">{notice}</span>
-            <button className="ml-2 text-[13px] font-bold text-text-secondary hover:text-text" onClick={() => setNotice(null)}>Close</button>
+            <Button variant="ghost" tiny className="ml-2" onClick={() => setNotice(null)}>Close</Button>
           </div>
         )}
       </div>

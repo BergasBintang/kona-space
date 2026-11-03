@@ -9,7 +9,29 @@ const attr = (tag: string, name: string): string | undefined => {
 const isSheet = (tag: string) => /\bstylesheet\b/i.test(attr(tag, "rel") ?? "");
 const decode = (s: string) => s.replace(/&amp;/gi, "&");
 
-/** The files a page names on this computer: its pictures and its style sheets, as written in the page, once each. Web addresses and inline data are not files. */
+const URL_IN_CSS = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s'"]+))\s*\)/gi; // url(x), url("x"), url('x'): in a style block, a style attribute or a style sheet
+
+/** The files that CSS names with url(...): backgrounds, as written, once each. Web addresses, inline data and `#` anchors are not files. */
+export function cssRefs(css: string): string[] {
+  const out = new Set<string>();
+  for (const m of css.matchAll(URL_IN_CSS)) {
+    const ref = decode((m[1] ?? m[2] ?? m[3] ?? "").trim());
+    if (ref && !ref.startsWith("#") && !WEB.test(ref)) out.add(ref);
+  }
+  return [...out];
+}
+
+/** The same CSS with each relative url(...) rewritten by `name` (a style sheet in another folder names its pictures from there). Others stay as they are. */
+export function renameCssRefs(css: string, name: (ref: string) => string | null): string {
+  return css.replace(URL_IN_CSS, (all, a?: string, b?: string, c?: string) => {
+    const ref = decode((a ?? b ?? c ?? "").trim());
+    if (!ref || ref.startsWith("#") || WEB.test(ref)) return all;
+    const to = name(ref);
+    return to === null ? all : `url("${to}")`;
+  });
+}
+
+/** The files a page names on this computer: its pictures, its style sheets and the backgrounds in its CSS, as written in the page, once each. Web addresses and inline data are not files. */
 export function pageRefs(html: string): string[] {
   const out = new Set<string>();
   for (const m of html.matchAll(/<(img|link)\b[^>]*>/gi)) {
@@ -17,6 +39,7 @@ export function pageRefs(html: string): string[] {
     const ref = m[1].toLowerCase() === "img" ? attr(tag, "src") : isSheet(tag) ? attr(tag, "href") : undefined;
     if (ref && !WEB.test(ref.trim())) out.add(decode(ref.trim()));
   }
+  for (const ref of cssRefs(html)) out.add(ref);
   return [...out];
 }
 
@@ -42,5 +65,22 @@ export function buildPage(html: string, got: Map<string, string>): Page {
     if (hit === undefined) return tag;
     return n === "img" ? tag.replace(/(\ssrc\s*=\s*)(?:"[^"]*"|'[^']*'|[^\s>]+)/i, `$1"${hit}"`) : `<style>${hit.replace(/<\/style/gi, "<\\/style")}</style>`;
   });
+  // a picture used as a background is written once, as a variable in the page, and every url(...) that names it points there:
+  // a page that cuts one big picture into seven strips would otherwise carry seven copies of it
+  const vars: string[] = [], seen = new Map<string, string>();
+  out = out.replace(URL_IN_CSS, (all, a?: string, b?: string, c?: string) => {
+    const ref = decode((a ?? b ?? c ?? "").trim());
+    if (!ref || ref.startsWith("#")) return all;
+    const hit = got.get(ref); // a style sheet's own pictures are named "kona:<path>" by the reader, and are found here too
+    if (hit === undefined || !/^data:image\//i.test(hit)) { if (WEB.test(ref) && !/^(?:data|kona):/i.test(ref)) web++; return all; }
+    let name = seen.get(ref);
+    if (!name) { name = `--kona-pic-${vars.length}`; seen.set(ref, name); vars.push(`${name}:url("${hit}");`); }
+    return `var(${name})`;
+  });
+  if (vars.length > 0) {
+    const style = `<style>:root{${vars.join("")}}</style>`;
+    const doc = /^\s*<!doctype[^>]*>/i.exec(out);
+    out = doc ? out.slice(0, doc[0].length) + style + out.slice(doc[0].length) : style + out;
+  }
   return { html: out, scripts, web };
 }

@@ -52,7 +52,7 @@ fn check_claude() -> Result<ClaudeInfo, String> {
 /// What the screen may ask a session to start with. A mode that skips the permission checks, a model name that is really an option for the
 /// program, a resume id that is not a session id, or a folder that is not a project are all refused here, whatever the screen sends.
 fn check_launch(mode: &str, model: &str, resume: Option<&str>) -> Result<(), String> {
-    if !["default", "acceptEdits", "plan"].contains(&mode) {
+    if !["default", "acceptEdits", "plan", "auto"].contains(&mode) {
         return Err("That permission mode is not one Kona offers".into());
     }
     let model_ok = !model.is_empty() && model.len() <= 60 && model.chars().next().is_some_and(|c| c.is_ascii_alphanumeric()) && model.chars().all(|c| c.is_ascii_alphanumeric() || ".-_[]".contains(c));
@@ -780,8 +780,9 @@ mod tests {
         assert!(check_launch("default", "sonnet", None).is_ok());
         assert!(check_launch("acceptEdits", "claude-opus-5-5", Some("3b1c2a4e-1111-4222-8333-444455556666")).is_ok());
         assert!(check_launch("plan", "claude-sonnet-5-5[1m]", None).is_ok());
+        assert!(check_launch("auto", "sonnet", None).is_ok());
         assert!(check_launch("bypassPermissions", "sonnet", None).is_err());
-        assert!(check_launch("auto", "sonnet", None).is_err());
+        assert!(check_launch("dontAsk", "sonnet", None).is_err());
         assert!(check_launch("default", "--dangerously-skip-permissions", None).is_err());
         assert!(check_launch("default", "", None).is_err());
         assert!(check_launch("default", "sonnet", Some("../../x")).is_err());

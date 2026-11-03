@@ -84,7 +84,7 @@ fn check(p: &Profile) -> Result<Profile, String> {
     if !["sonnet", "opus", "haiku"].contains(&p.model.as_str()) {
         return Err("Choose Sonnet, Opus or Haiku".into());
     }
-    if !["plan", "default", "acceptEdits"].contains(&p.mode.as_str()) {
+    if !["plan", "default", "acceptEdits", "auto"].contains(&p.mode.as_str()) {
         return Err("That permission mode is not one Kona offers".into());
     }
     if p.brief.trim().is_empty() || p.brief.chars().count() > 3000 {

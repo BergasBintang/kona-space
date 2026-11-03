@@ -27,7 +27,7 @@ export function Report({ brain, wanted, onOpen, onWrite, onDrop }: {
         {wanted.map((w) => (
           <div key={w.question} className="flex items-center justify-between gap-4">
             <div className="flex min-w-0 flex-col"><span className="truncate font-bold">{w.question}</span><span className="text-[13px] leading-5 text-text-tertiary">Asked {w.count} {w.count === 1 ? "time" : "times"} · last {w.last}</span></div>
-            <div className="flex shrink-0 gap-2"><Button variant="ghost" small onClick={() => onDrop(w.question)}>Remove</Button><Button variant="quiet" small onClick={() => onWrite(w.question)}>Write this note</Button></div>
+            <div className="flex shrink-0 gap-2"><Button variant="danger" small onClick={() => onDrop(w.question)}>Remove</Button><Button variant="quiet" small onClick={() => onWrite(w.question)}>Write this note</Button></div>
           </div>
         ))}
       </Card>
@@ -37,12 +37,12 @@ export function Report({ brain, wanted, onOpen, onWrite, onDrop }: {
         {warns.map((w, i) => (
           <div key={i} className="flex items-start justify-between gap-4 text-[14px] leading-5">
             <span className="flex items-start gap-2.5"><Glyph state="waiting" size={16} /><span className="text-text-secondary">{w.text}{w.line ? ` (line ${w.line})` : ""}</span></span>
-            {w.noteId && <button type="button" onClick={() => onOpen(w.noteId!)} className="shrink-0 font-bold text-text-secondary hover:text-text">Open</button>}
+            {w.noteId && <Button variant="ghost" tiny onClick={() => onOpen(w.noteId!)}>Open</Button>}
           </div>
         ))}
         {infos.map((w, i) => (
           <div key={`i${i}`} className="flex items-start justify-between gap-4 text-[13px] leading-5 text-text-tertiary">
-            <span>{w.text}</span>{w.noteId && <button type="button" onClick={() => onOpen(w.noteId!)} className="shrink-0 font-bold hover:text-text">Open</button>}
+            <span>{w.text}</span>{w.noteId && <Button variant="ghost" tiny onClick={() => onOpen(w.noteId!)}>Open</Button>}
           </div>
         ))}
       </Card>

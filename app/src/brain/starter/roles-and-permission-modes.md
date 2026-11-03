@@ -11,7 +11,8 @@ A permission mode decides what Claude may do without asking:
 - **Ask every time (default):** reading inside the project is free; editing files and running commands ask first.
 - **Edits free, commands asked (acceptEdits):** file edits and simple file commands in the project go through; other commands still ask.
 - **Plan only (plan):** Claude reads and plans, and does not edit your source files.
-- Claude Code also has **dontAsk** (refuse anything that would ask), **auto** (a checker decides) and **bypassPermissions** (skip prompts). Kona does not offer the last one in roles.
+- **Auto (auto):** a safety checker built into Claude Code decides each step. Most steps go through without a question; you are asked only when the checker holds something back. Rules that ask, such as Kona's check on commands that reach a server, still ask. It needs an account and a model that Claude Code allows it for.
+- Claude Code also has **dontAsk** (refuse anything that would ask) and **bypassPermissions** (skip prompts). Kona does not offer either in roles.
 
 ## Rules
 Rules say yes, ask or no for specific tools and commands. They are checked in this order: deny first, then ask, then allow. The first match wins, so an allow rule can never undo a deny rule.

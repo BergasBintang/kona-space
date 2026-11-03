@@ -7,7 +7,7 @@ import { Button } from "./ui";
 import { Help } from "./Help";
 
 const MODELS = [{ value: "sonnet", label: "Sonnet", hint: "Usual choice" }, { value: "opus", label: "Opus", hint: "Hard problems" }, { value: "haiku", label: "Haiku", hint: "Fast, cheap" }];
-const MODES = [{ value: "plan", hint: "Reads only" }, { value: "default", hint: "Asks first" }, { value: "acceptEdits", hint: "Edits free" }];
+const MODES = [{ value: "plan", hint: "Reads only" }, { value: "default", hint: "Asks first" }, { value: "acceptEdits", hint: "Edits free" }, { value: "auto", hint: "A checker decides" }];
 const STARTERS = ["Careful and blunt: says what is wrong first.", "Warm and patient: explains as if to a friend.", "Short and dry: facts only, no filler.", "Curious: asks one question before starting."];
 
 const area = "border border-line-strong bg-inset px-3.5 py-3 text-[15px] leading-6 text-text placeholder:text-text-tertiary";
@@ -96,7 +96,7 @@ export function RoleSetup({ role, onSaved }: { role: Role; onSaved: (r: Role) =>
             </div>
             <div className="@container"><div className="grid grid-cols-1 gap-5 @md:grid-cols-2">
               <Choice label="Model" value={model} options={MODELS} onChange={setModel} help={<p className="m-0">Sonnet is the usual choice. Opus is slower and costs more of your plan, and is for hard problems. Haiku is fast and cheap, for simple jobs.</p>} />
-              <Choice label="Permissions" value={mode} options={MODES.map((m) => ({ ...m, label: modeWord(m.value), hint: "" }))} onChange={setMode} help={<><p className="m-0">Plan only: the role reads and plans and changes nothing.</p><p className="m-0">Ask every time: it asks before every change.</p><p className="m-0">Edits free, commands asked: it edits files freely and asks before running commands.</p></>} />
+              <Choice label="Permissions" value={mode} options={MODES.map((m) => ({ ...m, label: modeWord(m.value), hint: "" }))} onChange={setMode} help={<><p className="m-0">Plan only: the role reads and plans and changes nothing.</p><p className="m-0">Ask every time: it asks before every change.</p><p className="m-0">Edits free, commands asked: it edits files freely and asks before running commands.</p><p className="m-0">Auto: a safety checker built into Claude Code decides, so you are asked only when it holds something back. Commands to a server still ask. It needs an account and a model that Claude Code allows it for.</p></>} />
             </div></div>
           </div>
         </div>

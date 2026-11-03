@@ -58,7 +58,7 @@ export function PersonHeader({ role, s, onNote, onEnd, onNew, onCompact }: {
           </div>
         )}
         {onNote && s && s.turns > 0 && s.run !== "working" && <Button variant="ghost" small onClick={onNote}>Write a note</Button>}
-        {live && onEnd && <IconButton icon="stop" label="End session" onClick={onEnd} />}
+        {live && onEnd && <IconButton icon="stop" label="End session" variant="danger" onClick={onEnd} />}
         {s && onNew && <IconButton icon="newChat" label="New conversation" onClick={onNew} />}
       </div>
     </div>

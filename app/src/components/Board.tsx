@@ -30,27 +30,28 @@ function liveState(t: TicketView, state: State): "waiting" | "working" | null {
 
 function Card({ t, role, live, active, waits, onOpen }: { t: TicketView; role?: Role; live: "waiting" | "working" | null; active: boolean; waits: string[]; onOpen: () => void }) {
   return (
-    <div role="button" tabIndex={0} draggable aria-label={`${t.id} ${t.title}`}
-      onClick={onOpen} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } }}
+    <button type="button" draggable aria-label={`${t.id} ${t.title}`}
+      onClick={onOpen}
       onDragStart={(e) => { e.dataTransfer.setData("text/kona-ticket", t.id); e.dataTransfer.effectAllowed = "move"; }}
-      className={`flex cursor-grab flex-col gap-2.5 border px-3.5 py-3 text-left active:cursor-grabbing ${active ? "border-accent bg-surface-2" : "border-line-subtle bg-surface-1 hover:bg-surface-2"}`}>
-      <div className="flex items-center justify-between gap-2">
+      style={{ fontFamily: "var(--font-sans)", letterSpacing: "normal" }} // a button is drawn in the pixel font by default; a ticket is text to read
+      className={`flex w-full cursor-grab flex-col gap-2.5 border px-3.5 py-3 text-left active:cursor-grabbing ${active ? "border-accent bg-surface-2" : "border-line-subtle bg-surface-1 hover:bg-surface-2"}`}>
+      <span className="flex items-center justify-between gap-2">
         <span className="font-mono text-[12px] text-text-tertiary">{t.id}</span>
         {live && (
           <span className={`flex items-center gap-1.5 text-[12px] leading-4 font-bold ${live === "waiting" ? "text-state-waiting" : "text-state-live"}`}>
             <Glyph state={live === "waiting" ? "waiting" : "live"} size={14} />{live === "waiting" ? "Waiting on you" : "Working"}
           </span>
         )}
-      </div>
+      </span>
       <span className="line-clamp-3 text-[15px] leading-5 font-bold">{t.title}</span>
       {waits.length > 0 && <span className="flex items-center gap-1.5 text-[12px] leading-4 font-bold text-text-secondary" title="A step of a workflow that comes after these tickets"><Glyph state="idle" size={14} />Waits for {waits.join(", ")}</span>}
       {t.branch && <span className="truncate font-mono text-[12px] leading-4 text-text-tertiary" title={t.branch}>{t.branch}</span>}
       {t.next && <span className="line-clamp-2 text-[13px] leading-[18px] text-text-secondary">Next: {t.next}</span>}
-      <div className="flex items-center justify-between gap-2 text-[13px] leading-5 text-text-tertiary">
+      <span className="flex items-center justify-between gap-2 text-[13px] leading-5 text-text-tertiary">
         <span className="flex min-w-0 items-center gap-2">{role ? (<><RoleMark roleId={role.id} size={22} /><span className="truncate">{roleLabel(role)}</span></>) : <span>No role</span>}</span>
         {t.cost > 0 && <span className="shrink-0 font-mono">{dollars(t.cost)}</span>}
-      </div>
-    </div>
+      </span>
+    </button>
   );
 }
 
@@ -171,7 +172,7 @@ function Drawer({ project, roles, ticket, state, guardDone, onClose, onSaved, on
               {ticket!.sessions.map((id) => (
                 <div key={id} className="flex items-center justify-between gap-3 text-[14px] leading-5">
                   <span className="font-mono text-text-secondary">{id.slice(0, 8)}</span>
-                  {state.sessions[id] ? <button type="button" onClick={() => onOpenSession(id)} className="font-bold text-text-secondary hover:text-text">Open</button> : <span className="text-text-tertiary">Not open in this window</span>}
+                  {state.sessions[id] ? <Button variant="ghost" tiny onClick={() => onOpenSession(id)}>Open</Button> : <span className="text-text-tertiary">Not open in this window</span>}
                 </div>
               ))}
               {ticket!.cost > 0 && <span className="font-mono text-[13px] text-text-secondary">{dollars(ticket!.cost)} so far <span className="font-sans text-text-tertiary">· an estimate, not your bill</span></span>}

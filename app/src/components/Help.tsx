@@ -3,6 +3,7 @@
 // label or a button (a click inside the dialog must not reach them).
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { Button } from "./ui";
 
 export function Help({ title, children }: { title: string; children: ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -33,7 +34,7 @@ function HelpDialog({ title, children, onClose }: { title: string; children: Rea
         className="flex max-h-full w-full max-w-[520px] flex-col gap-4 overflow-y-auto px-card px-shadow p-3">
         <h2 className="m-0 text-[20px] leading-7 font-bold">{title}</h2>
         <div className="flex flex-col gap-3 text-[15px] leading-6 text-text-secondary">{children}</div>
-        <div className="flex justify-end pt-1"><button ref={closer} type="button" onClick={onClose} className="inline-flex h-11 items-center justify-center border border-line-strong px-5 text-[15px] font-bold text-text hover:bg-surface-3">Close</button></div>
+        <div className="flex justify-end pt-1"><Button ref={closer} variant="quiet" onClick={onClose}>Close</Button></div>
       </div>
     </div>,
     document.body,

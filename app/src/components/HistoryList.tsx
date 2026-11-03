@@ -19,7 +19,7 @@ export function HistoryList({ role, items, onResume, busy }: { role: Role; items
               <span className="truncate text-[15px] leading-6">{e.title || "(no first message)"}</span>
               <span className="text-[13px] leading-5 text-text-tertiary">{new Date(e.modified).toLocaleString([], { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}</span>
             </span>
-            <IconButton icon="play" label="Resume" disabled={busy} title={busy ? "End the open conversation first" : "Resume this conversation"} onClick={() => onResume(e)} />
+            <IconButton icon="play" label="Resume" variant="primary" disabled={busy} title={busy ? "End the open conversation first" : "Resume this conversation"} onClick={() => onResume(e)} />
           </div>
         ))}
       </div>

@@ -88,7 +88,7 @@ export type Action =
 let counter = 0;
 const nextId = (p: string) => `${p}-${++counter}`;
 
-const MODE_WORDS: Record<string, string> = { default: "Ask every time", acceptEdits: "Edits free, commands asked", plan: "Plan only" };
+const MODE_WORDS: Record<string, string> = { default: "Ask every time", acceptEdits: "Edits free, commands asked", plan: "Plan only", auto: "Auto" };
 export const modeWord = (m: string) => MODE_WORDS[m] ?? m;
 
 /** One plain line for a tool call, shown in the transcript. */

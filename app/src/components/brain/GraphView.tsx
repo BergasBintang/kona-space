@@ -4,7 +4,7 @@
 import { useId, useMemo, useState } from "react";
 import { describe, diagramKind, layoutGraph, parseGraph, parseState, type Graph, type Layout, type PNode } from "../../lib/brain/graph.ts";
 import { describeSequence, layoutSequence, parseSequence, type Seq, type SeqLayout } from "../../lib/brain/sequence.ts";
-import { Glyph } from "../ui";
+import { Button, Glyph } from "../ui";
 import { CopyButton } from "./Copy";
 
 let measured: number | null = null;
@@ -172,7 +172,7 @@ export function GraphView({ source }: { source: string }) {
       )}
       <figcaption className="flex justify-end gap-4 text-[13px] leading-5">
         <CopyButton text={shown} label="Copy the source" />
-        <button type="button" onClick={() => setText((t) => !t)} aria-pressed={text} className="font-bold text-text-secondary hover:text-text">{text ? "Show the picture" : "Show the source"}</button>
+        <Button variant="ghost" tiny onClick={() => setText((t) => !t)} aria-pressed={text}>{text ? "Show the picture" : "Show the source"}</Button>
       </figcaption>
     </figure>
   );

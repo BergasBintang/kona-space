@@ -89,7 +89,7 @@ export function Leftovers({ state, roles, overview, onRefresh }: { state: State;
 
         {ignored.length > 0 && (
           <section className="flex flex-col gap-2" aria-label="Ignored">
-            <button type="button" onClick={() => setShowIgnored((v) => !v)} aria-expanded={showIgnored} className="self-start text-[14px] leading-5 font-bold text-text-secondary hover:text-text">{showIgnored ? "Hide" : "Show"} {ignored.length} ignored</button>
+            <Button variant="ghost" tiny className="self-start" onClick={() => setShowIgnored((v) => !v)} aria-expanded={showIgnored}>{showIgnored ? "Hide" : "Show"} {ignored.length} ignored</Button>
             {showIgnored && ignored.map((it) => <Row key={it.key} it={it} who={who(it.session_id)} onStop={() => { setStopping(it); setError(null); }} />)}
           </section>
         )}

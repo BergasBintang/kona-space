@@ -2,13 +2,14 @@
 // Folders are read one level at a time, only when opened, so a big project costs nothing until you look in it.
 // The viewer follows links between files (with a way back), lists the headings of a long page, finds words in it, copies tables and code, and says when an agent
 // changed the file: the open file and the open folders are looked at again every few seconds while the window is showing.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { baseName, humanSize, listDir, readFile, type Entry, type FileView, type Project } from "../lib/api";
 import { dirOf, outline, resolveLink, slugify, type Heading } from "../lib/brain/outline.ts";
 import { changedSince, readSeen, stamp, writeSeen, type Seen } from "../lib/seen.ts";
-import { buildPage, pageRefs } from "../lib/htmlpage.ts";
+import { buildPage, cssRefs, pageRefs, renameCssRefs } from "../lib/htmlpage.ts";
 import { Button, Glyph } from "./ui";
+import { IconButton } from "./Icon";
 import { Markdown } from "./brain/Markdown";
 import { clearPaint, findIn, paint } from "./find";
 
@@ -181,22 +182,42 @@ type Note = { tone: "info" | "warn"; text: string };
 /** An .html file drawn as a page inside a sandboxed frame: its scripts do not run and nothing comes from the web. Its pictures and style sheets from the project are read and put in first. */
 function HtmlFrame({ html, path, bound, name }: { html: string; path: string; bound: string; name: string }) {
   const [shown, setShown] = useState<{ url: string; scripts: number; web: number } | null>(null);
+  const [scale, setScale] = useState(1);
   useEffect(() => {
     let live = true, url = "";
     (async () => {
       const got = new Map<string, string>();
+      // a picture is read once, however many places name it
+      const pictures = new Map<string, string | null>();
+      const picture = async (from: string, ref: string): Promise<string | null> => {
+        const to = resolveLink(from, ref, bound);
+        if (!to) return null;
+        if (!pictures.has(to.path)) {
+          try { const v = await readFile(to.path); pictures.set(to.path, v.kind === "image" ? `data:${v.mime};base64,${v.data}` : null); }
+          catch { pictures.set(to.path, null); } // a file that is not there: the page shows its own broken picture
+        }
+        return pictures.get(to.path) ?? null;
+      };
       for (const ref of pageRefs(html).slice(0, 60)) {
         const to = resolveLink(path, ref, bound);
         if (!to) continue;
         try {
-          const v = await readFile(to.path);
-          if (v.kind === "image") got.set(ref, `data:${v.mime};base64,${v.data}`);
-          else if (v.kind === "text" && /\.css$/i.test(ref.split(/[?#]/)[0])) got.set(ref, v.text);
-        } catch { /* a file that is not there: the page shows its own broken picture */ }
+          if (/\.css$/i.test(ref.split(/[?#]/)[0])) {
+            const v = await readFile(to.path);
+            if (v.kind !== "text") continue;
+            // the pictures a style sheet names are found from the sheet's own folder, then written into the page under a name of their own
+            const names = new Map<string, string>();
+            for (const r of cssRefs(v.text).slice(0, 60)) { const d = await picture(to.path, r); const target = resolveLink(to.path, r, bound); if (d && target) { got.set(`kona:${target.path}`, d); names.set(r, `kona:${target.path}`); } }
+            got.set(ref, renameCssRefs(v.text, (r) => names.get(r) ?? null));
+          } else {
+            const d = await picture(path, ref);
+            if (d) got.set(ref, d);
+          }
+        } catch { /* a file that cannot be read: the page shows what it can */ }
       }
       if (!live) return;
       const page = buildPage(html, got);
-      url = URL.createObjectURL(new Blob([page.html], { type: "text/html" }));
+      url = URL.createObjectURL(new Blob([page.html], { type: "text/html;charset=utf-8" }));
       setShown({ url, scripts: page.scripts, web: page.web });
     })();
     return () => { live = false; if (url) URL.revokeObjectURL(url); };
@@ -204,10 +225,128 @@ function HtmlFrame({ html, path, bound, name }: { html: string; path: string; bo
 
   if (!shown) return <p className="m-0 p-8 text-text-tertiary">Reading…</p>;
   const says = [shown.scripts > 0 && "This page has scripts. Kona does not run them.", shown.web > 0 && "Pictures from the web are not loaded."].filter(Boolean).join(" ");
+  // Ctrl and the wheel over the page zoom it. The frame may be read from here (allow-same-origin) and still runs nothing: with no allow-scripts a page's scripts and handlers are
+  // switched off, and buildPage has taken the scripts out as well. The wheel listener is put on the page's own window, because wheel events inside a frame never reach this one.
+  const watchWheel = (e: React.SyntheticEvent<HTMLIFrameElement>) => {
+    try {
+      e.currentTarget.contentWindow?.addEventListener("wheel", (w) => {
+        if (!w.ctrlKey) return;
+        w.preventDefault();
+        setScale((s) => Math.min(PAGE_MAX, Math.max(PAGE_MIN, s * Math.exp(-w.deltaY * 0.0015))));
+      }, { passive: false });
+    } catch { /* the frame cannot be reached: the buttons still zoom */ }
+  };
+  const pct = Math.round(scale * 100);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {says && <div className="px-8 pb-2 text-[13px] leading-5 text-text-tertiary">{says}</div>}
-      <iframe title={name} src={shown.url} sandbox="" className="min-h-0 flex-1 border-0 bg-white" />
+      <div className="flex items-center justify-between gap-4 px-8 pb-2">
+        <span className="text-[13px] leading-5 text-text-tertiary">{says}</span>
+        <ZoomBar wheel pct={pct} canOut={scale > PAGE_MIN} canIn={scale < PAGE_MAX} onOut={() => setScale((s) => Math.max(PAGE_MIN, s / IMG_STEP))} onIn={() => setScale((s) => Math.min(PAGE_MAX, s * IMG_STEP))}
+          onReset={() => setScale(1)} resetTitle="Back to 100%" />
+      </div>
+      {/* the page is drawn in a frame that is 1/scale as big again and then shrunk or grown, which is what a browser's zoom does: the page lays itself out again for the new width */}
+      <div className="relative min-h-0 flex-1 overflow-hidden bg-white">
+        <iframe title={name} src={shown.url} sandbox="allow-same-origin" onLoad={watchWheel} className="absolute top-0 left-0 border-0 bg-white" style={{ width: `${100 / scale}%`, height: `${100 / scale}%`, transform: `scale(${scale})`, transformOrigin: "0 0" }} />
+      </div>
+    </div>
+  );
+}
+
+const IMG_MIN = 0.1, IMG_MAX = 8, IMG_STEP = 1.25, PAGE_MIN = 0.25, PAGE_MAX = 3;
+
+/** The three zoom controls: smaller, the percent (it goes back to the usual size; `resetTitle` says which), bigger. Shared by pictures and html pages. */
+function ZoomBar({ pct, canOut, canIn, onOut, onIn, onReset, resetTitle, wheel = false }: { wheel?: boolean; pct: number; canOut: boolean; canIn: boolean; onOut: () => void; onIn: () => void; onReset: () => void; resetTitle: string }) {
+  return (
+    <div className="flex items-center gap-2" role="group" aria-label="Zoom">
+      <IconButton icon="zoomOut" label={`Zoom out${wheel ? " (Ctrl and the mouse wheel)" : ""}`} disabled={!canOut} onClick={onOut} />
+      <Button variant="quiet" small className="w-[72px]" onClick={onReset} title={resetTitle}>{pct}%</Button>
+      <IconButton icon="zoomIn" label={`Zoom in${wheel ? " (Ctrl and the mouse wheel)" : ""}`} disabled={!canIn} onClick={onIn} />
+    </div>
+  );
+}
+
+/** A picture that can be made bigger or smaller: the two buttons, Ctrl and the mouse wheel (a pinch on a touchpad is the same thing), and a drag to move it once it is bigger than the window.
+ *  It opens fitted to the window (never bigger than it really is); the percent in the middle goes to the real size and back. Zooming keeps the point under the pointer where it is. */
+function ImageView({ src, name }: { src: string; name: string }) {
+  const box = useRef<HTMLDivElement>(null);
+  const img = useRef<HTMLImageElement>(null);
+  const [nat, setNat] = useState<{ w: number; h: number } | null>(null);
+  const [room, setRoom] = useState({ w: 0, h: 0 });
+  const [zoom, setZoom] = useState<number | null>(null); // null: fitted to the window
+  const anchor = useRef<{ fx: number; fy: number; px: number; py: number } | null>(null);
+  const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
+
+  const fit = nat && room.w > 0 ? Math.min((room.w - 48) / nat.w, (room.h - 48) / nat.h, 1) : 1;
+  const scale = zoom ?? fit;
+  const now = useRef({ scale, nat });
+  now.current = { scale, nat };
+
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const watch = new ResizeObserver(() => setRoom({ w: el.clientWidth, h: el.clientHeight }));
+    watch.observe(el);
+    return () => watch.disconnect();
+  }, []);
+
+  /** Go to `next`, keeping the spot under (x, y) (the middle of the window when not given) where it is. */
+  const zoomTo = useCallback((next: number, x?: number, y?: number) => {
+    const b = box.current, i = img.current;
+    if (!b || !i || !now.current.nat) return;
+    const r = i.getBoundingClientRect(), br = b.getBoundingClientRect();
+    const px = x ?? br.left + br.width / 2, py = y ?? br.top + br.height / 2;
+    const to01 = (v: number) => Math.min(1, Math.max(0, v));
+    anchor.current = { fx: to01((px - r.left) / r.width), fy: to01((py - r.top) / r.height), px: px - br.left, py: py - br.top };
+    setZoom(Math.min(IMG_MAX, Math.max(IMG_MIN, next)));
+  }, []);
+
+  useLayoutEffect(() => {
+    const a = anchor.current, b = box.current, i = img.current;
+    anchor.current = null;
+    if (!a || !b || !i) return;
+    const r = i.getBoundingClientRect(), br = b.getBoundingClientRect();
+    b.scrollLeft += r.left + a.fx * r.width - (br.left + a.px);
+    b.scrollTop += r.top + a.fy * r.height - (br.top + a.py);
+  }, [scale]);
+
+  // Ctrl and the wheel: the listener is made by hand because a page listener may not stop the window's own zoom unless it is not passive
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const wheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      zoomTo(now.current.scale * Math.exp(-e.deltaY * 0.0015), e.clientX, e.clientY);
+    };
+    el.addEventListener("wheel", wheel, { passive: false });
+    return () => el.removeEventListener("wheel", wheel);
+  }, [zoomTo]);
+
+  const pct = Math.round(scale * 100);
+  const real = Math.abs(scale - 1) < 0.005; // at its real size, the percent goes back to fitted; anywhere else it goes to the real size
+  const bigger = !!box.current && !!nat && (nat.w * scale > room.w - 48 || nat.h * scale > room.h - 48);
+  return (
+    <div className="relative flex min-h-0 flex-1 bg-inset">
+      <div
+        ref={box}
+        className={`flex min-h-0 flex-1 overflow-auto p-6 ${bigger ? (dragging ? "cursor-grabbing" : "cursor-grab") : ""}`}
+        onPointerDown={(e) => { if (e.button !== 0 || !bigger || !box.current) return; drag.current = { x: e.clientX, y: e.clientY, left: box.current.scrollLeft, top: box.current.scrollTop }; setDragging(true); e.currentTarget.setPointerCapture(e.pointerId); }}
+        onPointerMove={(e) => { const d = drag.current, b = box.current; if (d && b) { b.scrollLeft = d.left - (e.clientX - d.x); b.scrollTop = d.top - (e.clientY - d.y); } }}
+        onPointerUp={() => { drag.current = null; setDragging(false); }}
+        onPointerCancel={() => { drag.current = null; setDragging(false); }}
+      >
+        <img
+          ref={img} src={src} alt={name} draggable={false}
+          onLoad={(e) => setNat({ w: e.currentTarget.naturalWidth || 300, h: e.currentTarget.naturalHeight || 150 })}
+          className="m-auto max-w-none shrink-0"
+          style={nat ? { width: nat.w * scale, height: nat.h * scale, imageRendering: scale >= 2 ? "pixelated" : "auto" } : { opacity: 0 }}
+        />
+      </div>
+      <div className="absolute top-3 right-6">
+        <ZoomBar wheel pct={pct} canOut={!!nat && scale > IMG_MIN} canIn={!!nat && scale < IMG_MAX} onOut={() => zoomTo(scale / IMG_STEP)} onIn={() => zoomTo(scale * IMG_STEP)}
+          onReset={() => (real ? setZoom(null) : zoomTo(1))} resetTitle={real ? "Fit it to the window" : "Show it at its real size"} />
+      </div>
     </div>
   );
 }
@@ -339,7 +478,7 @@ function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onF
     let t = view.text, tidy = false;
     if (ext === "json") { try { t = JSON.stringify(JSON.parse(view.text), null, 2); tidy = true; } catch { /* show it as it is */ } }
     content = html && rendered ? (
-      <HtmlFrame html={view.text} path={entry.path} bound={project.folder} name={entry.name} />
+      <HtmlFrame key={entry.path} html={view.text} path={entry.path} bound={project.folder} name={entry.name} />
     ) : md && rendered ? (
       <div className="flex min-h-0 flex-1">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -354,7 +493,7 @@ function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onF
         <div className="min-h-0 flex-1 overflow-auto py-3"><Gutter text={t} /></div>
       </div>
     );
-  } else if (view.kind === "image") content = <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-inset p-6"><img src={`data:${view.mime};base64,${view.data}`} alt={entry.name} className="max-h-full max-w-full" /></div>;
+  } else if (view.kind === "image") content = <ImageView key={entry.path} src={`data:${view.mime};base64,${view.data}`} name={entry.name} />;
   else if (view.kind === "pdf") content = pdfUrl ? <embed src={pdfUrl} type="application/pdf" className="min-h-0 flex-1" /> : <p className="m-0 p-8 text-text-tertiary">Reading…</p>;
   else content = (
     <div className="flex flex-col items-start gap-4 p-8">
@@ -373,7 +512,7 @@ function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onF
         </div>
         <div className="flex flex-wrap gap-x-4 text-[13px] leading-5 text-text-tertiary">
           <span className="truncate font-mono">{rel}</span>
-          {(md || html) && <button type="button" onClick={() => setRendered((r) => !r)} aria-pressed={rendered} className="font-bold text-text-secondary hover:text-text">{rendered ? "Show the text" : "Show it as a page"}</button>}
+          {(md || html) && <Button variant="ghost" tiny onClick={() => setRendered((r) => !r)} aria-pressed={rendered}>{rendered ? "Show the text" : "Show it as a page"}</Button>}
           <span>{humanSize(entry.size)}</span>
           {entry.modified && <span>changed {new Date(entry.modified * 1000).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</span>}
         </div>
@@ -388,9 +527,9 @@ function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onF
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); step(e.shiftKey ? -1 : 1); } else if (e.key === "Escape") { e.preventDefault(); setFinding(false); } }}
               className="h-9 w-64 border border-line-strong bg-inset px-3 text-[14px] text-text placeholder:text-text-tertiary" />
             <span className="text-[13px] leading-5 text-text-tertiary" aria-live="polite">{!query ? "" : hits.count === 0 ? "Nothing found" : `${hits.at + 1} of ${hits.count}`}</span>
-            <button type="button" onClick={() => step(-1)} disabled={hits.count === 0} className="font-bold text-text-secondary hover:text-text disabled:text-text-disabled">Previous</button>
-            <button type="button" onClick={() => step(1)} disabled={hits.count === 0} className="font-bold text-text-secondary hover:text-text disabled:text-text-disabled">Next</button>
-            <button type="button" onClick={() => setFinding(false)} className="font-bold text-text-secondary hover:text-text">Close the search</button>
+            <Button variant="ghost" tiny onClick={() => step(-1)} disabled={hits.count === 0}>Previous</Button>
+            <Button variant="ghost" tiny onClick={() => step(1)} disabled={hits.count === 0}>Next</Button>
+            <Button variant="ghost" tiny onClick={() => setFinding(false)}>Close the search</Button>
           </div>
         )}
       </div>

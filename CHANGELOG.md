@@ -2,6 +2,16 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.31.0, 2026-11-03
+
+Pictures and web pages zoom, web pages show the pictures drawn by their styles, Auto is a permission mode, and the buttons say what they do.
+
+- **Zoom for pictures.** A picture in the file reader opens fitted to the window. Two buttons and the percent between them zoom it; Ctrl and the mouse wheel (or a pinch) zoom toward the pointer; a bigger picture can be dragged. The percent goes to the real size and back to fitted.
+- **Zoom for web pages.** An `.html` file has the same buttons, and Ctrl and the wheel work over the page. The page lays itself out again for the new size, as a browser does. Its scripts still do not run.
+- **Web pages show their background pictures.** A page that draws pictures with `url(...)` in its styles (a mock-up cut in strips of one screenshot, for example) showed none of them. They are read from the project now, also from a style sheet's own folder, and a picture used many times is carried once.
+- **Auto.** A person's Set up offers a fourth permission: Auto, where a safety checker built into Claude Code decides, and you are asked only when it holds something back. Commands to a server still ask. It needs an account and a model that Claude Code allows it for.
+- **Buttons.** End session is red, Resume is green (the accent colour). Plain actions (Open, Copy, Check again, Previous, Next, Cancel and Close in boxes) are real buttons, and the ticket cards on the Board are real buttons too, so the keyboard and the screen reader treat them the same way.
+
 ## 0.30.0, 2026-11-03
 
 You can see how big a chat's memory has grown and make it smaller, links in replies open, lists count properly, and the map zooms smoothly.

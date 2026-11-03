@@ -4,6 +4,7 @@
 import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { filterRows, numericColumn, sortRows, type Table } from "../../lib/brain/table.ts";
 import { CopyButton } from "./Copy";
+import { Button } from "../ui";
 
 type Look = { tight: boolean; stripes: boolean; wrap: boolean; freeze: boolean };
 const KEY = "kona.tables";
@@ -73,10 +74,10 @@ export function MdTable({ table, cell, source }: { table: Table; cell: (text: st
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Filter rows" aria-label="Filter rows"
             className="h-8 w-44 border border-line-strong bg-inset px-2.5 text-[14px] text-text placeholder:text-text-tertiary" />
         )}
-        <CopyButton text={source} className="h-8 px-1" />
-        <button type="button" onClick={() => setPanel((o) => !o)} aria-expanded={panel} className="h-8 px-1 font-bold text-text-secondary hover:text-text">
+        <CopyButton text={source} />
+        <Button variant="ghost" tiny onClick={() => setPanel((o) => !o)} aria-expanded={panel}>
           {panel ? "Hide the view" : "View"}
-        </button>
+        </Button>
       </div>
 
       {panel && (
@@ -95,7 +96,7 @@ export function MdTable({ table, cell, source }: { table: Table; cell: (text: st
                 <span>{h || `Column ${i + 1}`}</span>
               </label>
             ))}
-            {changed && <button type="button" onClick={() => { setHidden(new Set()); setSort(null); setQuery(""); }} className="ml-auto font-bold text-text-secondary hover:text-text">Back to the file's order</button>}
+            {changed && <Button variant="ghost" tiny className="ml-auto" onClick={() => { setHidden(new Set()); setSort(null); setQuery(""); }}>Back to the file's order</Button>}
           </div>
         </div>
       )}
@@ -132,7 +133,7 @@ export function MdTable({ table, cell, source }: { table: Table; cell: (text: st
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={shown.length} className={`${pad} text-text-tertiary`}>{query.trim() ? <>No row has “{query.trim()}”. <button type="button" onClick={() => setQuery("")} className="font-bold text-text-secondary hover:text-text">Clear the filter</button></> : "No rows."}</td></tr>
+              <tr><td colSpan={shown.length} className={`${pad} text-text-tertiary`}>{query.trim() ? <>No row has “{query.trim()}”. <Button variant="ghost" tiny onClick={() => setQuery("")}>Clear the filter</Button></> : "No rows."}</td></tr>
             )}
           </tbody>
         </table>

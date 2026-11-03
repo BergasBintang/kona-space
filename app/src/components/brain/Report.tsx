@@ -37,12 +37,12 @@ export function Report({ brain, wanted, onOpen, onWrite, onDrop }: {
         {warns.map((w, i) => (
           <div key={i} className="flex items-start justify-between gap-4 text-[14px] leading-5">
             <span className="flex items-start gap-2.5"><Glyph state="waiting" size={16} /><span className="text-text-secondary">{w.text}{w.line ? ` (line ${w.line})` : ""}</span></span>
-            {w.noteId && <Button variant="ghost" tiny onClick={() => onOpen(w.noteId!)}>Open</Button>}
+            {w.noteId && <Button variant="ghost" tiny className="-my-1.5" onClick={() => onOpen(w.noteId!)}>Open</Button>}
           </div>
         ))}
         {infos.map((w, i) => (
           <div key={`i${i}`} className="flex items-start justify-between gap-4 text-[13px] leading-5 text-text-tertiary">
-            <span>{w.text}</span>{w.noteId && <Button variant="ghost" tiny onClick={() => onOpen(w.noteId!)}>Open</Button>}
+            <span>{w.text}</span>{w.noteId && <Button variant="ghost" tiny className="-my-1.5" onClick={() => onOpen(w.noteId!)}>Open</Button>}
           </div>
         ))}
       </Card>

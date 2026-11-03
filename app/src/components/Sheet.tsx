@@ -1,4 +1,4 @@
-// The sheet: a page of Kona that slides up from below over the office, under the top bar and the turn buttons. It closes with the X or Esc. If the owner typed something
+// The sheet: a page of Kona that slides up from below over the whole office, from the top bar down (the top bar's own line is its upper edge). It closes with the X or Esc. If the owner typed something
 // in it that nothing has taken yet (see lib/unsaved.ts), closing, switching tab or leaving through the top bar first asks. A room with two pages shows them as tabs.
 import { useEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import { Confirm } from "./Confirm";
@@ -50,7 +50,7 @@ export function Sheet({ title, subtitle, tabs, active, onTab, onClose, guard, ke
       onInput={(e) => { if (isText(e.target as Element)) typed.current.typed(e.target); }}
       onClickCapture={(e) => { const b = (e.target as Element).closest("button"); if (b && !b.hasAttribute("data-leave")) typed.current.acted(); }}
       onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && isText(e.target as Element)) typed.current.acted(); }}
-      className="kona-sheet absolute inset-x-0 top-[88px] bottom-0 z-10 flex flex-col border-t-2 border-line-strong bg-ground outline-none" style={{ boxShadow: "0 -4px 0 0 rgb(45 34 24 / 0.2)" }}>
+      className="kona-sheet absolute inset-0 z-10 flex flex-col bg-ground outline-none">
       <header className="flex min-h-14 shrink-0 items-center gap-4 border-b border-line-subtle bg-surface-1 px-8">
         <div className="flex min-w-0 items-baseline gap-3">
           <h2 className="m-0 text-[20px] leading-7 font-bold">{title}</h2>

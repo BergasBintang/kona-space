@@ -3,6 +3,7 @@
 // The viewer follows links between files (with a way back), lists the headings of a long page, finds words in it, copies tables and code, and says when an agent
 // changed the file: the open file and the open folders are looked at again every few seconds while the window is showing.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { baseName, humanSize, listDir, readFile, type Entry, type FileView, type Project } from "../lib/api";
 import { dirOf, outline, resolveLink, slugify, type Heading } from "../lib/brain/outline.ts";
@@ -10,6 +11,7 @@ import { changedSince, readSeen, stamp, writeSeen, type Seen } from "../lib/seen
 import { buildPage, cssRefs, pageRefs, renameCssRefs } from "../lib/htmlpage.ts";
 import { Button, Glyph } from "./ui";
 import { IconButton } from "./Icon";
+import { FileInfo } from "./FileInfo";
 import { Markdown } from "./brain/Markdown";
 import { clearPaint, findIn, paint } from "./find";
 
@@ -180,7 +182,7 @@ function Outline({ heads, active, onJump }: { heads: Heading[]; active: string |
 type Note = { tone: "info" | "warn"; text: string };
 
 /** An .html file drawn as a page inside a sandboxed frame: its scripts do not run and nothing comes from the web. Its pictures and style sheets from the project are read and put in first. */
-function HtmlFrame({ html, path, bound, name }: { html: string; path: string; bound: string; name: string }) {
+function HtmlFrame({ html, path, bound, name, slot }: { html: string; path: string; bound: string; name: string; slot: HTMLElement | null }) {
   const [shown, setShown] = useState<{ url: string; scripts: number; web: number } | null>(null);
   const [scale, setScale] = useState(1);
   useEffect(() => {
@@ -239,11 +241,9 @@ function HtmlFrame({ html, path, bound, name }: { html: string; path: string; bo
   const pct = Math.round(scale * 100);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center justify-between gap-4 px-8 pb-2">
-        <span className="text-[13px] leading-5 text-text-tertiary">{says}</span>
-        <ZoomBar wheel pct={pct} canOut={scale > PAGE_MIN} canIn={scale < PAGE_MAX} onOut={() => setScale((s) => Math.max(PAGE_MIN, s / IMG_STEP))} onIn={() => setScale((s) => Math.min(PAGE_MAX, s * IMG_STEP))}
-          onReset={() => setScale(1)} resetTitle="Back to 100%" />
-      </div>
+      {says && <div className="px-8 pb-2 text-[13px] leading-5 text-text-tertiary">{says}</div>}
+      {slot && createPortal(<ZoomBar wheel pct={pct} canOut={scale > PAGE_MIN} canIn={scale < PAGE_MAX} onOut={() => setScale((s) => Math.max(PAGE_MIN, s / IMG_STEP))} onIn={() => setScale((s) => Math.min(PAGE_MAX, s * IMG_STEP))}
+        onReset={() => setScale(1)} resetTitle="Back to 100%" />, slot)}
       {/* the page is drawn in a frame that is 1/scale as big again and then shrunk or grown, which is what a browser's zoom does: the page lays itself out again for the new width */}
       <div className="relative min-h-0 flex-1 overflow-hidden bg-white">
         <iframe title={name} src={shown.url} sandbox="allow-same-origin" onLoad={watchWheel} className="absolute top-0 left-0 border-0 bg-white" style={{ width: `${100 / scale}%`, height: `${100 / scale}%`, transform: `scale(${scale})`, transformOrigin: "0 0" }} />
@@ -267,7 +267,7 @@ function ZoomBar({ pct, canOut, canIn, onOut, onIn, onReset, resetTitle, wheel =
 
 /** A picture that can be made bigger or smaller: the two buttons, Ctrl and the mouse wheel (a pinch on a touchpad is the same thing), and a drag to move it once it is bigger than the window.
  *  It opens fitted to the window (never bigger than it really is); the percent in the middle goes to the real size and back. Zooming keeps the point under the pointer where it is. */
-function ImageView({ src, name }: { src: string; name: string }) {
+function ImageView({ src, name, slot }: { src: string; name: string; slot: HTMLElement | null }) {
   const box = useRef<HTMLDivElement>(null);
   const img = useRef<HTMLImageElement>(null);
   const [nat, setNat] = useState<{ w: number; h: number } | null>(null);
@@ -343,10 +343,8 @@ function ImageView({ src, name }: { src: string; name: string }) {
           style={nat ? { width: nat.w * scale, height: nat.h * scale, imageRendering: scale >= 2 ? "pixelated" : "auto" } : { opacity: 0 }}
         />
       </div>
-      <div className="absolute top-3 right-6">
-        <ZoomBar wheel pct={pct} canOut={!!nat && scale > IMG_MIN} canIn={!!nat && scale < IMG_MAX} onOut={() => zoomTo(scale / IMG_STEP)} onIn={() => zoomTo(scale * IMG_STEP)}
-          onReset={() => (real ? setZoom(null) : zoomTo(1))} resetTitle={real ? "Fit it to the window" : "Show it at its real size"} />
-      </div>
+      {slot && createPortal(<ZoomBar wheel pct={pct} canOut={!!nat && scale > IMG_MIN} canIn={!!nat && scale < IMG_MAX} onOut={() => zoomTo(scale / IMG_STEP)} onIn={() => zoomTo(scale * IMG_STEP)}
+        onReset={() => (real ? setZoom(null) : zoomTo(1))} resetTitle={real ? "Fit it to the window" : "Show it at its real size"} />, slot)}
     </div>
   );
 }
@@ -354,6 +352,8 @@ function ImageView({ src, name }: { src: string; name: string }) {
 function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onFollow, onFresh }: {
   project: Project; entry: Entry | null; note: Note | null; anchor: { id: string; n: number } | null; canGoBack: boolean; backName: string; onBack: () => void; onFollow: (href: string) => void; onFresh: (e: Entry) => void;
 }) {
+  const [about, setAbout] = useState(false); // the dialog with the size, the date and the path of the open file
+  const [zoomSlot, setZoomSlot] = useState<HTMLElement | null>(null); // where a picture or a page puts its zoom buttons: in the title row, beside the file name
   const [rendered, setRendered] = useState(true); // a markdown or html file is shown read as a page, with a switch to the plain text
   const [view, setView] = useState<FileView | { error: string } | "loading" | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -453,7 +453,7 @@ function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onF
     paint(found, 0, found.length > 0);
     return clearPaint;
   }, [finding, query, finds, rendered, entry?.path]);
-  useEffect(() => { setFinding(false); setQuery(""); }, [entry?.path]);
+  useEffect(() => { setFinding(false); setQuery(""); setAbout(false); }, [entry?.path]);
   const step = (d: number) => {
     if (matches.current.length === 0) return;
     const at = (hits.at + d + matches.current.length) % matches.current.length;
@@ -478,7 +478,7 @@ function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onF
     let t = view.text, tidy = false;
     if (ext === "json") { try { t = JSON.stringify(JSON.parse(view.text), null, 2); tidy = true; } catch { /* show it as it is */ } }
     content = html && rendered ? (
-      <HtmlFrame key={entry.path} html={view.text} path={entry.path} bound={project.folder} name={entry.name} />
+      <HtmlFrame key={entry.path} html={view.text} path={entry.path} bound={project.folder} name={entry.name} slot={zoomSlot} />
     ) : md && rendered ? (
       <div className="flex min-h-0 flex-1">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -493,7 +493,7 @@ function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onF
         <div className="min-h-0 flex-1 overflow-auto py-3"><Gutter text={t} /></div>
       </div>
     );
-  } else if (view.kind === "image") content = <ImageView key={entry.path} src={`data:${view.mime};base64,${view.data}`} name={entry.name} />;
+  } else if (view.kind === "image") content = <ImageView key={entry.path} src={`data:${view.mime};base64,${view.data}`} name={entry.name} slot={zoomSlot} />;
   else if (view.kind === "pdf") content = pdfUrl ? <embed src={pdfUrl} type="application/pdf" className="min-h-0 flex-1" /> : <p className="m-0 p-8 text-text-tertiary">Reading…</p>;
   else content = (
     <div className="flex flex-col items-start gap-4 p-8">
@@ -507,14 +507,11 @@ function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onF
       <div className="flex flex-col gap-1 px-8 pt-6 pb-4">
         <div className="flex items-center gap-3">
           {canGoBack && <Button variant="quiet" small onClick={onBack} title={`Back to ${backName}`}>← Back</Button>}
-          <h2 className="m-0 min-w-0 flex-1 truncate text-[22px] leading-[30px] font-bold">{entry.name}</h2>
+          <h2 className="m-0 min-w-0 flex-1 truncate text-[22px] leading-[30px] font-bold" title={rel}>{entry.name}</h2>
           {finds && <Button variant="ghost" small onClick={() => { setFinding((f) => !f); requestAnimationFrame(() => finder.current?.select()); }} aria-pressed={finding} title="Find in this file (Ctrl+F)">Find</Button>}
-        </div>
-        <div className="flex flex-wrap gap-x-4 text-[13px] leading-5 text-text-tertiary">
-          <span className="truncate font-mono">{rel}</span>
-          {(md || html) && <Button variant="ghost" tiny onClick={() => setRendered((r) => !r)} aria-pressed={rendered}>{rendered ? "Show the text" : "Show it as a page"}</Button>}
-          <span>{humanSize(entry.size)}</span>
-          {entry.modified && <span>changed {new Date(entry.modified * 1000).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</span>}
+          {(md || html) && <Button variant="ghost" small onClick={() => setRendered((r) => !r)} aria-pressed={rendered}>{rendered ? "Show the text" : "Show it as a page"}</Button>}
+          <span ref={setZoomSlot} className="flex shrink-0 items-center" />
+          <IconButton icon="info" label="About this file" onClick={() => setAbout(true)} />
         </div>
         {note && (
           <div role="status" className={`flex items-center gap-2 text-[13px] leading-5 font-bold ${note.tone === "warn" ? "text-state-left" : "text-state-live"}`}>
@@ -535,6 +532,7 @@ function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onF
       </div>
       <div className="mx-8 h-px bg-line-subtle" />
       <div ref={body} className="flex min-h-0 flex-1 flex-col">{content}</div>
+      {about && <FileInfo entry={entry} rel={rel} onClose={() => setAbout(false)} />}
     </div>
   );
 }

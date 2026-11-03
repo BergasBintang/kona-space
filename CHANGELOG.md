@@ -2,6 +2,14 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.31.1, 2026-11-03
+
+A tidier file reader, and the slide sheet reaches the top bar.
+
+- **One row for the file's name and its controls.** Find, Show the text (or Show it as a page), the zoom and an info icon now sit in the title row, to the right of the file name. The zoom buttons no longer float over the picture or the page, and "Show the text" no longer sits lower than the words beside it.
+- **File details in a dialog.** The row with the path, size and date is gone. The info icon opens a small dialog with where the file is, its place on this PC, its size, when it changed and what kind it is, with Copy path and Show in Explorer. The path also shows when you hover over the file name.
+- **The sheet starts at the top bar.** A page that slides up (Files, Brain, a person...) now covers the whole office strip instead of leaving a band of the office above it.
+
 ## 0.31.0, 2026-11-03
 
 Pictures and web pages zoom, web pages show the pictures drawn by their styles, Auto is a permission mode, and the buttons say what they do.

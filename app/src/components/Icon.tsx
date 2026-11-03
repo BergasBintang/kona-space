@@ -193,6 +193,10 @@ const ICONS = {
     ".......##.......",
     "................",
   ]),
+  info: (p) => { // a ring with an i in it: what this is
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const d = Math.hypot(x + 0.5 - 8, y + 0.5 - 8); if (d >= 5.6 && d <= 7.5) p(x, y); }
+    rect(p, 7, 4, 8, 5); rect(p, 7, 7, 8, 11);
+  },
   play: (p) => { for (let y = 0; y < 12; y++) rect(p, 4, 2 + y, 4 + Math.ceil(Math.min(y + 1, 12 - y) * 1.4) - 1, 2 + y); }, // a triangle that points on: pick it up again
 } satisfies Record<string, Draw>;
 

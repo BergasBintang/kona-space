@@ -1,0 +1,19 @@
+{
+  "frameWidth": 28,
+  "frameHeight": 20,
+  "frames": [
+    "idle",
+    "blink",
+    "walkA",
+    "walkB",
+    "walkC",
+    "walkD",
+    "happy",
+    "carryIdle",
+    "carryA",
+    "carryB",
+    "carryC",
+    "carryD"
+  ],
+  "looks": 4
+}

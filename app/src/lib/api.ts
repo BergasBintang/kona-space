@@ -122,8 +122,8 @@ export const officeMapLoad = (folder: string) => invoke<string | null>("office_m
 export const officeMapSave = (folder: string, map: string) => invoke<void>("office_map_save", { folder, map });
 export const officeMapReset = (folder: string) => invoke<void>("office_map_reset", { folder });
 export const startWorkflow = (folder: string, workflow: Workflow) => invoke<Ticket[]>("workflow_start", { folder, workflow });
-/** One reply from Kibby, the office boy (a cheap Haiku call with no tools). `history` is what was said before; the new `message` is not in it. */
-export const kibbySay = (projectId: string, accountId: string, history: { who: string; text: string }[], message: string) => invoke<string>("kibby_say", { projectId, accountId, history, message });
+/** One reply from an office boy, `who` being "kibby" or "bako" (a cheap Haiku call with no tools). `history` is what was said before; the new `message` is not in it. */
+export const officeSay = (projectId: string, accountId: string, who: string, history: { who: string; text: string }[], message: string) => invoke<string>("office_say", { projectId, accountId, who, history, message });
 export const skillCatalog = (folder: string) => invoke<SkillInfo[]>("skill_catalog", { folder });
 export const computerSkills = (accountId: string | null, folder: string) => invoke<SkillInfo[]>("computer_skills", { accountId, folder });
 export const readSkill = (folder: string, name: string) => invoke<string>("read_skill", { folder, name });

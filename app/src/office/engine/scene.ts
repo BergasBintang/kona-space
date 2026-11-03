@@ -131,22 +131,36 @@ export function buildScene(map: OfficeMap, view: number): Scene {
   return { iso, width: iso.width, height: iso.height, content: [x0, y0, x1, y1], ground, items: sorted, boxes: sbox, cats, hits, walkable, tall };
 }
 
-/** Kibby standing at (i, j) of the plan (a point, in tiles): where his picture goes and the place in the list of items where he is drawn (between what lies behind him and what lies in
- * front of him, as for a cat). `k` is the index of the first item drawn after him. */
+/** One of the office boys standing at (i, j) of the plan (a point, in tiles): where his picture goes and the place in the list of items where he is drawn (between what lies behind him and what lies in
+ * front of him, as for a cat). `k` is the index of the first item drawn after him. `side` is the side the thing in his paw hangs on (-1 left, 1 right, 0 none): the place is then worked out for the
+ * paw's thing as well: its ground is the body's square made wider towards that side (`PAW` of a tile, so the broom's handle, about 11 pixels from his middle, is inside it), so a wall, a post or a piece
+ * of furniture that is only beside him cannot be drawn over his broom, his mug or his bento when it lies behind him (and the other way round).
+ * When the body and the paw ask for places that cannot both be kept, the body's place wins, as before. */
 export const KIB = { w: 28, h: 20, bx: 6, by: 2, bw: 16, bh: 18, footX: 14, footY: 19, half: 0.3 };
-export function kibbySlot(scene: Scene, i: number, j: number): { x: number; y: number; k: number } {
+const PAW = 0.4;
+export function kibbySlot(scene: Scene, i: number, j: number, side: -1 | 0 | 1 = 0): { x: number; y: number; k: number } {
   const { iso } = scene, [px, py] = iso.P(i, j), x = Math.round(px) - KIB.footX, y = Math.round(py) - KIB.footY;
-  const rect = [x + KIB.bx, y + KIB.by, x + KIB.bx + KIB.bw, y + KIB.by + KIB.bh];
   const [u, v] = iso.rot(i, j), h = KIB.half, K = [u - h, u + h, v - h, v + h], kd = u + v;
   const behind = (a: number[], b: number[]) => a[1] <= b[0] + 1e-6 || a[3] <= b[2] + 1e-6;
-  let lo = 0, hi = scene.items.length;
-  scene.items.forEach((t, n) => { // only what overlaps his picture on the screen decides where he goes in the list
-    const b = scene.boxes[n];
-    if (!(b[0] < rect[2] && rect[0] < b[2] && b[1] < rect[3] && rect[1] < b[3])) return;
-    if (t.fp) {
-      const tb = behind(t.fp, K), kb = behind(K, t.fp);
-      if (tb && !kb) lo = Math.max(lo, n + 1); else if (kb && !tb) hi = Math.min(hi, n);
-    } else if (t.depth <= kd) lo = Math.max(lo, n + 1); else hi = Math.min(hi, n);
-  });
-  return { x, y, k: Math.min(lo, scene.items.length) }; // if something asks for a place before and after the same piece, he goes after it
+  // what lies behind him must be drawn before him, what lies in front of him after (null: the footprints say nothing, a piece beside him on the diagonal)
+  const relation = (t: Scene["items"][number], K: number[]): "before" | "after" | null => {
+    if (!t.fp) return t.depth <= kd ? "before" : "after";
+    const tb = behind(t.fp, K), kb = behind(K, t.fp);
+    return tb && !kb ? "before" : kb && !tb ? "after" : null;
+  };
+  const place = (rect: number[], wide?: number[]) => { // the first and the last place in the list that suit everything that overlaps the rectangle on the screen; where his own ground says nothing about a piece, the wider ground decides
+    let lo = 0, hi = scene.items.length;
+    scene.items.forEach((t, n) => {
+      const b = scene.boxes[n];
+      if (!(b[0] < rect[2] && rect[0] < b[2] && b[1] < rect[3] && rect[1] < b[3])) return;
+      const r = relation(t, K) ?? (wide ? relation(t, wide) : null);
+      if (r === "before") lo = Math.max(lo, n + 1); else if (r === "after") hi = Math.min(hi, n);
+    });
+    return { lo, hi };
+  };
+  const body = place([x + KIB.bx, y + KIB.by, x + KIB.bx + KIB.bw, y + KIB.by + KIB.bh]); // only what overlaps his picture on the screen decides where he goes in the list
+  // on the screen the left is towards smaller u and larger v (the picture's x runs with u - v), the right the other way
+  const paw = side === 0 ? body : place(side < 0 ? [x, y + KIB.by, x + KIB.bx + KIB.bw, y + KIB.h] : [x + KIB.bx, y + KIB.by, x + KIB.w, y + KIB.h], side < 0 ? [K[0] - PAW, K[1], K[2], K[3] + PAW] : [K[0], K[1] + PAW, K[2] - PAW, K[3]]);
+  const use = paw.lo <= paw.hi ? paw : body;
+  return { x, y, k: Math.min(use.lo, scene.items.length) }; // if something asks for a place before and after the same piece, he goes after it
 }

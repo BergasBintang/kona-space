@@ -67,10 +67,12 @@ export function lookOf(scene: Scene, w: Walker): number {
 /** The way he looks when he stands: towards the viewer (0 down-left, 1 down-right), whichever way he was going. */
 export const towardsViewer = (dir: number) => (dir >= 2 ? 3 - dir : dir);
 
-/** Where his picture goes and which of his pictures to show. */
+/** Where his picture goes and which of his pictures to show. The thing in his paw hangs on the left of the picture in looks 0 and 2 and on the right in looks 1 and 3 (mirrored), and the place in the
+ * drawing order is worked out for it too: a wall, a post or a piece of furniture beside him must not be drawn over it when it lies behind him. */
 export function pose(scene: Scene, w: Walker): Pose {
-  const { x, y, k } = kibbySlot(scene, w.x / 8, w.y / 8), moving = w.x !== w.tx || w.y !== w.ty, look = lookOf(scene, w);
-  return { x, y, k, dir: moving ? look : towardsViewer(look), frame: moving ? HOPS[w.n % 4] : w.n % 40 === 0 ? "blink" : "idle" };
+  const moving = w.x !== w.tx || w.y !== w.ty, look = lookOf(scene, w), dir = moving ? look : towardsViewer(look);
+  const { x, y, k } = kibbySlot(scene, w.x / 8, w.y / 8, dir % 2 === 1 ? 1 : -1);
+  return { x, y, k, dir, frame: moving ? HOPS[w.n % 4] : w.n % 40 === 0 ? "blink" : "idle" };
 }
 
 /** While he talks he stands where he is, looking towards you, smiling. */

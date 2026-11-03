@@ -16,21 +16,21 @@ const put = (row, x, c) => row.slice(0, x) + c + row.slice(x + 1);
 // so the two outer stripes are one pixel long (row 3) and the middle one two (rows 3 and 4): a row of fur is left between a stripe and an eye, so the eyes never run into a stripe
 const STRIPES = [[4, 3], [6, 3], [6, 4], [8, 3]]; // [column, row] inside the 16 x 18 cat
 const forehead = TURNED.map((r, n) => (n === 4 ? r.replace(/d/g, (m, i) => (i < 8 ? "f" : m)) : r));
-const front = forehead.map((r, n) => (n >= 11 && n <= 16 ? torso(APRON[n - 11]) : STRIPES.reduce((s, [x, y]) => (y === n ? put(s, x, "S") : s), r)));
-const behind = BEHIND.map((r, n) => (n >= 11 && n <= 16 ? torso(BACK[n - 11]) : r));
+export const front = forehead.map((r, n) => (n >= 11 && n <= 16 ? torso(APRON[n - 11]) : STRIPES.reduce((s, [x, y]) => (y === n ? put(s, x, "S") : s), r)));
+export const behind = BEHIND.map((r, n) => (n >= 11 && n <= 16 ? torso(BACK[n - 11]) : r));
 const MUG = fromRows([".ooooo.", "owcccwo", "owwwwwo", "owwwwwo", ".owwwo.", "..ooo.."], KPAL); // 7 x 6, held where the role cats hold their card
 
 export const FRAMES = ["idle", "blink", "walkA", "walkB", "walkC", "walkD", "happy"];
 export const LOOKS = 4;
 const LEAN_ROWS = 12; // the rows above this lean (the head and the top of the body); the feet stay
 
-// the whole frame, hopped up and the top of it leaned
-function pose(src, hop, lean) {
+// the whole frame, hopped up and the top of it leaned (Bako, bako.mjs, walks the same way, drawn from the same rows)
+export function pose(src, hop, lean) {
   const out = new Img(src.w, src.h);
   for (let y = 0; y < src.h; y++) for (let x = 0; x < src.w; x++) { const p = src.get(x, y); if (p[3]) out.set(x + (y < LEAN_ROWS ? lean : 0), y - hop, p); }
   return out;
 }
-const WALK = { walkA: [2, -1], walkB: [0, 0], walkC: [2, 1], walkD: [0, 0] }; // [hop in pixels, lean in pixels]
+export const WALK = { walkA: [2, -1], walkB: [0, 0], walkC: [2, 1], walkD: [0, 0] }; // [hop in pixels, lean in pixels]
 
 function drawn(frame, dir) { // dir 0 or 2
   const back = dir === 2, img = new Img(FRAME_W, FRAME_H);

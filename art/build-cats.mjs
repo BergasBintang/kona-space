@@ -1,6 +1,7 @@
 import { sheet, ROLES, FRAMES, FRAME_W, FRAME_H, DIRS } from "./cat.mjs";
 import { Img } from "./lib.mjs";
 import { kibbySheet, FRAMES as KFRAMES, LOOKS as KLOOKS } from "./kibby.mjs";
+import { bakoSheet, FRAMES as BFRAMES, LOOKS as BLOOKS } from "./bako.mjs";
 import { writeFileSync } from "node:fs";
 const s = sheet();
 s.save("out/cats.png");
@@ -12,4 +13,8 @@ writeFileSync("out/cats.json", JSON.stringify({ frameWidth: FRAME_W, frameHeight
 const k = kibbySheet();
 k.save("out/kibby.png");
 writeFileSync("out/kibby.json", JSON.stringify({ frameWidth: FRAME_W, frameHeight: FRAME_H, frames: KFRAMES, looks: KLOOKS }, null, 2));
+// Bako, the second office boy, the same way
+const b = bakoSheet();
+b.save("out/bako.png");
+writeFileSync("out/bako.json", JSON.stringify({ frameWidth: FRAME_W, frameHeight: FRAME_H, frames: BFRAMES, looks: BLOOKS }, null, 2));
 console.log("cats ok", s.w, "x", s.h);

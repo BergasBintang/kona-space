@@ -6,6 +6,8 @@ import catSheet from "../office/cats.png";
 import cats from "../office/cats.json";
 import kibbySheet from "../office/kibby.png";
 import kibby from "../office/kibby.json";
+import bakoSheet from "../office/bako.png";
+import bako from "../office/bako.json";
 
 export type GlyphState = "live" | "waiting" | "idle" | "done" | "stopped" | "left";
 
@@ -132,12 +134,17 @@ export const catRow = (roleId: string, dir = 0) => dir * cats.rows.length + (ROW
 export const KIB_SHEET = kibbySheet;
 export const KIB_FRAMES = kibby.frames as string[];
 export const KIB_W = kibby.frameWidth, KIB_H = kibby.frameHeight, KIB_LOOKS = kibby.looks;
-/** His head and shoulders, looking at you, for the dialog. `scale` is a whole number so the pixels stay square. */
-export function KibbyFace({ scale = 5 }: { scale?: number }) {
+/** Bako, the second office boy, the same way: his sheet has more frames (the walk with the broom, then the walk with the bento). */
+export const BAKO_SHEET = bakoSheet;
+export const BAKO_FRAMES = bako.frames as string[];
+export const BAKO_W = bako.frameWidth, BAKO_H = bako.frameHeight, BAKO_LOOKS = bako.looks;
+/** The head and shoulders of an office boy, looking at you, for the dialog. `scale` is a whole number so the pixels stay square. */
+export function OfficeFace({ who, scale = 5 }: { who: "kibby" | "bako"; scale?: number }) {
+  const s = who === "bako" ? { sheet: BAKO_SHEET, w: BAKO_W, h: BAKO_H, frames: BAKO_FRAMES.length, looks: BAKO_LOOKS } : { sheet: KIB_SHEET, w: KIB_W, h: KIB_H, frames: KIB_FRAMES.length, looks: KIB_LOOKS };
   return (
     <span aria-hidden="true" className="pixel inline-block" style={{
-      width: 16 * scale, height: 14 * scale, backgroundImage: `url(${KIB_SHEET})`, backgroundRepeat: "no-repeat",
-      backgroundSize: `${KIB_W * KIB_FRAMES.length * scale}px ${KIB_H * KIB_LOOKS * scale}px`, backgroundPosition: `${-6 * scale}px ${-2 * scale}px`,
+      width: 16 * scale, height: 14 * scale, backgroundImage: `url(${s.sheet})`, backgroundRepeat: "no-repeat",
+      backgroundSize: `${s.w * s.frames * scale}px ${s.h * s.looks * scale}px`, backgroundPosition: `${-6 * scale}px ${-2 * scale}px`,
     }} />
   );
 }

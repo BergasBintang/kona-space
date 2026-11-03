@@ -2,6 +2,15 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.29.0, 2026-11-03
+
+Bako joins the office, web pages open as pages in the file reader, and the cats no longer hold a card.
+
+- **Bako, the second office boy.** Kibby's friend, in dark brown with peach stripes and gold eyes. He sweeps the floor with a broom, and now and then goes to a door on the wall, takes a bento from the delivery person and brings it to one of the workers, saying "Got it, thanks!" and "Bento for (name)!". Click him to chat: he is the social one and knows every bit of office gossip (made up cat gossip, never about you or your project). With more than one door he picks one by chance; a map with no door leaves him sweeping.
+- **Web pages in the file reader.** An `.html` file opens as a page, with its style sheets and the pictures that sit next to it in the project. A switch under the file name shows the text instead. Scripts in the file do not run and nothing is loaded from the web.
+- **The cats no longer hold a card with their role icon.** Every role is already its own cat, with a name and a desk.
+- **Fixed:** the broom, the mug and the bento were sometimes hidden behind a wall, a shelf, a cabinet or a post next to the office boys; and on an errand Bako no longer shows the standing picture between two tiles.
+
 ## 0.28.0, 2026-11-03
 
 The file reader becomes a real reader: tables you can sort, diagrams, a list of headings, links between files, find, and a note when an agent changes a file. Every session is also told where to keep lasting knowledge, and has a tool to save it.

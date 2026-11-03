@@ -7,6 +7,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { baseName, humanSize, listDir, readFile, type Entry, type FileView, type Project } from "../lib/api";
 import { dirOf, outline, resolveLink, slugify, type Heading } from "../lib/brain/outline.ts";
 import { changedSince, readSeen, stamp, writeSeen, type Seen } from "../lib/seen.ts";
+import { buildPage, pageRefs } from "../lib/htmlpage.ts";
 import { Button, Glyph } from "./ui";
 import { Markdown } from "./brain/Markdown";
 import { clearPaint, findIn, paint } from "./find";
@@ -177,10 +178,44 @@ function Outline({ heads, active, onJump }: { heads: Heading[]; active: string |
 
 type Note = { tone: "info" | "warn"; text: string };
 
+/** An .html file drawn as a page inside a sandboxed frame: its scripts do not run and nothing comes from the web. Its pictures and style sheets from the project are read and put in first. */
+function HtmlFrame({ html, path, bound, name }: { html: string; path: string; bound: string; name: string }) {
+  const [shown, setShown] = useState<{ url: string; scripts: number; web: number } | null>(null);
+  useEffect(() => {
+    let live = true, url = "";
+    (async () => {
+      const got = new Map<string, string>();
+      for (const ref of pageRefs(html).slice(0, 60)) {
+        const to = resolveLink(path, ref, bound);
+        if (!to) continue;
+        try {
+          const v = await readFile(to.path);
+          if (v.kind === "image") got.set(ref, `data:${v.mime};base64,${v.data}`);
+          else if (v.kind === "text" && /\.css$/i.test(ref.split(/[?#]/)[0])) got.set(ref, v.text);
+        } catch { /* a file that is not there: the page shows its own broken picture */ }
+      }
+      if (!live) return;
+      const page = buildPage(html, got);
+      url = URL.createObjectURL(new Blob([page.html], { type: "text/html" }));
+      setShown({ url, scripts: page.scripts, web: page.web });
+    })();
+    return () => { live = false; if (url) URL.revokeObjectURL(url); };
+  }, [html, path, bound]);
+
+  if (!shown) return <p className="m-0 p-8 text-text-tertiary">Reading…</p>;
+  const says = [shown.scripts > 0 && "This page has scripts. Kona does not run them.", shown.web > 0 && "Pictures from the web are not loaded."].filter(Boolean).join(" ");
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {says && <div className="px-8 pb-2 text-[13px] leading-5 text-text-tertiary">{says}</div>}
+      <iframe title={name} src={shown.url} sandbox="" className="min-h-0 flex-1 border-0 bg-white" />
+    </div>
+  );
+}
+
 function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onFollow, onFresh }: {
   project: Project; entry: Entry | null; note: Note | null; anchor: { id: string; n: number } | null; canGoBack: boolean; backName: string; onBack: () => void; onFollow: (href: string) => void; onFresh: (e: Entry) => void;
 }) {
-  const [rendered, setRendered] = useState(true); // a markdown file is shown read as a page, with a switch to the plain text
+  const [rendered, setRendered] = useState(true); // a markdown or html file is shown read as a page, with a switch to the plain text
   const [view, setView] = useState<FileView | { error: string } | "loading" | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [active, setActive] = useState<string | null>(null);
@@ -227,6 +262,8 @@ function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onF
 
   const text = view && typeof view !== "string" && !("error" in view) && view.kind === "text" ? view : null;
   const md = !!entry && /\.(md|markdown)$/i.test(entry.name);
+  const html = !!entry && /\.html?$/i.test(entry.name);
+  const finds = text && !(html && rendered) ? text : null; // a drawn html page sits in its own frame, which the search cannot reach
   const heads = useMemo(() => (text && md && rendered ? outline(text.text).filter((h) => h.level <= 3) : []), [text, md, rendered]);
 
   const jump = useCallback((id: string) => {
@@ -265,18 +302,18 @@ function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onF
   // find in this file: Ctrl+F opens the box, Enter and Shift+Enter step, Esc closes
   useEffect(() => {
     if (!entry) return;
-    const key = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f" && text) { e.preventDefault(); setFinding(true); requestAnimationFrame(() => finder.current?.select()); } };
+    const key = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f" && finds) { e.preventDefault(); setFinding(true); requestAnimationFrame(() => finder.current?.select()); } };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [entry, text]);
+  }, [entry, finds]);
   useEffect(() => {
-    if (!finding || !query || !body.current || !text) { matches.current = []; setHits({ count: 0, at: 0 }); clearPaint(); return; }
+    if (!finding || !query || !body.current || !finds) { matches.current = []; setHits({ count: 0, at: 0 }); clearPaint(); return; }
     const found = findIn(body.current, query);
     matches.current = found;
     setHits({ count: found.length, at: 0 });
     paint(found, 0, found.length > 0);
     return clearPaint;
-  }, [finding, query, text, rendered, entry?.path]);
+  }, [finding, query, finds, rendered, entry?.path]);
   useEffect(() => { setFinding(false); setQuery(""); }, [entry?.path]);
   const step = (d: number) => {
     if (matches.current.length === 0) return;
@@ -301,7 +338,9 @@ function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onF
   else if (view.kind === "text") {
     let t = view.text, tidy = false;
     if (ext === "json") { try { t = JSON.stringify(JSON.parse(view.text), null, 2); tidy = true; } catch { /* show it as it is */ } }
-    content = md && rendered ? (
+    content = html && rendered ? (
+      <HtmlFrame html={view.text} path={entry.path} bound={project.folder} name={entry.name} />
+    ) : md && rendered ? (
       <div className="flex min-h-0 flex-1">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {view.truncated && <div className="px-8 pb-2 text-[13px] leading-5 text-text-tertiary">Only the first 2 MB are shown.</div>}
@@ -330,11 +369,11 @@ function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onF
         <div className="flex items-center gap-3">
           {canGoBack && <Button variant="quiet" small onClick={onBack} title={`Back to ${backName}`}>← Back</Button>}
           <h2 className="m-0 min-w-0 flex-1 truncate text-[22px] leading-[30px] font-bold">{entry.name}</h2>
-          {text && <Button variant="ghost" small onClick={() => { setFinding((f) => !f); requestAnimationFrame(() => finder.current?.select()); }} aria-pressed={finding} title="Find in this file (Ctrl+F)">Find</Button>}
+          {finds && <Button variant="ghost" small onClick={() => { setFinding((f) => !f); requestAnimationFrame(() => finder.current?.select()); }} aria-pressed={finding} title="Find in this file (Ctrl+F)">Find</Button>}
         </div>
         <div className="flex flex-wrap gap-x-4 text-[13px] leading-5 text-text-tertiary">
           <span className="truncate font-mono">{rel}</span>
-          {md && <button type="button" onClick={() => setRendered((r) => !r)} aria-pressed={rendered} className="font-bold text-text-secondary hover:text-text">{rendered ? "Show the text" : "Show it as a page"}</button>}
+          {(md || html) && <button type="button" onClick={() => setRendered((r) => !r)} aria-pressed={rendered} className="font-bold text-text-secondary hover:text-text">{rendered ? "Show the text" : "Show it as a page"}</button>}
           <span>{humanSize(entry.size)}</span>
           {entry.modified && <span>changed {new Date(entry.modified * 1000).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</span>}
         </div>
@@ -343,7 +382,7 @@ function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onF
             <Glyph state={note.tone === "warn" ? "left" : "live"} size={14} />{note.text}
           </div>
         )}
-        {finding && text && (
+        {finding && finds && (
           <div role="search" className="mt-1 flex flex-wrap items-center gap-3">
             <input ref={finder} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find in this file" aria-label="Search in this file"
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); step(e.shiftKey ? -1 : 1); } else if (e.key === "Escape") { e.preventDefault(); setFinding(false); } }}

@@ -33,7 +33,7 @@ import { localDate, redact } from "./lib/brain/text.ts";
 import { loadZoom, stepZoom } from "./lib/zoom";
 import { checkForUpdate } from "./lib/update";
 import { UpdateCard } from "./components/UpdateCard";
-import { getSettings, earlierSessions, costRows, saveNote, wantedRemove, kibbySay, officeMapLoad, officeMapSave, officeMapReset, type Earlier } from "./lib/api";
+import { getSettings, earlierSessions, costRows, saveNote, wantedRemove, officeSay, officeMapLoad, officeMapSave, officeMapReset, type Earlier } from "./lib/api";
 
 const remembered = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const remember = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* the choice is just not kept */ } };
@@ -289,14 +289,14 @@ export default function App() {
     openPerson(role.id);
   };
 
-  // Kibby, the office boy, answers through the project's account (a cheap one-shot Haiku call; the talk is not kept).
-  const sayToKibby = async (history: { who: string; text: string }[], message: string) => {
+  // Kibby and Bako, the office boys, answer through the project's account (a cheap one-shot Haiku call; the talk is not kept).
+  const sayToOffice = async (who: string, history: { who: string; text: string }[], message: string) => {
     if (!project) throw new Error("Open a project first");
     const accountId = accountOf(project);
     if (!accountId) throw new Error(NO_ACCOUNT);
     const status = await accountStatus(accountId);
     if (!status.logged_in) throw new Error("That account is not signed in. Open Accounts to sign in.");
-    return kibbySay(project.id, accountId, history, message);
+    return officeSay(project.id, accountId, who, history, message);
   };
 
   // Ask a question from the Brain: the Secretary (general questions) takes it, in a new session in plan-only mode (it can read, not change), with the question sent at once.
@@ -383,7 +383,7 @@ export default function App() {
           onSave={async (m) => { await officeMapSave(project.folder, JSON.stringify(m)); setOfficeMap(m); setOwnMap(true); setBrokenMap(null); setNotice("Saved the office of this project."); }}
           onReset={async () => { await officeMapReset(project.folder); setOfficeMap(STANDARD); setOwnMap(false); setBrokenMap(null); setNotice("This project shows the standard office again."); }}
           onClose={() => setEditing(false)} />
-      : <Office map={officeMap} looks={looks} sheetOpen={place !== "office" || person !== null} names={names} onOpen={openPlace} onOpenPerson={openPerson} onKibbySay={sayToKibby} onEdit={() => setEditing(true)} />;
+      : <Office map={officeMap} looks={looks} sheetOpen={place !== "office" || person !== null} names={names} onOpen={openPlace} onOpenPerson={openPerson} onSay={sayToOffice} onEdit={() => setEditing(true)} />;
     if (place !== "office") {
       const info = PLACES.find((x) => x.id === place);
       const brainTabs = place === "brain" ? { tabs: BRAIN_TABS, active: brainTab, onTab: (id: string) => setBrainTab(id as BrainTab), keepDraftOnTab: true } : {};

@@ -6,14 +6,15 @@
 // The map has its own zoom and its own place in the window (lib/mapview.ts), not the window's percent view: the mouse wheel moves it up and down, Shift and the wheel left and right,
 // Ctrl and the left button drags it, Ctrl and the wheel (or the + and - keys) zoom round the pointer, and Center brings the secretary's desk back to the middle.
 // A cat's state is the real state of that role's session in this project: typing is "working", a raised paw is "waiting on you".
-// Kibby, the office boy, walks the open floor of the hall with a small hop and a small lean; click him to talk (KibbyChat). He stands still while the sheet is open or he is talking,
-// and with "reduce motion". While the sheet is open the building cannot be turned and its rooms cannot be clicked.
+// Kibby and Bako, the two office boys, walk the open floor with a small hop and a small lean; click one to talk (KibbyChat). Kibby wanders; Bako sweeps and now and then fetches a bento at a door
+// and brings it to a worker (lib/bako.ts). They stand still while the sheet is open or someone is talking, and with "reduce motion". While the sheet is open the building cannot be turned and its rooms cannot be clicked.
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { Glyph, CAT_SHEET, CAT_W, CAT_H, FRAME_NAMES, catRow, KIB_SHEET, KIB_FRAMES, KIB_W, KIB_H } from "./ui";
+import { Glyph, CAT_SHEET, CAT_W, CAT_H, FRAME_NAMES, catRow, KIB_SHEET, KIB_FRAMES, KIB_W, KIB_H, BAKO_SHEET, BAKO_FRAMES, BAKO_W, BAKO_H } from "./ui";
 import { Help } from "./Help";
 import { Icon, IconButton, type IconName } from "./Icon";
-import { KibbyChat, type Turn } from "./KibbyChat";
-import { pose, startWalker, step, stillValid, talking, TICK_MS, type Pose, type Walker } from "../lib/kibby";
+import { KibbyChat, type Turn, type Who } from "./KibbyChat";
+import { pose, startWalker, step, stillValid, talking, TICK_MS, type Walker } from "../lib/kibby";
+import { bakoPose, bakoSays, bakoStillValid, bakoTalking, placesOf, startBako, tickBako, type Bako, type Drawn, type Places } from "../lib/bako";
 import type { Place } from "../lib/places";
 import { PLACES } from "../lib/places";
 import { NO_LOOKS, type Look } from "../lib/office";
@@ -53,9 +54,9 @@ export function canvasOf(img: Img): HTMLCanvasElement {
 }
 
 const loadImage = (url: string) => new Promise<HTMLImageElement>((resolve, reject) => { const im = new Image(); im.onload = () => resolve(im); im.onerror = () => reject(new Error(`could not load ${url}`)); im.src = url; });
-export type Sheets = { sheet: HTMLImageElement; kibby: HTMLImageElement };
+export type Sheets = { sheet: HTMLImageElement; kibby: HTMLImageElement; bako: HTMLImageElement };
 let sheets: Promise<Sheets> | null = null;
-export const loadSheets = () => (sheets ??= Promise.all([loadImage(CAT_SHEET), loadImage(KIB_SHEET)]).then(([sheet, kibby]) => ({ sheet, kibby })));
+export const loadSheets = () => (sheets ??= Promise.all([loadImage(CAT_SHEET), loadImage(KIB_SHEET), loadImage(BAKO_SHEET)]).then(([sheet, kibby, bako]) => ({ sheet, kibby, bako })));
 
 /** Which picture of the cat to show: its state in the project decides, and a cat blinks now and then. */
 export function frameOf(phase: number, look: Look, tick: number) {
@@ -69,7 +70,7 @@ export function frameOf(phase: number, look: Look, tick: number) {
 }
 
 /** The building and its cats, drawn piece by piece from back to front. It keeps its own clock (four steps a second, paused when the window is hidden), so only this redraws. */
-function Scene2({ scene, looks, kibby, chatting, paused }: { scene: Scene; looks: Record<string, Look>; kibby: Pose | null; chatting: boolean; paused: boolean }) {
+function Scene2({ scene, looks, crowd, paused }: { scene: Scene; looks: Record<string, Look>; crowd: Drawn[]; paused: boolean }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [art, setArt] = useState<Sheets | null>(null);
   const [tick, setTick] = useState(0);
@@ -85,19 +86,22 @@ function Scene2({ scene, looks, kibby, chatting, paused }: { scene: Scene; looks
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, scene.width, scene.height);
     ctx.drawImage(canvasOf(scene.ground), 0, 0);
-    let kib = kibby; // drawn between the pieces behind him and the pieces in front of him
-    if (kib && chatting) kib = talking(kib);
-    const drawKibby = () => { if (kib) ctx.drawImage(art.kibby, KIB_FRAMES.indexOf(kib.frame) * KIB_W, kib.dir * KIB_H, KIB_W, KIB_H, kib.x, kib.y, KIB_W, KIB_H); };
+    // the two office boys are drawn between the pieces behind them and the pieces in front of them
+    const drawBoy = (c: Drawn) => {
+      const a = c.who === "bako" ? { img: art.bako, frames: BAKO_FRAMES, w: BAKO_W, h: BAKO_H } : { img: art.kibby, frames: KIB_FRAMES, w: KIB_W, h: KIB_H };
+      const f = a.frames.indexOf(c.frame);
+      if (f >= 0) ctx.drawImage(a.img, f * a.w, c.dir * a.h, a.w, a.h, c.x, c.y, a.w, a.h);
+    };
     for (let idx = 0; idx < scene.items.length; idx++) {
       const it = scene.items[idx];
-      if (kib && kib.k === idx) drawKibby();
+      crowd.forEach((c) => { if (c.k === idx) drawBoy(c); });
       if (it.kind === "cat") {
         const role = it.role!, f = FRAME_NAMES.indexOf(frameOf(scene.cats.findIndex((c) => c.role === role) * 5, looks[role] ?? IDLE, tick));
         ctx.drawImage(art.sheet, f * CAT_W, catRow(role, it.dir ?? 0) * CAT_H, CAT_W, CAT_H, it.x, it.y, CAT_W, CAT_H);
       } else if (it.img) ctx.drawImage(canvasOf(it.img), it.x, it.y);
     }
-    if (kib && kib.k >= scene.items.length) drawKibby();
-  }, [scene, art, looks, tick, kibby, chatting]);
+    crowd.forEach((c) => { if (c.k >= scene.items.length) drawBoy(c); });
+  }, [scene, art, looks, tick, crowd]);
   return <canvas ref={canvas} width={scene.width} height={scene.height} role="img" aria-label="The Kona office, a building with a room for each place" className="pixel" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", maxWidth: "none" }} />;
 }
 
@@ -126,37 +130,59 @@ function Bubbles({ scene, looks, k }: { scene: Scene; looks: Record<string, Look
   );
 }
 
-/** The building with its cats, and Kibby on the hall. He keeps his own clock (eight steps a second) here, so only the drawing and his click box change as he walks. `children` (the
- * rooms' click areas) sit between the picture and Kibby's click box, and do not redraw on his steps. */
-function Living({ scene, looks, k, sheetOpen, chatting, onTalk, children }: { scene: Scene; looks: Record<string, Look>; k: number; sheetOpen: boolean; chatting: boolean; onTalk: () => void; children: React.ReactNode }) {
+/** The building with its cats, and the two office boys on the floor. Each keeps its own clock here (eight steps a second), so only the drawing and the click boxes change as they walk. `children` (the
+ * rooms' click areas) sit between the picture and the click boxes of the boys, and do not redraw on their steps. */
+function Living({ scene, looks, names, places, k, sheetOpen, chatting, onTalk, children }: { scene: Scene; looks: Record<string, Look>; names: Record<string, string>; places: Places; k: number; sheetOpen: boolean; chatting: Who | null; onTalk: (who: Who) => void; children: React.ReactNode }) {
   const [walker, setWalker] = useState<Walker | null>(() => startWalker(scene.walkable));
-  const [near, setNear] = useState(false);
-  const paused = sheetOpen || chatting;
+  const [bako, setBako] = useState<Bako | null>(() => startBako(scene.walkable, Math.random));
+  const [near, setNear] = useState<Who | null>(null);
+  const paused = sheetOpen || chatting !== null;
   const walkable = scene.walkable;
   useEffect(() => { setWalker((w) => (w && stillValid(w, walkable) ? w : startWalker(walkable))); }, [walkable]); // after the map changed, he starts again if his tile is gone
+  useEffect(() => { setBako((b) => (b && bakoStillValid(b, walkable) ? b : startBako(walkable, Math.random))); }, [walkable]); // and so does Bako, with his errand dropped
   useEffect(() => {
     if (paused || reducedMotion()) return;
-    const t = setInterval(() => { if (!document.hidden) setWalker((w) => (w ? step(w, walkable, Math.random) : w)); }, TICK_MS);
+    const t = setInterval(() => {
+      if (document.hidden) return;
+      setWalker((w) => (w ? step(w, walkable, Math.random) : w));
+      setBako((b) => (b ? tickBako(b, walkable, places, Math.random) : b));
+    }, TICK_MS);
     return () => clearInterval(t);
-  }, [paused, walkable]);
+  }, [paused, walkable, places]);
   const { width: W, height: H } = scene;
   const p = useMemo(() => (walker ? pose(scene, walker) : null), [scene, walker]);
+  const q = useMemo(() => (bako ? bakoPose(scene, bako) : null), [scene, bako]);
+  const crowd = useMemo(() => {
+    const list: Drawn[] = [];
+    if (p) list.push({ who: "kibby", ...(chatting === "kibby" ? talking(p) : p) });
+    if (q && bako) list.push(chatting === "bako" ? bakoTalking(q, bako) : q);
+    return list;
+  }, [p, q, bako, chatting]);
+  const says = bako && q && !sheetOpen && chatting === null ? bakoSays(bako, (role) => (names[role] ?? role).split(",")[0]) : null; // what Bako says at the door and at the desk
+  const boys: { who: Who; at: Drawn | null; name: string }[] = [{ who: "kibby", at: p ? { who: "kibby", ...p } : null, name: "Kibby" }, { who: "bako", at: q, name: "Bako" }];
   return (
     <>
-      <Scene2 scene={scene} looks={looks} kibby={p} chatting={chatting} paused={sheetOpen} />
+      <Scene2 scene={scene} looks={looks} crowd={crowd} paused={sheetOpen} />
       <Bubbles scene={scene} looks={looks} k={k} />
-      {children}
-      {p && !sheetOpen && (
-        <>
-          <button type="button" aria-label="Talk to Kibby, the office boy" onClick={onTalk} onPointerEnter={() => setNear(true)} onPointerLeave={() => setNear(false)} onFocus={() => setNear(true)} onBlur={() => setNear(false)}
-            className="absolute m-0 cursor-pointer border-0 bg-transparent p-0 outline-none"
-            style={{ left: `${((p.x + 6) / W) * 100}%`, top: `${((p.y + 2) / H) * 100}%`, width: `${(16 / W) * 100}%`, height: `${(18 / H) * 100}%` }} />
-          {near && !chatting && (
-            <span className="font-pixel pointer-events-none absolute -translate-x-1/2 -translate-y-full border-2 border-line-strong bg-surface-2 px-1.5 text-[12px] leading-5 font-bold whitespace-nowrap text-text px-shadow"
-              style={{ left: `${((p.x + 14) / W) * 100}%`, top: `${((p.y + 2) / H) * 100}%` }}>Kibby</span>
-          )}
-        </>
+      {says && q && (
+        <span data-bubble={says} className="font-pixel pointer-events-none absolute z-[1] flex -translate-x-1/2 -translate-y-full items-center gap-1.5 border-2 border-line-strong bg-surface-2 px-2 text-[15px] leading-6 font-bold whitespace-nowrap text-text px-shadow"
+          style={{ left: (q.x + 14) * k, top: (q.y + 2) * k - 6 }}>
+          {says}
+          <i aria-hidden className="absolute top-full left-1/2 -mt-[5px] size-2.5 -translate-x-1/2 rotate-45 border-r-2 border-b-2 border-line-strong bg-surface-2" />
+        </span>
       )}
+      {children}
+      {!sheetOpen && boys.map(({ who, at, name }) => at && (
+        <span key={who}>
+          <button type="button" aria-label={`Talk to ${name}, the office boy`} onClick={() => onTalk(who)} onPointerEnter={() => setNear(who)} onPointerLeave={() => setNear((n) => (n === who ? null : n))} onFocus={() => setNear(who)} onBlur={() => setNear((n) => (n === who ? null : n))}
+            className="absolute m-0 cursor-pointer border-0 bg-transparent p-0 outline-none"
+            style={{ left: `${((at.x + 6) / W) * 100}%`, top: `${((at.y + 2) / H) * 100}%`, width: `${(16 / W) * 100}%`, height: `${(18 / H) * 100}%` }} />
+          {near === who && chatting === null && (
+            <span className="font-pixel pointer-events-none absolute -translate-x-1/2 -translate-y-full border-2 border-line-strong bg-surface-2 px-1.5 text-[12px] leading-5 font-bold whitespace-nowrap text-text px-shadow"
+              style={{ left: `${((at.x + 14) / W) * 100}%`, top: `${((at.y + 2) / H) * 100}%` }}>{name}</span>
+          )}
+        </span>
+      ))}
     </>
   );
 }
@@ -164,13 +190,14 @@ function Living({ scene, looks, k, sheetOpen, chatting, onTalk, children }: { sc
 /** The small picture over each piece of the office that opens a screen: what that screen is about (the pieces are faint at rest, so the office does not turn into a sign board). */
 const CLUE: Record<string, IconName> = { brain: "bulb", files: "folder", servers: "server", costs: "coin", accounts: "key", settings: "gear", leftovers: "crate", workflows: "flow", board: "board", worktrees: "branch" };
 
-export const Office = memo(function Office({ map, looks = NO_LOOKS, names = NO_NAMES, sheetOpen, onOpen, onOpenPerson, onKibbySay, onEdit }: {
-  map: OfficeMap; looks?: Record<string, Look>; /** what each role is called */ names?: Record<string, string>; sheetOpen: boolean; onOpen: (p: Place) => void; onOpenPerson: (role: string) => void; onKibbySay: (history: Turn[], message: string) => Promise<string>; onEdit?: () => void;
+export const Office = memo(function Office({ map, looks = NO_LOOKS, names = NO_NAMES, sheetOpen, onOpen, onOpenPerson, onSay, onEdit }: {
+  map: OfficeMap; looks?: Record<string, Look>; /** what each role is called */ names?: Record<string, string>; sheetOpen: boolean; onOpen: (p: Place) => void; onOpenPerson: (role: string) => void; /** one reply from an office boy */ onSay: (who: Who, history: Turn[], message: string) => Promise<string>; onEdit?: () => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [hover, setHover] = useState<string | null>(null);
-  const [chatting, setChatting] = useState(false);
+  const [chatting, setChatting] = useState<Who | null>(null); // who is being talked to
+  const places = useMemo(() => placesOf(map), [map]); // the doors and the desks Bako goes between
   const [view, setView] = useState(savedView);
   const [scale, setScale] = useState<number | null>(savedScale); // screen pixels for each pixel of the drawing; null until the player zooms: the whole building fits
   const [ctr, setCtr] = useState<Pt | null>(null); // the drawing point in the middle of the window; null: the middle of the building
@@ -205,11 +232,11 @@ export const Office = memo(function Office({ map, looks = NO_LOOKS, names = NO_N
     return () => ro.disconnect();
   }, []);
   useEffect(() => {
-    const key = (e: KeyboardEvent) => { if (e.key === "Escape" && chatting) setChatting(false); };
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape" && chatting) setChatting(null); };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, [chatting]);
-  useEffect(() => { if (sheetOpen) { setChatting(false); setHover(null); } }, [sheetOpen]);
+  useEffect(() => { if (sheetOpen) { setChatting(null); setHover(null); } }, [sheetOpen]);
 
   const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1; // screen pixels for each CSS pixel: the percent view and Windows scaling both change it
   const content: [number, number, number, number] = [CX0, CY0, CX1, CY1];
@@ -244,7 +271,7 @@ export const Office = memo(function Office({ map, looks = NO_LOOKS, names = NO_N
     if (!el) return;
     const pan = (dx: number, dy: number) => setCtr((c) => { const l = live.current; const at = c ?? l.centre; return clampCenter({ x: at.x + dx, y: at.y + dy }, l.content); });
     const wheel = (e: WheelEvent) => {
-      if (live.current.sheetOpen || live.current.chatting) return; // Kibby's chat scrolls with the wheel
+      if (live.current.sheetOpen || live.current.chatting) return; // the chat with an office boy scrolls with the wheel
       e.preventDefault(); // (and Ctrl and the wheel must not zoom the whole window)
       if (e.ctrlKey) { // zoom round the pointer
         const z = wheelZoom(wheelCarry.current, pinchBoost(e.deltaY * (e.deltaMode === 1 ? 16 : 1))); // a pinch on a touchpad arrives here too
@@ -300,7 +327,7 @@ export const Office = memo(function Office({ map, looks = NO_LOOKS, names = NO_N
       {size.w > 0 && (
         <>
           <div style={{ position: "absolute", left, top, width: W * k, height: H * k }}>
-            <Living scene={scene} looks={looks} k={k} sheetOpen={sheetOpen} chatting={chatting} onTalk={() => setChatting(true)}>
+            <Living scene={scene} looks={looks} names={names} places={places} k={k} sheetOpen={sheetOpen} chatting={chatting} onTalk={setChatting}>
               {HITS.map((h) => (
                 <button key={h.key} type="button" tabIndex={sheetOpen ? -1 : 0} aria-label={`Open ${labelOf(h)}`}
                   className="absolute m-0 cursor-pointer border-0 bg-transparent p-0 outline-none focus-visible:outline-2 focus-visible:outline-brand"
@@ -329,7 +356,7 @@ export const Office = memo(function Office({ map, looks = NO_LOOKS, names = NO_N
         <IconButton icon="turnLeft" label="Turn the building to the left" onClick={() => turn(-1)} disabled={sheetOpen} />
         <IconButton icon="turnRight" label="Turn the building to the right" onClick={() => turn(1)} disabled={sheetOpen} />
       </div>
-      {chatting && !sheetOpen && <KibbyChat onSay={onKibbySay} onClose={() => setChatting(false)} />}
+      {chatting && !sheetOpen && <KibbyChat key={chatting} who={chatting} onSay={(h, m) => onSay(chatting, h, m)} onClose={() => setChatting(null)} />}
       {!sheetOpen && !chatting && <div className="absolute bottom-5 left-5 rounded-full bg-surface-1"><Help title="The office"><p className="m-0">Click a person, or a piece of furniture or a board, to open it. A faint icon marks each piece that opens a screen.</p><p className="m-0">Touchpad: two fingers move the map, pinch to zoom.</p></Help></div>}
     </div>
   );

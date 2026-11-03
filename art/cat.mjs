@@ -1,5 +1,5 @@
-// The Kona cat: one cat for every role, told apart by a small icon beside its head.
-// A frame is 28 x 20 pixels. The cat itself is 16 x 18 at x 6, y 2; the card with the role icon is held on the left (x 0, y 9); the raised paw uses the right edge.
+// The Kona cat: one cat for every role, told apart by its own coat, collar and eyes.
+// A frame is 28 x 20 pixels. The cat itself is 16 x 18 at x 6, y 2; the raised paw uses the right edge. (The cats used to hold a card with the role icon on the left; it was removed on 2026-11-03 because every role already has its own coat, collar and eyes, a name and a desk.)
 import { Img, fromRows } from "./lib.mjs";
 
 export const PAL = {
@@ -36,7 +36,7 @@ const flip = (row) => [...row].reverse().join(""); // a row of the picture seen 
 const LOGO_LOOK = LOGO_RIGHT.map(flip);
 
 // The cat seen from the four directions the building can turn it (dir). Two looks are drawn, the other two are their mirror images (the whole frame is mirrored,
-// so the card and the raised paw change sides too). 0 looks down-left: a three-quarter view with the eyes, the muzzle and the belly turned to the left, light from
+// so the raised paw changes sides too). 0 looks down-left: a three-quarter view with the eyes, the muzzle and the belly turned to the left, light from
 // the left so the right cheek and flank are in shade. 2 looks up-left: seen from behind, with the left cheek and the inside of the left ear showing. 1 and 3 are 0 and 2 mirrored.
 export const TURNED = [
   "..oo........oo..", ".offo......ofdo.", ".opffoooooopfdo.",
@@ -90,23 +90,6 @@ function baseCat(role, dir = 0) { // dir is 0, 2 or "logo"
 }
 const rgbaOf = (c) => { const h = c.replace("#", ""); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; };
 
-// the icons, 5 wide and 6 tall
-const ICONS = {
-  product: [".yyy.", "owwwo", "ogggo", "owwwo", "ogggo", "ooooo"], // clipboard
-  design: ["...or", "..oyo", ".oyo.", "oyo..", "ono..", "oo..."], // pencil
-  frontend: ["ooooo", "obbbo", "obwbo", "ooooo", ".ooo.", "..o.."], // screen
-  backend: ["ooooo", "oggGo", "ooooo", "oggGo", "ooooo", "ooooo"], // server
-  qa: [".sss.", "s...s", "s...s", ".sss.", "...yy", "....y"], // magnifier
-  security: ["ooooo", "obbbo", "obwbo", "obbbo", ".obo.", "..o.."], // shield
-  devops: ["ss.ss", "sssss", ".sss.", "..s..", "..s..", "..s.."], // wrench
-  marketing: ["....r", "..rrr", "orrrr", "orrrr", "..rrr", "....r"], // megaphone
-  content: [".sss.", "s...s", "sssss", "s...s", "s...s", "....."], // the letter A
-  support: [".sss.", "s...s", "s...s", "gg.gg", "gg.gg", "..m.."], // headset
-  secretary: ["..y..", ".yyy.", ".yyy.", "yyyyy", "ooooo", "..o.."], // desk bell
-};
-const iconCache = {};
-const icon = (role) => (iconCache[role] ??= fromRows(ICONS[role], PAL));
-
 export const ROLES = [
   { id: "product", name: "Product", group: "Plan" }, { id: "design", name: "Design", group: "Plan" },
   { id: "frontend", name: "Frontend", group: "Build" }, { id: "backend", name: "Backend", group: "Build" },
@@ -126,17 +109,6 @@ export function layer(fur, c = PAL.f) {
   l.outline(PAL.o);
   return l;
 }
-// a small card the cat holds, with the role icon on it (7 x 8)
-const cardCache = {};
-function card(role) {
-  if (cardCache[role]) return cardCache[role];
-  const c = new Img(7, 8);
-  c.rect(0, 0, 7, 8, PAL.o);
-  c.rect(1, 1, 5, 6, PAL.w);
-  [[0, 0], [6, 0], [0, 7], [6, 7]].forEach(([x, y]) => c.set(x, y, [0, 0, 0, 0]));
-  c.blit(icon(role), 1, 1);
-  return (cardCache[role] = c);
-}
 export const hand = (x, y, c) => { const l = new Img(FRAME_W, FRAME_H); l.rect(x, y, 2, 1, c); l.rect(x, y + 1, 2, 1, PAL.o); return l; };
 
 export function cat(role, frame, dir = 0) {
@@ -154,8 +126,7 @@ export function cat(role, frame, dir = 0) {
   if (frame === "waitA") img.blit(layer([[CX + 14, 9], [CX + 15, 9], [CX + 14, 10], [CX + 15, 10], [CX + 14, 11], [CX + 15, 11], [CX + 14, 12], [CX + 14, 13]], fur), 0, 0);
   if (frame === "waitB") img.blit(layer([[CX + 15, 8], [CX + 16, 8], [CX + 15, 9], [CX + 16, 9], [CX + 15, 10], [CX + 16, 10], [CX + 15, 11], [CX + 14, 12], [CX + 14, 13]], fur), 0, 0);
   img.blit(layer(TAIL.map(([x, y]) => [CX + x, CY + y]), fur), 0, 0);
-  if (back) return img; // from behind: no card
-  img.blit(card(role), 0, 9);
+  if (back) return img;
   img.blit(layer([[7, 13], [7, 14]], fur), 0, 0);
   return img;
 }
@@ -167,5 +138,5 @@ export function sheet() {
   return s;
 }
 
-// the cat alone, 16 x 18, without the card or the paw: for the logo and the small faces
+// the cat alone, 16 x 18, without the paw: for the logo and the small faces
 export const catBody = (role) => baseCat(role, "logo");

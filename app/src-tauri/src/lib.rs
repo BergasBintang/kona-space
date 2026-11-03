@@ -426,20 +426,21 @@ async fn write_note_with_haiku(
     Ok(text)
 }
 
-/// One reply from Kibby, the office boy: one cheap Haiku call with no tools, his character as the system prompt and the last turns of the talk in the prompt.
-/// The talk is kept on the screen only. The call's dollars go in the ledger under the kind `kibby`.
+/// One reply from an office boy (`who`: "kibby" or "bako"): one cheap Haiku call with no tools, the character as the system prompt and the last turns of the talk in the prompt.
+/// The talk is kept on the screen only. The call's dollars go in the ledger under the kind `kibby` or `bako`.
 #[tauri::command]
-async fn kibby_say(
+async fn office_say(
     sessions: State<'_, Sessions>, accounts: State<'_, Accounts>, projects: State<'_, Projects>,
-    project_id: String, account_id: Option<String>, history: Vec<kibby::Turn>, message: String,
+    project_id: String, account_id: Option<String>, who: String, history: Vec<kibby::Turn>, message: String,
 ) -> Result<String, String> {
-    let prompt = kibby::prompt(&history, &message)?;
+    let (name, persona, kind) = kibby::character(&who).ok_or("There is nobody of that name in the office")?;
+    let prompt = kibby::prompt(&history, &message, name)?;
     let folder = projects.all().into_iter().find(|p| p.id == project_id).map(|p| p.folder).ok_or("That project does not exist any more")?;
     let dir = account_id.as_ref().and_then(|id| accounts.get(id)).and_then(|a| a.config_dir);
-    let (text, record) = summary::run_haiku(kibby::PERSONA, &prompt, dir.as_deref()).await?;
-    sessions.ledger.record_oneshot("kibby", &folder, None, account_id.as_deref(), "kibby", &record);
-    let reply = kibby::tidy(&text);
-    if reply.is_empty() { Err("Kibby had nothing to say".into()) } else { Ok(reply) }
+    let (text, record) = summary::run_haiku(persona, &prompt, dir.as_deref()).await?;
+    sessions.ledger.record_oneshot(kind, &folder, None, account_id.as_deref(), kind, &record);
+    let reply = kibby::tidy(&text, name);
+    if reply.is_empty() { Err(format!("{name} had nothing to say")) } else { Ok(reply) }
 }
 
 /// A project's servers (references: host, user, key file path, fingerprint, roles; never a key).
@@ -765,7 +766,7 @@ pub fn run() {
             app.manage(backup::SettingsStore::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![read_skill_files, save_skill_folder, default_role_kit, apply_default_tree, check_claude, save_tool, delete_tool, read_skill, write_skill, delete_skill, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, cost_rows, set_project_github, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, kibby_say, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, workflow_list, workflow_save, workflow_delete, office_map_load, office_map_save, office_map_reset, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
+        .invoke_handler(tauri::generate_handler![read_skill_files, save_skill_folder, default_role_kit, apply_default_tree, check_claude, save_tool, delete_tool, read_skill, write_skill, delete_skill, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, cost_rows, set_project_github, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, office_say, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, workflow_list, workflow_save, workflow_delete, office_map_load, office_map_save, office_map_reset, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { lookOf, pose, startWalker, step, stillValid, talking, towardsViewer, type Walker } from "./kibby.ts";
-import { buildScene } from "../office/engine/scene.ts";
+import { buildScene, kibbySlot } from "../office/engine/scene.ts";
 import { STANDARD } from "../office/map.ts";
 
 const seeded = (seed: number) => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32; };
@@ -120,4 +120,22 @@ test("when he is not stopping he sets off at once: he is never still for a tick 
   }
   assert.ok(moving > 1000);
   assert.equal(still, 0, "no tick of standing frames in the middle of a walk");
+});
+
+test("what is in his paw is drawn with him: beside a shelf or a cabinet behind him the broom is not hidden, and the paw's place never puts him earlier than his body's", () => {
+  let later = 0;
+  for (let view = 0; view < 4; view++) {
+    const scene = buildScene(STANDARD, view);
+    scene.walkable.forEach((row, j) => row.forEach((free, i) => {
+      if (!free) return;
+      for (const side of [-1, 1] as const) {
+        const body = kibbySlot(scene, i + 0.5, j + 0.5, 0).k, paw = kibbySlot(scene, i + 0.5, j + 0.5, side).k;
+        assert.ok(paw >= body, `side ${view}, tile ${i},${j}: the paw's thing would be drawn behind something that lies behind his body`);
+        if (paw > body) later++;
+      }
+    }));
+  }
+  assert.ok(later > 20, "there are places where the broom used to be hidden behind a shelf, a cabinet or a board that stands behind him");
+  const scene = buildScene(STANDARD, 0);
+  assert.ok(kibbySlot(scene, 14.5, 2.5, 1).k > kibbySlot(scene, 14.5, 2.5, 0).k, "beside the cabinets of the back wall, the right-hand thing is drawn after them");
 });

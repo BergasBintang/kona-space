@@ -32,6 +32,7 @@ Agreed with the owner on 2026-10-31 (decision 57 in `kona-space-app.md`). This i
 - The editor cannot rename or recolour rooms, add a room or change its floor pattern: it paints with the rooms that exist. A map made by hand can.
 - The plan has no zoom by mouse wheel (buttons only), no box select, no copy and paste.
 - Windows only on tall walls (the back of the side you look from); a low wall shows only a door.
+- **A door is where Bako fetches the food (2026-11-03).** Bako, the second office boy, goes to a door of the map now and then and brings a bento to a worker. With several doors he picks one by chance; with none, or none he can walk to (the floor in front of it must be free), he only sweeps.
 - The first pipeline (`art/office.mjs` and friends) was removed in 0.26.0 (it is in git history).
 
 ## The editor since 2026-11-02 (ticket T-0005, decision 60)

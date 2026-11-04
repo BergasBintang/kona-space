@@ -7,7 +7,7 @@ import { Button, Glyph } from "./ui";
 import { Confirm } from "./Confirm";
 import { Help } from "./Help";
 import { Select } from "./pick";
-import { getZoom, onZoom, setZoom, ZOOMS, type Zoom } from "../lib/zoom";
+import { DEFAULT_ZOOM, getZoom, onZoom, setZoom, ZOOMS, type Zoom } from "../lib/zoom";
 import { checkForUpdate, installUpdate, useUpdate } from "../lib/update";
 import { KonaMark } from "./KonaMark";
 
@@ -52,7 +52,7 @@ export function Settings({ projects, version, onProjects }: { projects: Project[
 
         <section className="flex flex-col gap-3" aria-label="Size">
           <div className="flex items-center gap-2.5"><h2 className="m-0 text-[18px] leading-7 font-bold">Size</h2><Help title="Size"><p className="m-0">How big everything is drawn. Smaller fits more on a small screen.</p><p className="m-0">Ctrl and minus or plus change it from anywhere; Ctrl and 0 goes back to 100%.</p></Help></div>
-          <div className="max-w-[240px]"><Select ariaLabel="Size" value={String(zoom)} onChange={(v) => setZoom(Number(v) as Zoom)} options={ZOOMS.map((z) => ({ value: String(z), label: `${z}%`, hint: z === 100 ? "Normal" : undefined }))} /></div>
+          <div className="max-w-[240px]"><Select ariaLabel="Size" value={String(zoom)} onChange={(v) => setZoom(Number(v) as Zoom)} options={ZOOMS.map((z) => ({ value: String(z), label: `${z}%`, hint: z === DEFAULT_ZOOM ? "Default" : undefined }))} /></div>
         </section>
 
         <section className="flex flex-col gap-3" aria-label="Updates">

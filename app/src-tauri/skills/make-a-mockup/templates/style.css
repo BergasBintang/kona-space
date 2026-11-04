@@ -1,0 +1,51 @@
+/* The design values come first, each with its code. Rules below use the variables and never a bare size.
+   If the project has its own values, copy them in here and keep the codes. A value nobody gave is [TBD], and is listed in mockup.json. */
+:root {
+  /* space */
+  --space-1: 4px;   /* S1 */
+  --space-2: 8px;   /* S2 */
+  --space-3: 16px;  /* S3 */
+  --space-4: 24px;  /* S4 */
+  --space-inset: var(--space-2); /* S5 = S2, the padding inside a card */
+  /* shape */
+  --border: 1px;                 /* B1 */
+  --radius-outer: 12px;          /* R1 */
+  --radius-inner: calc(var(--radius-outer) - var(--border) - var(--space-inset)); /* R2 = R1 - B1 - S5, a formula, so it cannot drift */
+  /* type */
+  --text-body: 16px;   /* T1 */
+  --text-title: 24px;  /* T2 */
+  --measure: 480px;    /* W1, the widest a column of text gets */
+  /* colour */
+  --c-page: #f7f5ef;   /* K1 */
+  --c-card: #ffffff;   /* K2 */
+  --c-text: #1f2328;   /* K3 */
+  --c-muted: #5b636b;  /* K4 */
+  --c-line: #d9d6cc;   /* K5 */
+  --c-accent: #2f6f5e; /* K6 */
+  --c-error: #a8321f;  /* K7 */
+}
+
+/* the dark values: once for the sheet's switch, once for a computer set to dark */
+:root[data-theme="dark"] {
+  --c-page: #16181a; --c-card: #1f2326; --c-text: #eceae4; --c-muted: #a3aab0; --c-line: #343a3e; --c-accent: #6fb7a1; --c-error: #e58d7c;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --c-page: #16181a; --c-card: #1f2326; --c-text: #eceae4; --c-muted: #a3aab0; --c-line: #343a3e; --c-accent: #6fb7a1; --c-error: #e58d7c;
+  }
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--c-page); color: var(--c-text); font: var(--text-body) / 1.5 system-ui, sans-serif; }
+main { max-width: var(--measure); margin: 0 auto; padding: var(--space-4) var(--space-3); display: grid; gap: var(--space-3); }
+h1 { margin: 0; font-size: var(--text-title); }
+p { margin: 0; }
+.muted { color: var(--c-muted); }
+.card { background: var(--c-card); border: var(--border) solid var(--c-line); border-radius: var(--radius-outer); padding: var(--space-inset); display: grid; gap: var(--space-2); }
+.card .inner { border-radius: var(--radius-inner); background: var(--c-page); padding: var(--space-2); }
+label { display: grid; gap: var(--space-1); }
+input { font: inherit; color: inherit; background: var(--c-page); border: var(--border) solid var(--c-line); border-radius: var(--radius-inner); padding: var(--space-2); }
+button, .button { font: inherit; cursor: pointer; text-align: center; text-decoration: none; color: var(--c-page); background: var(--c-accent); border: 0; border-radius: var(--radius-inner); padding: var(--space-2) var(--space-3); }
+button.quiet { color: var(--c-text); background: transparent; border: var(--border) solid var(--c-line); }
+.error { color: var(--c-error); }
+[hidden] { display: none; }

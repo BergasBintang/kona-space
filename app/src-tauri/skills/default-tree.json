@@ -15,6 +15,8 @@
   "design": [
     { "branch": "Making a screen", "when": "something new or a redesign", "skills": [
       ["design-a-screen", "Layout, order and every state"],
+      ["make-a-mockup", "A page to click through, with made-up data"],
+      ["reverse-a-mockup", "A built page, copied static with made-up data"],
       ["ui-words", "Buttons, errors, empty states"]
     ] },
     { "branch": "Judging a screen", "when": "something already exists", "skills": [
@@ -25,6 +27,9 @@
   "frontend": [
     { "branch": "Building", "when": "adding or changing what people see", "skills": [
       ["build-a-screen", "Any screen, form or component"],
+      ["build-from-a-mockup", "A mockup the owner agreed to, built for real"],
+      ["make-a-mockup", "A page to click through, with made-up data"],
+      ["reverse-a-mockup", "A built page, copied static with made-up data"],
       ["write-tests-first", "Logic that can break"],
       ["accessibility-check", "Forms, dialogs, menus"]
     ] },

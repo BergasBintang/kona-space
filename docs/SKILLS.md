@@ -24,7 +24,7 @@ Kona's built-in skills use `templates/` and `references/`. They have no `scripts
 - **A new project** gets all the skills in `.kona/skills/` and everyone's tree in `.kona/role-kits.json` when it is added. A folder that already has `role-kits.json` is left alone.
 - **An older project** keeps what it has. The Skills tab offers "Use it for this person" and "For everyone in this project"; the tree joins what is there, and nothing of the owner's is replaced.
 - **Updates.** `.kona/builtin-skills.json` holds a fingerprint of what Kona wrote. When a new version of Kona has better text, a copy still exactly as Kona wrote it is replaced. A copy the owner changed, and a skill the owner deleted, stay that way.
-- **Cost.** A session only sees that person's skills (`--plugin-dir`), so forty skills in the folder cost nothing extra. Each person starts at about 280 to 500 tokens: their list plus the tree.
+- **Cost.** A session only sees that person's skills (`--plugin-dir`), so forty-three skills in the folder cost nothing extra. Each person starts at about 280 to 500 tokens: their list plus the tree.
 
 ## Rules for a built-in skill
 
@@ -60,7 +60,7 @@ Kona's built-in skills use `templates/` and `references/`. They have no `scripts
 - A description is at most 1,024 characters. It says what the skill does and when to use it, with words people really use.
 - `SKILL.md` stays under 500 lines, and references are one level deep.
 
-**All 40 were written fresh for Kona.** No text was copied from these sources, so no licence comes along with them. The methods are common practice; thanks to the authors above for writing them down well.
+**All 43 were written fresh for Kona.** (The first 40 on 2026-11-02, the three mockup skills on 2026-11-04.) No text was copied from these sources, so no licence comes along with them. The methods are common practice; thanks to the authors above for writing them down well.
 
 **Tried in real conversations (2026-11-02, a throwaway project, Sonnet, through Kona's window):**
 
@@ -69,3 +69,13 @@ Kona's built-in skills use `templates/` and `references/`. They have no `scripts
 - In the first run Sora did not open the template, because the skill only said "the template has both forms". After every pointer was changed to an order ("open the template"), Sora opened it. `cargo test` now checks this wording.
 - A built-in skill in the project was updated by itself when the program had new text.
 - A description with a colon in it was read correctly, so the rule against colons is a caution and not a proven need.
+
+## The mockup skills (2026-11-04, 0.33.0)
+
+| Skill | Who has it | What it does |
+|---|---|---|
+| `make-a-mockup` | design, frontend | Draws a page or flow that runs by itself in the Mockups sheet, with made-up data. HTML and CSS are required, JavaScript is optional. Every size has a code and a variable; a derived value is a `calc()` formula; an unknown value is `[TBD]` and is listed. `templates/` holds a starter login page and dashboard, a style sheet, `mockup.json`, the fake API and data, and `check.mjs` (an optional Node check) |
+| `reverse-a-mockup` | design, frontend | Reads a built project's own source and rebuilds a few pages as a static mockup with made-up data. Never the live site, never real accounts. Says for each page whether it was compared with the live site (public pages) or checked against the source only |
+| `build-from-a-mockup` | frontend | Builds the page for real in the project's stack: maps the mockup's value codes to the project's tokens, keeps the HTML and CSS, swaps the fake API for the real client, and lists every difference |
+
+**Tried in real conversations (2026-11-04, Haiku, a throwaway school project, the built program):** Jiro built a sign-in page and a course list from a card in a ticket copy and handed over a faithful report; Nokka made a course page that runs in the sheet; a session reversed two pages of the built site. **Found:** a mockup runs where a form cannot be sent, so a submit button does nothing (the skills now say to use a plain button with a click handler); a ticket copy needs read access to the main folder's mockups and skill files (a read rule, not `--add-dir`, which also allows writing). Details: `docs/LESSONS.md`, section 15.

@@ -2,6 +2,16 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.33.0, 2026-11-04
+
+Three new skills for drawing and building pages, and the window opens full screen at an 80 percent view.
+
+- **Three skills for mockups.** `make-a-mockup` draws a page that runs by itself with made-up data (HTML and CSS required, JavaScript optional, every size a named value, unknown values marked `[TBD]`, a check script and a starter login page with three made-up accounts). `reverse-a-mockup` reads a built project's own source and copies a few pages as a static mockup, never from the live site or real data. `build-from-a-mockup` turns an agreed mockup into the project's own code, with its own values and its real API. Nokka (the Designer) and Jiro (the Frontend) have them in their trees.
+- **A ticket's own copy can read what it needs.** The owner's mockups and the person's skill files live in the main folder, which the copy does not hold. The session may now read them there, and only read: it still has to ask before it writes anywhere outside its copy.
+- **Opens full screen.** The middle button of the title bar brings the window back at half the width and half the height of the screen, in the middle.
+- **80 percent is the default view.** Ctrl and 0 goes back to it. A copy that was already installed starts at 80 once; after that your own choice is kept.
+- **Good to know.** A mockup cannot send a form, so a button that relies on the form's own submit does nothing there. The skills say so, and make buttons that work.
+
 ## 0.32.0, 2026-11-04
 
 Mockups: a big screen in the office opens a sheet where the pages that people drew for a project can be clicked through, in drawn devices.

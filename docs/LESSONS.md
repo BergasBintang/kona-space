@@ -55,6 +55,7 @@ Every line was paid for with a correction or a wasted hour. Before showing the o
 23. A Rust compile error kills the dev window. A backslash in a Rust test string is the usual cause.
 24. Open choices go to the owner through the question tool, the recommended answer first. Ask only what has not been said.
 25. A piece placed in the office is looked at in the picture of the real office, from all four sides, and nothing stands beside a doorway (a test checks it).
+26. A page, a mockup or a button that people click is proven by clicking it in the real window. A test of its logic in Node proves only the logic: a form button that could not be sent passed every such test.
 
 ---
 
@@ -564,3 +565,23 @@ What the owner said is printed by `node tests/owner-said.mjs` in `app/`. The dec
 | The build failed on a function with the same name as mine | `project_folder` already existed in `lib.rs` | Search for a name before adding it to a big file |
 | The owner's screen recording was a good test video | H.264 with AAC, 1080p, 19.5 s, 20.7 MB, its index at the END of the file, so the browser reads the end first (a range request) | Its path is given to the test by `MOCK_TEST_VIDEO`; the file is copied into the throwaway project and deleted with it, never changed and never kept in the repo |
 | A release build is about 6 minutes and leaves little free memory; a debug build with the real policy is about a minute | LTO and one code unit in the release profile | Say the cost first. Use the debug build for tests of the window; the release build is for the release |
+
+## 15. What was found in the session of 2026-11-04, later (0.33.0: the three mockup skills, the window)
+
+What the owner said is printed by `node tests/owner-said.mjs` in `app/`. The tickets are T-0019 to T-0023; decisions 66, 75, 76 and 77 of `kona-space-app.md`.
+
+| Seen | Cause | Keep |
+|---|---|---|
+| The Sign in button of a mockup did nothing, with no error, in the Mockups sheet. The first starter page and the first reversed card both had it. Tests in Node of the fake API had passed | A mockup runs where a form cannot be sent, so the browser never fires the form's `submit` event. A button that relies on it is dead. Proven by contrast: the same click worked on a `type="button"` version | A page people click is proven by clicking it in the real sheet (benchmark 26). The rule is now in `make-a-mockup` (plain button, click handler, Enter by hand); a second run of `reverse-a-mockup` followed it by itself |
+| My own clicks in the sheet missed their targets for an hour | I took the screenshot's pixels for the window's pixels. The scale between them was 1.2, not 1.25 | Calibrate before clicking: the page can print the click it got (a temporary line that adds the clicked tag to the page). Take it out afterwards |
+| A session in a ticket copy was refused the owner's mockups, and also the template files of its own skills | Git does not track `.kona`, so the copy has no `.kona`; the mockups and the person's skill files are in the main folder | The session gets two read rules (`copy_read_rules` in `tickets.rs`), not `--add-dir`: with `--add-dir` a session could also write into the mockups (a file was made there). Rule syntax on Windows: forward slashes, `Read(D:/folder/**)` |
+| The same test on a Windows path: `Read(//D:/...)` was refused, `Read(D:/...)` and `Read(//d/...)` worked | Claude Code reads the rule as a path; a double slash then a drive with a colon is not one | Try the rule in a session before relying on it, and keep the form that worked in the test next to the code |
+| A Rust test failed to compile after I wrote a string with a backslash through a shell heredoc | The shell halved the backslashes (benchmark 22 and 23, again) | Write Rust with the editor tool, never through a heredoc |
+| A stray `python -` waited for input for ten minutes | The command line read standard input | Benchmark 22 says it: never `python -`. Use the file tools |
+| Haiku built a real page from a mockup in about 3 cents: it read the card from the main folder, mapped every code to the project's own token, kept the parts, swapped the fake API for the real client, wrote tests first, committed, and listed what differed | The skill said what to read, what to map and what to hand over | A small cheap model is enough to prove a skill, and it shows where the words are unclear. Read what it hands over as a report to check, not as proof |
+| The permission check refused my script that sent restore and maximise messages to the window | It looked like driving another program | I did not look for another way round it. The owner tried the window by hand: "the view is good" |
+| The window restore rule is half the screen's usable width and height, centred; Kona opens full screen at an 80 percent view; the saved percent of older installs is dropped once | Owner's word of 2026-11-04 | Decision 77. The stored percent was always 100 because every start saved it, so a one-time reset (`kona.zoom.v2`) was the only way to give older installs the new default |
+
+**Left behind by the tests (not deleted, say so):** an empty folder `D--temp-kona-e2e-project` in `.claude\projects` that dates from 2026-10-30. Everything this session made was removed: the throwaway project and its folder, the test copy of the program was closed, and no transcripts exist (the test sessions ran with `--no-session-persistence`).
+
+**Not seen:** a session started from the Kona window with the new read rules (the card path), Jiro building from a card that Nokka made, and the pages opened on a screen with a different display scale.

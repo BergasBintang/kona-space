@@ -5,16 +5,23 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 export const ZOOMS = [100, 90, 80] as const;
 export type Zoom = (typeof ZOOMS)[number];
 
-let current: Zoom = 100;
+/** What a fresh Kona uses, and what Ctrl and 0 goes back to. */
+export const DEFAULT_ZOOM: Zoom = 80;
+
+let current: Zoom = DEFAULT_ZOOM;
 const listeners = new Set<(z: Zoom) => void>();
 
 export const getZoom = (): Zoom => current;
 export const onZoom = (f: (z: Zoom) => void) => { listeners.add(f); return () => { listeners.delete(f); }; };
 
 export function loadZoom() {
-  let saved = 100;
-  try { saved = Number(localStorage.getItem("kona.zoom")) || 100; } catch { /* use 100 */ }
-  setZoom((ZOOMS as readonly number[]).includes(saved) ? (saved as Zoom) : 100);
+  let saved: number = DEFAULT_ZOOM;
+  try {
+    // Before 0.33.0 every start stored 100 whether anyone chose it or not, so the old value is dropped once; later choices are kept.
+    if (localStorage.getItem("kona.zoom.v2")) saved = Number(localStorage.getItem("kona.zoom")) || DEFAULT_ZOOM;
+    localStorage.setItem("kona.zoom.v2", "1");
+  } catch { /* use the default */ }
+  setZoom((ZOOMS as readonly number[]).includes(saved) ? (saved as Zoom) : DEFAULT_ZOOM);
 }
 
 export function setZoom(z: Zoom) {
@@ -25,9 +32,9 @@ export function setZoom(z: Zoom) {
   listeners.forEach((f) => f(z));
 }
 
-/** One step smaller (-1) or bigger (+1), or back to 100 (0). Ctrl and minus, plus, zero. */
+/** One step smaller (-1) or bigger (+1), or back to the default (0). Ctrl and minus, plus, zero. */
 export function stepZoom(dir: -1 | 0 | 1) {
-  if (dir === 0) return setZoom(100);
+  if (dir === 0) return setZoom(DEFAULT_ZOOM);
   const i = ZOOMS.indexOf(current) - dir; // the list runs from big to small
   setZoom(ZOOMS[Math.min(ZOOMS.length - 1, Math.max(0, i))]);
 }

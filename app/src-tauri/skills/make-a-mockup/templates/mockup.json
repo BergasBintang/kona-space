@@ -1,0 +1,18 @@
+{
+  "name": "Sign in and dashboard",
+  "entry": "index.html",
+  "project": "the folder of the project this came from",
+  "values": [
+    { "code": "S1", "variable": "--space-1", "value": "4px", "formula": "" },
+    { "code": "S2", "variable": "--space-2", "value": "8px", "formula": "" },
+    { "code": "S3", "variable": "--space-3", "value": "16px", "formula": "" },
+    { "code": "S4", "variable": "--space-4", "value": "24px", "formula": "" },
+    { "code": "S5", "variable": "--space-inset", "value": "8px", "formula": "S2" },
+    { "code": "B1", "variable": "--border", "value": "1px", "formula": "" },
+    { "code": "R1", "variable": "--radius-outer", "value": "12px", "formula": "" },
+    { "code": "R2", "variable": "--radius-inner", "value": "3px", "formula": "R1 - B1 - S5" },
+    { "code": "T1", "variable": "--text-body", "value": "16px", "formula": "" },
+    { "code": "T2", "variable": "--text-title", "value": "24px", "formula": "" },
+    { "code": "W1", "variable": "--measure", "value": "480px", "formula": "" }
+  ]
+}

@@ -188,7 +188,7 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     // and the voice, when it is on for this session (it changes wording only; see persona.rs for the scope clause)
     let voice_prompt = match &role { Some(r) => Persona::for_role(&r.person, r.persona.trim(), &r.voice, persona.enabled).prompt(), None => persona.prompt() }; // a person talks in their own voice; with no role the shared one
     let extra: Vec<String> = role.as_ref().map(|r| if r.person.is_empty() { r.brief.trim().to_string() } else { format!("Your name is {}. {}", r.person, r.brief.trim()) }).filter(|b| !b.is_empty()).into_iter().chain(skill_notes(&kit))
-        .chain(ticket.as_ref().map(tickets::prompt_for)).chain(digest.filter(|d| !d.trim().is_empty())).chain([BRAIN_RULES.to_string(), READABLE_FILES.to_string()]).chain(voice_prompt).collect();
+        .chain(ticket.as_ref().map(|t| tickets::prompt_for(t, &folder))).chain(digest.filter(|d| !d.trim().is_empty())).chain([BRAIN_RULES.to_string(), READABLE_FILES.to_string()]).chain(voice_prompt).collect();
     if !extra.is_empty() {
         cmd.args(["--append-system-prompt", &extra.join("\n\n")]);
     }
@@ -203,6 +203,8 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     for (name, def) in &kit.mcp { servers.insert(name.clone(), def.clone()); }
     if !servers.is_empty() { cmd.args(["--mcp-config", &json!({"mcpServers": servers}).to_string()]); }
     if servers.contains_key("kona-board") { cmd.args(["--allowedTools", "mcp__kona-board"]); }
+    // a ticket's own copy has no `.kona/mockups` (Git does not track `.kona`): the session may read the main folder's, and the person's skill files (their templates sit in `.kona/role-plugins`), and nothing else outside the copy
+    if ticket.as_ref().is_some_and(|t| !t.worktree.is_empty()) { cmd.arg("--allowedTools").args(tickets::copy_read_rules(&folder)); }
     if role.is_some() {
         cmd.args(["--strict-mcp-config", "--setting-sources", "project,local"]);
         if let Some(dir) = &kit.plugin_dir { cmd.arg("--plugin-dir").arg(dir); }

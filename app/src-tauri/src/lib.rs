@@ -773,6 +773,28 @@ pub fn run() {
                 responder.respond(mock::serve(&lookup, request.method().as_str(), request.uri().path(), range).into_response());
             });
         })
+        // the window opens full screen (tauri.conf.json); the middle button of the title bar then brings it back at half the width and half the height of the screen, in the middle
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Resized(_) = event {
+                use std::sync::atomic::{AtomicBool, Ordering};
+                static WAS_FULL: AtomicBool = AtomicBool::new(true);
+                if window.is_minimized().unwrap_or(false) {
+                    return; // minimising also reports a new size; wait for the real change
+                }
+                let full = window.is_maximized().unwrap_or(false) || window.is_fullscreen().unwrap_or(false);
+                if WAS_FULL.swap(full, Ordering::SeqCst) && !full {
+                    if let Ok(Some(m)) = window.current_monitor() {
+                        let area = m.work_area();
+                        let (w, h) = (area.size.width / 2, area.size.height / 2);
+                        let _ = window.set_size(tauri::PhysicalSize::new(w, h));
+                        let _ = window.set_position(tauri::PhysicalPosition::new(
+                            area.position.x + (area.size.width - w) as i32 / 2,
+                            area.position.y + (area.size.height - h) as i32 / 2,
+                        ));
+                    }
+                }
+            }
+        })
         .setup(|app| {
             // %APPDATA%\Kona\kona.db (the plan's place for the app's own data)
             let base = app.path().app_data_dir().ok().and_then(|p| p.parent().map(|d| d.join("Kona"))).ok_or("no app data folder")?;

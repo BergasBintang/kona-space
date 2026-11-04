@@ -385,13 +385,44 @@ pub fn remove(dir: &Path, id: &str) -> Result<(), String> {
 }
 
 /// The paragraph that tells a session which ticket it works on.
-pub fn prompt_for(t: &Ticket) -> String {
+pub fn prompt_for(t: &Ticket, main_folder: &str) -> String {
     let mut p = format!("You are working on ticket {}: {}.", t.id, t.title);
     if !t.description.trim().is_empty() { p.push_str(&format!(" What it is: {}", one_line(&t.description))); }
     if !t.acceptance.trim().is_empty() { p.push_str(&format!(" It is done when: {}", one_line(&t.acceptance))); }
     if !t.worktree.is_empty() {
         p.push_str(&format!(" You are working in this ticket's own copy of the repository, on the branch {}. Commit your work there when it is ready; do not switch branches.", t.branch));
+        // the copy holds only what Git tracks, and `.kona` is not tracked, so the owner's mockups are only in the main folder (read only, see `copy_read_rules`)
+        p.push_str(&format!(" The mockups are not in your copy. They are in the main project folder, at {}/.kona/mockups/<card>/. You may read them there; do not change them.", slashes(main_folder)));
     }
     p.push_str(" You can read and change tickets with the kona-board tools. Keep this ticket's next step up to date with update_ticket. When your part is ready for the owner to look at, move it to review. Never move a ticket to done: only the owner does that.");
     p
+}
+
+fn slashes(p: &str) -> String {
+    p.replace('\\', "/").trim_end_matches('/').to_string()
+}
+
+/// The one thing a ticket's own copy may read outside itself: the owner's mockups in the main folder. A read rule, so the session can read them and
+/// still has to ask before it writes there (tried with Claude Code 2.1.293: `--add-dir` let a session write into them too).
+/// The skills of the person live in `.kona/role-plugins` of the main folder too, and a skill's template files are read from there (a copy was refused them
+/// in the same test), so the same kind of rule covers that folder.
+pub fn copy_read_rules(main_folder: &str) -> Vec<String> {
+    let main = slashes(main_folder);
+    vec![format!("Read({main}/.kona/mockups/**)"), format!("Read({main}/.kona/role-plugins/**)")]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_session_in_a_ticket_copy_is_told_where_the_mockups_are_and_may_only_read_them() {
+        let t = Ticket { id: "T-0001".into(), title: "Sign in".into(), worktree: "x".into(), branch: "feat/T-0001".into(), ..Default::default() };
+        assert_eq!(copy_read_rules("D:\\work\\school\\"), ["Read(D:/work/school/.kona/mockups/**)", "Read(D:/work/school/.kona/role-plugins/**)"]);
+        let p = prompt_for(&t, "D:\\work\\school");
+        assert!(p.contains("D:/work/school/.kona/mockups/<card>/") && p.contains("do not change them"));
+        // a session in the main folder has them already and is told nothing about them
+        let main = Ticket { worktree: String::new(), ..t };
+        assert!(!prompt_for(&main, "D:\\work\\school").contains("mockups"));
+    }
 }

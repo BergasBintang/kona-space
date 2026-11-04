@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Kona",
-  "version": "0.32.0",
+  "version": "0.33.0",
   "identifier": "dev.kona.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -15,6 +15,7 @@
         "title": "Kona",
         "width": 1440,
         "height": 900,
+        "maximized": true,
         "dragDropEnabled": false,
         "additionalBrowserArgs": "--disable-gpu --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection"
       }

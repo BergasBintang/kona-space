@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Your courses</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main data-part="dashboard-page">
+    <h1>Your courses</h1>
+    <p class="muted" data-part="state-loading">Loading your courses...</p>
+    <section class="card" data-part="state-empty" hidden>
+      <p>No courses yet.</p>
+      <p class="muted">When you join one, it shows up here.</p>
+    </section>
+    <section class="card" data-part="state-error" role="alert" hidden>
+      <p class="error" data-part="error-text"></p>
+      <button type="button" data-part="retry">Try again</button>
+    </section>
+    <ul class="card" data-part="course-list"></ul>
+    <a class="button" href="index.html" data-part="sign-out">Sign out</a>
+  </main>
+  <script src="data.js"></script>
+  <script src="api.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

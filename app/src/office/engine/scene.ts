@@ -4,7 +4,7 @@
 import { Img } from "./img.ts";
 import { WALL_SHADES } from "./palette.ts";
 import { Iso, LOW, WALL, STEP } from "./iso.ts";
-import { KINDS, Stage, footprintOf, type Item } from "./furniture.ts";
+import { KINDS, Stage, footprintOf, seatCat, type Item } from "./furniture.ts";
 import { renderWalls, type WallBox } from "./walls.ts";
 import { ARTS, UNIQUE_ARTS, WALL_PAGES, decorPlan, decorRect } from "./decor.ts";
 import { drawGround } from "./floor.ts";
@@ -37,10 +37,26 @@ const ARTS_LABEL = (art: string) => ARTS[art]?.label ?? art;
 
 export const styleMap = (map: OfficeMap) => new Map(map.styles.map((r) => [r.id, r] as [string, FloorStyle]));
 
-export function buildScene(map: OfficeMap, view: number): Scene {
+/** The chairs of the meeting room: the 1 x 1 chairs that touch a long meeting table along one of its sides, in a fixed order (by row, then by column), as [index in the map, chair]. */
+export function meetingSeats(map: OfficeMap): { k: number; o: OfficeMap["objects"][number] }[] {
+  const tables = map.objects.map((o) => (o.kind === "workflow table" ? footprintOf(o) : null)).filter((f): f is [number, number, number, number] => f !== null);
+  const out: { k: number; o: OfficeMap["objects"][number] }[] = [];
+  map.objects.forEach((o, k) => {
+    if (o.kind !== "chair" || !tables.some(([ti, tj, tw, td]) => (o.i >= ti && o.i < ti + tw && (o.j === tj - 1 || o.j === tj + td)) || (o.j >= tj && o.j < tj + td && (o.i === ti - 1 || o.i === ti + tw)))) return;
+    out.push({ k, o });
+  });
+  return out.sort((a, b) => a.o.j - b.o.j || a.o.i - b.o.i);
+}
+
+/** `seated` says which people sit at the meeting table now: the person's id, and the number of the chair they take (a person keeps their chair for the whole meeting). A person whose number is more than
+ * the chairs of the room stays at their desk, and so does everybody when the office has no long meeting table. */
+export function buildScene(map: OfficeMap, view: number, seated: Readonly<Record<string, number>> = {}): Scene {
   const iso = new Iso(map.cols, map.rows, view), styleOf = styleMap(map);
   const stage = new Stage(iso);
+  const seats = meetingSeats(map), sitting = Object.entries(seated).filter(([, n]) => Number.isInteger(n) && n >= 0 && n < seats.length);
+  for (const [role] of sitting) stage.away.add(role);
   map.objects.forEach((o, k) => { try { KINDS[o.kind]?.make(stage, k, o); } catch { /* a broken object is left out; checks.ts names it */ } });
+  for (const [role, n] of sitting) { try { seatCat(stage, seats[n].k, seats[n].o, role); } catch { /* the cat stays away */ } }
   const ground = drawGround(map, iso, stage.rugs, styleOf);
 
   // ---- walls: a block on every wall tile, tall where the open air is behind it, low elsewhere; all one colour (palette.ts WALL_COLOUR)
@@ -105,6 +121,10 @@ export function buildScene(map: OfficeMap, view: number): Scene {
     const person = o.kind === "workstation";
     hits.push({ key: person ? `person:${String(o.role)}` : `piece:${o.kind}`, kind: person ? "person" : "piece", role: person ? String(o.role) : undefined, opens: kd.opens, label: kd.label, rect: [bx0 - 2, by0 - 2, bx1 + 2, by1 + 2], front: by1 });
   });
+  for (const [role, n] of sitting) {
+    const seat = seats[n];
+    sorted.forEach((it, m) => { if (it.kind === "cat" && it.role === role && it.ref === seat.k) { const b = sbox[m]; hits.push({ key: `seated:${role}`, kind: "person", role, label: "Cat", rect: [b[0] - 2, b[1] - 2, b[2] + 2, b[3] + 2], front: b[3] }); } });
+  }
   map.attach.forEach((a) => {
     const page = a.kind === "art" && a.art && UNIQUE_ARTS.includes(a.art) ? WALL_PAGES[a.art] : undefined;
     if (!page || !a.art) return;

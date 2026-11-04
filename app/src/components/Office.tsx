@@ -33,12 +33,15 @@ const IDLE: Look = { mode: "idle", word: null, glyph: null, sessionId: null };
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
 /** The scenes of a map, one for each side, built when first asked for and kept while the map is the same one. */
-const scenes = new WeakMap<OfficeMap, Scene[]>();
-export function sceneOf(map: OfficeMap, view: number): Scene {
+const scenes = new WeakMap<OfficeMap, Map<string, Scene>>();
+const NOBODY: Record<string, number> = {};
+/** `seated` says who sits at the meeting table now (person -> chair number, see buildScene); a scene is kept for each side and each such arrangement. */
+export function sceneOf(map: OfficeMap, view: number, seated: Record<string, number> = NOBODY): Scene {
   let list = scenes.get(map);
-  if (!list) { list = []; scenes.set(map, list); }
-  if (!list[view]) { try { list[view] = buildScene(map, view); } catch (e) { console.warn("The office map could not be drawn; the standard office is shown instead.", e); list[view] = map === STANDARD ? (() => { throw e; })() : sceneOf(STANDARD, view); } }
-  return list[view];
+  if (!list) { list = new Map(); scenes.set(map, list); }
+  const key = `${view}|${Object.entries(seated).sort(([a], [b]) => (a < b ? -1 : 1)).map(([r, n]) => `${r}:${n}`).join(",")}`;
+  if (!list.has(key)) { try { list.set(key, buildScene(map, view, seated)); } catch (e) { console.warn("The office map could not be drawn; the standard office is shown instead.", e); list.set(key, map === STANDARD ? (() => { throw e; })() : sceneOf(STANDARD, view, seated)); } }
+  return list.get(key)!;
 }
 
 /** A picture of the engine as a canvas the browser can draw, made once. */
@@ -190,8 +193,8 @@ function Living({ scene, looks, names, places, k, sheetOpen, chatting, onTalk, c
 /** The small picture over each piece of the office that opens a screen: what that screen is about (the pieces are faint at rest, so the office does not turn into a sign board). */
 const CLUE: Record<string, IconName> = { brain: "bulb", files: "folder", servers: "server", costs: "coin", accounts: "key", settings: "gear", leftovers: "crate", workflows: "flow", board: "board", worktrees: "branch", mockups: "deviceMonitor" };
 
-export const Office = memo(function Office({ map, looks = NO_LOOKS, names = NO_NAMES, sheetOpen, onOpen, onOpenPerson, onSay, onEdit }: {
-  map: OfficeMap; looks?: Record<string, Look>; /** what each role is called */ names?: Record<string, string>; sheetOpen: boolean; onOpen: (p: Place) => void; onOpenPerson: (role: string) => void; /** one reply from an office boy */ onSay: (who: Who, history: Turn[], message: string) => Promise<string>; onEdit?: () => void;
+export const Office = memo(function Office({ map, looks = NO_LOOKS, names = NO_NAMES, seated = NOBODY, sheetOpen, onOpen, onOpenPerson, onSay, onEdit }: {
+  map: OfficeMap; looks?: Record<string, Look>; /** what each role is called */ names?: Record<string, string>; /** who sits at the meeting table now: person -> chair number (the meeting that runs) */ seated?: Record<string, number>; sheetOpen: boolean; onOpen: (p: Place) => void; onOpenPerson: (role: string) => void; /** one reply from an office boy */ onSay: (who: Who, history: Turn[], message: string) => Promise<string>; onEdit?: () => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -203,7 +206,8 @@ export const Office = memo(function Office({ map, looks = NO_LOOKS, names = NO_N
   const [ctr, setCtr] = useState<Pt | null>(null); // the drawing point in the middle of the window; null: the middle of the building
   const [anim, setAnim] = useState<{ sc: number; centre: Pt } | null>(null); // a zoom on its way from one whole number to the next
   const glide = useRef(0); // the frame request of that glide
-  const scene = useMemo(() => sceneOf(map, view), [map, view]);
+  const seatKey = JSON.stringify(seated);
+  const scene = useMemo(() => sceneOf(map, view, seated), [map, view, seatKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const { width: W, height: H, hits: HITS } = scene;
   const [CX0, CY0, CX1, CY1] = scene.content;
   const turn = (by: number) => {

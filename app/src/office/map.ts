@@ -139,7 +139,15 @@ export function ensurePages(map: OfficeMap): { map: OfficeMap; added: string[]; 
       const used = taken();
       let spot: Obj | null = null;
       for (let d = 0; d <= out.cols + out.rows && !spot; d++) for (let di = -d; di <= d && !spot; di++) for (const dj of d === Math.abs(di) ? [0] : [-(d - Math.abs(di)), d - Math.abs(di)]) { const c = { ...n.obj, i: n.obj.i + di, j: n.obj.j + dj }; if (c.i >= 0 && c.j >= 0 && c.i < out.cols && c.j < out.rows && fits(c, used)) { spot = c; break; } }
-      if (spot) { out.objects.push(spot); added.push(n.text.split(",")[0].replace(/ is missing$| has no desk$/, "")); } else failed.push(n.text);
+      if (spot) {
+        out.objects.push(spot);
+        added.push(n.text.split(",")[0].replace(/ is missing$| has no desk$/, ""));
+        // the long meeting table seats the people at it: a chair on each side for each tile of it, where there is room
+        if (spot.kind === "workflow table" && !(spot.facing ?? 0)) {
+          const used2 = taken();
+          for (let x = spot.i; x < spot.i + 6; x++) for (const [j, facing] of [[spot.j - 1, 0], [spot.j + 1, 2]] as const) { const chair: Obj = { kind: "chair", i: x, j, facing, m: "red" }; if (fits(chair, used2)) { out.objects.push(chair); used2.add(`${x},${j}`); } }
+        }
+      } else failed.push(n.text);
     } else if (n.board) {
       const span = Math.max(1, n.board.span ?? 1), run = (i: number, j: number) => Array.from({ length: span }, (_, k) => k).every((k) => out.walls[j]?.[i + k] === true && !out.attach.some((a) => a.i === i + k && a.j === j && a.face === "j+" && a.kind !== "doorway"));
       let at: [number, number] | null = run(n.board.i, n.board.j) ? [n.board.i, n.board.j] : null;

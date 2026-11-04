@@ -22,7 +22,10 @@ import { Accounts } from "./components/Accounts";
 import { Kit } from "./components/Kit";
 import { Costs } from "./components/Costs";
 import { Board } from "./components/Board";
-import { Workflows } from "./components/Workflows";
+import { Meeting } from "./components/Meeting";
+import { useWorkflowRuns } from "./lib/useruns";
+import { seatedOf } from "./lib/workflowrun";
+import cats from "./office/cats.json";
 import { Worktrees } from "./components/Worktrees";
 import { Leftovers } from "./components/Leftovers";
 import { BRAIN_TABS, BrainPlace, type BrainTab } from "./components/brain/Brain";
@@ -38,6 +41,9 @@ import { getSettings, earlierSessions, costRows, saveNote, wantedRemove, officeS
 
 const remembered = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const remember = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* the choice is just not kept */ } };
+
+/** the chair each person takes at the meeting table: their place in the cat sheet */
+const SEAT_OF: Record<string, number> = Object.fromEntries((cats as { rows: { id: string }[] }).rows.map((r, i) => [r.id, i]));
 
 export default function App() {
   const [state, dispatch] = useReducer(reducer, undefined, () => ({ ...initialState, plans: loadPlans() }));
@@ -346,6 +352,30 @@ export default function App() {
     } catch (e) { setNotice(`Could not save the answer: ${String(e)}`); }
   };
 
+  // The workflows that run by themselves (decision 78): the person of each step works in turn, in a fresh session of their own, and hands their written result to the next. No ticket is made.
+  // The people of a run that is going sit at the meeting table of the office.
+  const startRunStep = async (role: Role, prompt: string): Promise<string> => {
+    if (!project) throw new Error("Open a project first.");
+    const busy = busyMessage(role.id);
+    if (busy) throw new Error(busy);
+    const accountId = accountOf(project);
+    if (!accountId) throw new Error(NO_ACCOUNT);
+    const status = await accountStatus(accountId);
+    if (!status.logged_in) throw new Error("That account is not signed in. Open Accounts to sign in.");
+    const brainDigest = await buildDigest(project.id, { roleId: role.id, roleName: role.name });
+    const id = await invoke<string>("start_session", { folder: project.folder, roleId: role.id, accountId, useVoice: false, ticketId: null, brainDigest, model: role.model, mode: role.mode, resume: null });
+    setLastAccount(accountId); remember("kona.account", accountId);
+    dispatch({ type: "user-sent", sessionId: id, text: prompt, images: [] });
+    await invoke("send_message", { sessionId: id, text: prompt, images: [] });
+    return id;
+  };
+  const runner = useWorkflowRuns({
+    project, roles, sessions: state.sessions, startStep: startRunStep, notify: setNotice, busy: busyMessage,
+    stopSession: (id) => invoke<void>("stop_session", { sessionId: id }),
+    sendTo: async (id, text) => { dispatch({ type: "user-sent", sessionId: id, text, images: [] }); await invoke("send_message", { sessionId: id, text, images: [] }); },
+  });
+  const seated = useMemo(() => seatedOf(runner.runs.find((r) => r.status === "running"), SEAT_OF), [runner.runs]);
+
   if (import.meta.env.DEV && window.location.hash === "#kit") return <Kit />; // the base pickers on show, development only
 
   if (projects === null || persona === null || !accountsReady) return <div className="flex h-full items-center justify-center text-text-tertiary">Opening Kona…</div>;
@@ -377,7 +407,7 @@ export default function App() {
       case "leftovers": return <Leftovers state={state} roles={roles} overview={lo} onRefresh={() => { void leftoverOverview().then(setLo); }} />;
       case "worktrees": return <Worktrees project={project} onChanged={() => {}} />;
       case "board": return <Board project={project} roles={roles} state={state} onStart={startTicket} onOpenSession={(id) => openPerson(state.sessions[id]?.roleId ?? "secretary")} />;
-      case "workflows": return <Workflows project={project} roles={roles} onOpenBoard={() => setPlace("board")} onStart={startTicket} />;
+      case "workflows": return <Meeting project={project} roles={roles} runs={runner.runs} sessions={state.sessions} dispatch={dispatch} onRun={async (w) => { await runner.startRun(w); }} onStop={(id) => void runner.stop(id)} onRetry={runner.retry} onRemove={(id) => void runner.remove(id)} onSay={runner.say} />;
       case "costs": return <Costs project={project} roles={roles} accounts={accounts} />;
       default: return null;
     }
@@ -395,7 +425,7 @@ export default function App() {
           onSave={async (m) => { await officeMapSave(project.folder, JSON.stringify(m)); setOfficeMap(m); setOwnMap(true); setBrokenMap(null); setNotice("Saved the office of this project."); }}
           onReset={async () => { await officeMapReset(project.folder); setOfficeMap(STANDARD); setOwnMap(false); setBrokenMap(null); setNotice("This project shows the standard office again."); }}
           onClose={() => setEditing(false)} />
-      : <Office map={officeMap} looks={looks} sheetOpen={place !== "office" || person !== null} names={names} onOpen={openPlace} onOpenPerson={openPerson} onSay={sayToOffice} onEdit={() => setEditing(true)} />;
+      : <Office map={officeMap} looks={looks} seated={seated} sheetOpen={place !== "office" || person !== null} names={names} onOpen={openPlace} onOpenPerson={openPerson} onSay={sayToOffice} onEdit={() => setEditing(true)} />;
     if (place !== "office") {
       const info = PLACES.find((x) => x.id === place);
       const brainTabs = place === "brain" ? { tabs: BRAIN_TABS, active: brainTab, onTab: (id: string) => setBrainTab(id as BrainTab), keepDraftOnTab: true } : {};

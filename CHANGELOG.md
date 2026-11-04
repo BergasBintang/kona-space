@@ -2,6 +2,17 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.35.0, 2026-11-04
+
+A meeting room: a workflow now runs by itself, and the people talk in one group chat.
+
+- **Run a workflow.** Press Run on a workflow and its people work one after another, in the order of the steps. Each one works in a fresh session of their own, and when they finish, their last written words are handed to the next person, who starts at once. No tickets are made any more. Run asks first, and says who works in which order and that it uses your plan.
+- **The Meeting.** The Lounge is the meeting room. The flow board is gone from the standard office; a long table with twelve chairs, enough for all eleven people, stands in the Lounge and opens the Meeting sheet. It has two tabs: Chat, and Workflows (the plan editor).
+- **One group chat.** What each person says piles up in the order it was said, with their name and face. Their tool uses are one folded line that opens on a click. A permission or a question shows in the chat, and the meeting waits for you. You can write in the chat: to whoever is working now, or to a person by name ("Jiro, use PostgreSQL"); a person whose turn has not come reads it when they start. A finished chat can be read again later.
+- **Stop and Try again.** Stop is always there. If a step fails, or Kona is closed, the run shows as stopped and Try again goes on from that step.
+- **The cats sit at the table.** While a run goes on, each person's cat is on a chair at the long table, and the desk is left without it. The cat can still be clicked.
+- **Good to know.** An office you saved before this version keeps its old flow board as decoration and gets the long table back with its chairs, with a notice. The steps run one after another, never at the same time. Each run is one plain file in the project's `.kona/runs` folder.
+
 ## 0.34.0, 2026-11-04
 
 Mockups: pick a part of a page, leave a note, and turn the notes into a ticket for the designer.

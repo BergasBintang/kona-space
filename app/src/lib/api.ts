@@ -197,3 +197,7 @@ export async function pickFolder(title: string): Promise<string | null> {
 }
 /** The pins of a mockup written into a ticket draft by one cheap Haiku call (the prompt is built and cleaned in lib/mockdraft.ts). */
 export const mockupTicketDraft = (projectId: string, accountId: string, prompt: string) => invoke<string>("mockup_ticket_draft", { projectId, accountId, prompt });
+/** The runs of a workflow in a project, as the core keeps them (one plain file each); lib/workflowrun.ts reads and checks them. */
+export const runList = (folder: string) => invoke<unknown[]>("run_list", { folder });
+export const runSave = (folder: string, run: unknown) => invoke<void>("run_save", { folder, run });
+export const runDelete = (folder: string, id: string) => invoke<void>("run_delete", { folder, id });

@@ -4,7 +4,7 @@ export type Place = "office" | "mockups" | "files" | "accounts" | "costs" | "boa
 export const PLACES: { id: Place; label: string }[] = [
   { id: "office", label: "Office" },
   { id: "board", label: "Board" },
-  { id: "workflows", label: "Workflows" },
+  { id: "workflows", label: "Meeting" },
   { id: "worktrees", label: "Worktrees" },
   { id: "brain", label: "Brain" },
   { id: "files", label: "Files" },

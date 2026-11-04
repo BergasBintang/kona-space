@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { STANDARD, CAT_ROLES, checkMap, parseMap } from "./map.ts";
-import { buildScene } from "./engine/scene.ts";
+import { buildScene, meetingSeats } from "./engine/scene.ts";
 import { KINDS, footprintOf } from "./engine/furniture.ts";
 import { WALL_PAGES } from "./engine/decor.ts";
 import { OUT, WALL_SHADES } from "./engine/palette.ts";
@@ -334,6 +334,46 @@ test("a person without a desk, or a screen without a piece, stops a save, and a 
   assert.ok(desk.i !== spot.i || desk.j !== spot.j, "it was not put on top of the chair");
   assert.deepEqual(checkMap(e.map), [], "nothing overlaps or stands in a wall");
   assert.equal(ensurePages(STANDARD).map, STANDARD, "an office that has everything is left as it is");
+});
+
+test("a saved office from before the meeting room gets the long table back with its chairs, and its flow board stays as a plain decoration", () => {
+  const m = structuredClone(STANDARD);
+  const table = m.objects.find((o) => o.kind === "workflow table")!;
+  m.objects = m.objects.filter((o) => o.kind !== "workflow table" && !(o.kind === "chair" && o.j >= table.j - 1 && o.j <= table.j + 1 && o.i >= table.i && o.i < table.i + 6));
+  m.objects.push({ kind: "flow board", i: 24, j: 1, facing: 0 }); // what an office saved before this version holds
+  assert.equal(missingPieces(m).length, 1, "only the meeting table is named");
+  assert.equal(KINDS["flow board"].opens, undefined, "the old board opens nothing");
+  const e = ensurePages(m);
+  assert.deepEqual(e.failed, []);
+  const back = e.map.objects.find((o) => o.kind === "workflow table")!;
+  assert.deepEqual([back.i, back.j], [table.i, table.j], "it goes back where the standard office has it, as that place is free");
+  assert.equal(e.map.objects.filter((o) => o.kind === "chair" && o.j >= back.j - 1 && o.j <= back.j + 1 && o.i >= back.i && o.i < back.i + 6).length, 12, "with a chair for each of twelve places");
+  assert.deepEqual(checkMap(e.map), [], "nothing overlaps");
+  for (let view = 0; view < 4; view++) assert.doesNotThrow(() => buildScene(e.map, view));
+  assert.equal(meetingSeats(e.map).length, 12);
+});
+
+test("the people at the meeting table sit on its chairs, each keeps their chair, the desk stays without the cat, and the cat can still be clicked", () => {
+  const seats = meetingSeats(STANDARD);
+  assert.equal(seats.length, 12, "twelve chairs, enough for all eleven people");
+  const order = ["frontend", "backend", "qa", "security", "devops", "product", "design", "marketing", "content", "support", "secretary"];
+  const seated = Object.fromEntries(order.map((r, n) => [r, n]));
+  for (let view = 0; view < 4; view++) {
+    const none = buildScene(STANDARD, view), all = buildScene(STANDARD, view, seated);
+    assert.equal(none.cats.length, 11);
+    assert.equal(all.cats.length, 11, "still eleven cats: each one moved, none was added or lost");
+    const where = new Set(all.cats.map((c) => c.x + "," + c.y));
+    assert.equal(where.size, 11, "no two cats on the same chair");
+    const moved = all.cats.filter((c) => !none.cats.some((d) => d.role === c.role && d.x === c.x && d.y === c.y));
+    assert.equal(moved.length, 11, "every cat is away from its desk");
+    for (const role of order) assert.ok(all.hits.some((h) => h.role === role), `${role} can be clicked`);
+    const one = buildScene(STANDARD, view, { qa: 3 });
+    assert.equal(one.cats.filter((c) => none.cats.some((d) => d.role === c.role && d.x === c.x && d.y === c.y)).length, 10, "only the one who sits has left their desk");
+  }
+  // a person with a chair number that does not exist, and an office with no meeting table, change nothing
+  assert.deepEqual(buildScene(STANDARD, 0, { qa: 99, product: -1 }).cats, buildScene(STANDARD, 0).cats);
+  const bare = structuredClone(STANDARD); bare.objects = bare.objects.filter((o) => o.kind !== "workflow table");
+  assert.deepEqual(buildScene(bare, 0, { qa: 3 }).cats, buildScene(bare, 0).cats);
 });
 
 test("Kibby may walk on any floor tile with no wall and nothing standing on it, in every room", () => {

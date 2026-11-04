@@ -34,7 +34,7 @@ ok('the top bar is drawn', await c.waitFor(`!!document.querySelector('header')`,
 ok('the office is drawn with its people and pieces', await c.waitFor(`document.querySelectorAll('[aria-label^="Open "]').length >= 22`, 15000, 200));
 ok('Kibby, the office boy, is in the office', await c.waitFor(`!!document.querySelector('button[aria-label^="Talk to Kibby"]')`, 10000, 200));
 ok('there is no Go to list in the top bar', await c.ev(`!document.querySelector('header [aria-label="Go to"]')`));
-const pages = ['Board', 'Workflows', 'Worktrees', 'Brain', 'Files', 'Mockups', 'Leftovers', 'Costs', 'Settings', 'Servers', 'Accounts'];
+const pages = ['Board', 'Meeting', 'Worktrees', 'Brain', 'Files', 'Mockups', 'Leftovers', 'Costs', 'Settings', 'Servers', 'Accounts'];
 for (const page of pages) {
   const went = await open(page);
   await c.sleep(900);

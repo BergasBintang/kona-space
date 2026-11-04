@@ -44,6 +44,8 @@ export class Stage {
   items: Item[] = [];
   feet: Foot[] = [];
   rugs: Rug[] = [];
+  /** the people whose cat is away from the desk (sitting at the meeting table): their desk is drawn without the cat */
+  away = new Set<string>();
   constructor(iso: Iso) { this.iso = iso; }
 
   private box(img: Img, i0: number, j0: number, wi: number, dj: number, h: number, m: Material, z0 = 0) {
@@ -160,7 +162,16 @@ function workstation(S: Stage, ref: number, o: Obj) {
   const c = W.at(0.5, 0.5), [sx, sy] = iso.P(c[0], c[1], 4);
   const to = iso.rot(c[0] + [0, -1, 0, 1][facing], c[1] + [1, 0, -1, 0][facing]), from = iso.rot(c[0], c[1]);
   const dir = to[1] > from[1] ? 0 : to[0] > from[0] ? 1 : to[0] < from[0] ? 2 : 3; // which way the cat looks on the screen: 0 down-left
-  S.items.push({ kind: "cat", img: null, x: Math.round(sx) - 14, y: Math.round(sy) - FRAME_H + 1, depth: iso.D(c[0], c[1]) + 0.01, fp: iso.foot(ci, cj, 1, 1, 0.15), label: `cat ${role}`, ref, role, dir });
+  if (!S.away.has(role)) S.items.push({ kind: "cat", img: null, x: Math.round(sx) - 14, y: Math.round(sy) - FRAME_H + 1, depth: iso.D(c[0], c[1]) + 0.01, fp: iso.foot(ci, cj, 1, 1, 0.15), label: `cat ${role}`, ref, role, dir });
+}
+
+/** A cat sitting on a chair of the meeting table. `o` is the chair (a 1 x 1 piece that faces the table), `ref` the chair's place in the map, as for the cat of a workstation. */
+export function seatCat(S: Stage, ref: number, o: Obj, role: string) {
+  const { iso } = S, facing = (o.facing ?? 0) as Facing, W = S.frame(new Img(0, 0), o.i, o.j, 1, 1, facing);
+  const c = W.at(0.5, 0.5), [sx, sy] = iso.P(c[0], c[1], 4);
+  const to = iso.rot(c[0] + [0, -1, 0, 1][facing], c[1] + [1, 0, -1, 0][facing]), from = iso.rot(c[0], c[1]);
+  const dir = to[1] > from[1] ? 0 : to[0] > from[0] ? 1 : to[0] < from[0] ? 2 : 3;
+  S.items.push({ kind: "cat", img: null, x: Math.round(sx) - 14, y: Math.round(sy) - FRAME_H + 1, depth: iso.D(c[0], c[1]) + 0.01, fp: iso.foot(o.i, o.j, 1, 1, 0.15), label: `cat ${role}`, ref, role, dir });
 }
 
 type Spec = { label: string; w: number; d: number; h: number; draw: (L: Frame) => void };
@@ -176,6 +187,13 @@ const fixed: Record<string, Spec> = {
   "bin": { label: "Bin", w: 1, d: 1, h: 16, draw: (L) => { L.b(0.25, 0.25, 0.5, 0.5, 12, M.metal); L.b(0.125, 0.125, 0.75, 0.75, 4, M.black, 12); } },
   "water cooler": { label: "Water cooler", w: 1, d: 1, h: 20, draw: (L) => { L.b(0.25, 0.25, 0.5, 0.5, 12, M.white); L.b(0.375, 0.375, 0.25, 0.25, 8, M.blue, 12); } },
   "meeting table": { label: "Meeting table", w: 2, d: 1, h: 8, draw: (L) => L.b(0.125, 0.125, 1.75, 0.75, 8, M.wood) },
+  // the long table of the meeting room: six tiles, so six chairs along each side seat all eleven people; a blue runner and three coloured notes joined by a line, the plan of a workflow laid out on the wood
+  "workflow table": { label: "Long meeting table", w: 6, d: 1, h: 12, draw: (L) => {
+    L.b(0.125, 0.125, 5.75, 0.75, 8, M.wood);
+    L.top(0.375, 0.375, 5.25, 0.25, 8, "#7fb1e0");
+    L.top(0.75, 0.25, 0.5, 0.5, 8, "#8ed8c9"); L.top(2.5, 0.25, 0.5, 0.5, 8, "#f3c978"); L.top(4.25, 0.25, 0.5, 0.5, 8, "#d9786a");
+    L.top(1.375, 0.4375, 1.0, 0.125, 8, "#33241a"); L.top(3.125, 0.4375, 1.0, 0.125, 8, "#33241a");
+  } },
   "queue desk": { label: "Queue desk", w: 1, d: 1, h: 12, draw: (L) => { L.b(0.125, 0.125, 0.75, 0.75, 8, M.wood); L.b(0.25, 0.25, 0.5, 0.25, 4, M.blue, 8); } },
   "key desk": { label: "Key desk", w: 1, d: 1, h: 12, draw: (L) => { L.b(0.125, 0.125, 0.75, 0.75, 8, M.wood); [0, 1, 2].forEach((k) => L.b(0.25 + k * 0.25, 0.375, 0.125, 0.125, 4, M.gold, 8)); } },
   "control panel": { label: "Control panel", w: 2, d: 1, h: 16, draw: (L) => { L.b(0.125, 0.125, 1.75, 0.5, 16, M.metal); [0, 1, 2, 3].forEach((k) => L.fy(0.625, 0.25 + k * 0.375, 0.5 + k * 0.375, 6, 9 + (k % 2) * 2, ["#8ed8c9", "#f3c978", "#d9786a", "#7fb1e0"][k])); } },
@@ -286,7 +304,7 @@ export const KINDS: Record<string, Kind> = {
     make: (S, ref, o) => { const bars = (Array.isArray(o.bars) ? o.bars.slice(0, 12) : []).map((b) => [String(Array.isArray(b) ? b[0] : "#8ed8c9"), num(Array.isArray(b) ? b[1] : 6, 6)] as [string, number]); standing(S, ref, o, dim(o.w, 2), (L, y, ww) => { L.fy(y, 0.125, ww - 0.125, 17, 19, bars[0]?.[0] ?? "#8ed8c9"); barsOn(L, y, ww, bars.length ? bars : [["#8ed8c9", 6]]); }); },
   },
   "hooks board": { label: "Board of hooks", group: "boards", defaults: {}, params: [], size: () => [1, 1], make: (S, ref, o) => standing(S, ref, o, 1, (L, y) => [0, 1, 2, 3].forEach((k) => L.fy(y, 0.125 + k * 0.25, 0.25 + k * 0.25, 8 + (k % 2) * 3, 12 + (k % 2) * 3, "#f3c978"))) },
-  "reading table": fixedKind("reading table", "tables"), "folder table": fixedKind("folder table", "tables"), "meeting table": fixedKind("meeting table", "tables"),
+  "reading table": fixedKind("reading table", "tables"), "folder table": fixedKind("folder table", "tables"), "meeting table": fixedKind("meeting table", "tables"), "workflow table": fixedKind("workflow table", "pages", "workflows"),
   "cooling unit": fixedKind("cooling unit", "machines"), "console": fixedKind("console", "machines"), "deploy console": fixedKind("deploy console", "machines"), "rocket": fixedKind("rocket", "machines"),
   "control panel": fixedKind("control panel", "machines"),
   // the pieces that open a screen, one for each screen that has no worker (the two on walls, the cork board and the branch board, are in decor.ts: WALL_PAGES)
@@ -294,7 +312,7 @@ export const KINDS: Record<string, Kind> = {
   "server terminal": fixedKind("server terminal", "pages", "servers"), "cash desk": fixedKind("cash desk", "pages", "costs"), "key cabinet": fixedKind("key cabinet", "pages", "accounts"),
   "gear console": fixedKind("gear console", "pages", "settings"), "leftovers bin": fixedKind("leftovers bin", "pages", "leftovers"), "big screen": fixedKind("big screen", "pages", "mockups"),
   "flow board": {
-    label: "Flow board", group: "pages", opens: "workflows", unique: true, defaults: {}, params: [], size: (o) => swap(o, 2, 1), // a pale blue board of boxes joined by arrows, one of them branching; a blue rail on top and a stripe on the back, so it is not taken for a chart
+    label: "Flow board", group: "boards", defaults: {}, params: [], size: (o) => swap(o, 2, 1), // a pale blue board of boxes joined by arrows, one of them branching; a blue rail on top and a stripe on the back, so it is not taken for a chart
     make: (S, ref, o) => S.piece(ref, o.i, o.j, 2, 1, (o.facing ?? 0) as Facing, "flow board", 20, (L) => {
       const y = 0.375;
       L.b(0.125, 0.25, 0.125, 0.125, 4, M.darkwood); L.b(1.75, 0.25, 0.125, 0.125, 4, M.darkwood);

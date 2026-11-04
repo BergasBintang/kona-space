@@ -65,7 +65,7 @@ export function PersonHeader({ role, s, onNote, onEnd, onNew, onCompact }: {
   );
 }
 
-function ToolLine({ it }: { it: Extract<Item, { kind: "tool" }> }) {
+export function ToolLine({ it }: { it: Extract<Item, { kind: "tool" }> }) {
   const state: GlyphState = it.status === "running" ? "live" : it.status === "done" ? "done" : it.status === "denied" ? "stopped" : "left";
   const word = it.status === "running" ? "Running" : it.status === "done" ? "Done" : it.status === "denied" ? "You said no" : "Failed";
   return (
@@ -77,7 +77,7 @@ function ToolLine({ it }: { it: Extract<Item, { kind: "tool" }> }) {
   );
 }
 
-function PermissionCard({ it, who, onAnswer }: { it: Extract<Item, { kind: "permission" }>; who: string; onAnswer: (allow: boolean, remember?: unknown[]) => void }) {
+export function PermissionCard({ it, who, onAnswer }: { it: Extract<Item, { kind: "permission" }>; who: string; onAnswer: (allow: boolean, remember?: unknown[]) => void }) {
   const open = it.status === "asking";
   return (
     <div className="flex max-w-[680px] flex-col gap-4 border border-line-subtle bg-surface-2 p-6" role="group" aria-label={permissionTitle(it.toolName, who)}>
@@ -114,7 +114,7 @@ function PermissionCard({ it, who, onAnswer }: { it: Extract<Item, { kind: "perm
 }
 
 /** One of Claude's multiple-choice questions, as a card: the options are buttons, "Other" is a text box, and the pick goes back to Claude as the answer (decision 64). */
-function QuestionCard({ it, who, onAnswer }: { it: Extract<Item, { kind: "question" }>; who: string; onAnswer: (answers: Record<string, string> | null) => void }) {
+export function QuestionCard({ it, who, onAnswer }: { it: Extract<Item, { kind: "question" }>; who: string; onAnswer: (answers: Record<string, string> | null) => void }) {
   const open = it.status === "asking";
   const [picked, setPicked] = useState<Record<string, string[]>>({});
   const [other, setOther] = useState<Record<string, string>>({});

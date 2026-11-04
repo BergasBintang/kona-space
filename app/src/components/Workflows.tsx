@@ -1,11 +1,9 @@
-// Workflows: the usual steps of one kind of work (a feature, a fix, a launch), each step owned by a role, drawn as a flowchart and editable.
-// The chart is the plan, never the state: "Start" raises one Board ticket per step (a step that comes after another waits for its ticket), and the Board
-// stays the one place that shows where the work stands. Saving also writes a Brain note with the steps in words. Files: `.kona/workflows/<id>.json`.
-// Under the chart, "Running now" lists the open tickets of the workflow: the core moves a waiting step to Ready by itself when what it waits for is done,
-// and a Ready step has a button that starts its role's session (the owner presses it; Kona never starts a session unasked, it costs plan and can change files).
+// Workflows (the plans tab of the Meeting): the usual steps of one kind of work (a feature, a fix, a launch), each step owned by a role, drawn as a flowchart and editable.
+// The chart is the plan, never the state. "Run" starts the meeting: the people of the steps work one after another and hand their written result to the next (lib/useruns.ts,
+// components/Meeting.tsx); no tickets are made. Saving also writes a Brain note with the steps in words. Files: `.kona/workflows/<id>.json`.
 import { useEffect, useMemo, useState } from "react";
 import { Select } from "./pick";
-import { deleteWorkflow, listTickets, listWorkflows, roleLabel, saveWorkflow, startWorkflow, type Project, type Role, type Step, type TicketView, type Workflow } from "../lib/api";
+import { deleteWorkflow, listWorkflows, roleLabel, saveWorkflow, type Project, type Role, type Step, type Workflow } from "../lib/api";
 import { Button, Glyph, RoleMark } from "./ui";
 import { Help } from "./Help";
 
@@ -58,59 +56,10 @@ function Chart({ steps, roles, pick, onPick }: { steps: Step[]; roles: Role[]; p
   );
 }
 
-const WORDS: Record<string, string> = { backlog: "Waiting", ready: "Ready", "in-progress": "In progress", review: "In review" };
-
-/** The open tickets of one workflow, with a button for each step that is ready. */
-function Running({ project, workflowId, roles, onStart, onOpenBoard }: { project: Project; workflowId: string; roles: Role[]; onStart: (t: TicketView) => Promise<void>; onOpenBoard: () => void }) {
-  const [tickets, setTickets] = useState<TicketView[]>([]);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    let live = true;
-    const load = () => listTickets(project.id).then((t) => { if (live) setTickets(t); }).catch(() => {});
-    setTickets([]); setError(null); load();
-    const timer = setInterval(load, 2000);
-    return () => { live = false; clearInterval(timer); };
-  }, [project.id, workflowId]);
-  const mine = tickets.filter((t) => t.workflow === workflowId);
-  const open = mine.filter((t) => t.status !== "done");
-  if (mine.length === 0) return null;
-  const go = async (t: TicketView) => { setBusyId(t.id); setError(null); try { await onStart(t); } catch (e) { setError(String(e)); } setBusyId(null); };
-  return (
-    <section className="flex flex-col gap-2 border border-line-subtle bg-surface-1 p-3" aria-label="Running now">
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="m-0 text-[15px] leading-6 font-bold">Running now</h2>
-        <Help title="Running now">
-          <p className="m-0">These are the open tickets of this workflow. When you move a ticket to Done on the Board, the steps that were waiting only for it move to Ready by themselves.</p>
-          <p className="m-0">Kona does not start a session by itself: a session uses your plan and can change files. A Ready step has a button, and you press it when you want that role to begin.</p>
-        </Help>
-        <span className="text-[13px] leading-5 text-text-tertiary">{mine.length - open.length} of {mine.length} done</span>
-        <span className="flex-1" />
-        <Button variant="quiet" small onClick={onOpenBoard}>Open the Board</Button>
-      </div>
-      {open.length === 0 && <p className="m-0 text-[14px] leading-5 text-text-secondary">Everything is done.</p>}
-      {open.map((t) => {
-        const role = roles.find((r) => r.id === t.role);
-        const waits = t.blocked_by.filter((b) => mine.some((x) => x.id === b && x.status !== "done"));
-        return (
-          <div key={t.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-line-subtle pt-2 first:border-t-0 first:pt-0">
-            {t.role && <RoleMark roleId={t.role} size={20} />}
-            <span className="font-mono text-[13px] text-text-tertiary">{t.id}</span>
-            <span className="min-w-0 flex-1 text-[14px] leading-5 font-bold">{t.title.includes(": ") ? t.title.slice(t.title.indexOf(": ") + 2) : t.title}</span>
-            <span className="text-[13px] leading-5 text-text-secondary">{WORDS[t.status] ?? t.status}{waits.length > 0 ? `, waits for ${waits.join(", ")}` : ""}</span>
-            {t.status === "ready" && role && <Button small onClick={() => void go(t)} disabled={busyId !== null}>{busyId === t.id ? "Starting…" : `Start as ${roleLabel(role)}`}</Button>}
-          </div>
-        );
-      })}
-      {error && <p role="alert" className="m-0 flex items-start gap-2 text-[14px] leading-5 font-bold text-state-left"><Glyph state="left" size={16} />{error}</p>}
-    </section>
-  );
-}
-
 const slug = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 36);
 const fresh = (steps: Step[]) => { let n = steps.length + 1; while (steps.some((s) => s.id === `step-${n}`)) n++; return `step-${n}`; };
 
-export function Workflows({ project, roles, onOpenBoard, onStart }: { project: Project | null; roles: Role[]; onOpenBoard: () => void; onStart: (t: TicketView) => Promise<void> }) {
+export function Workflows({ project, roles, onRun }: { project: Project | null; roles: Role[]; /** run this workflow now (it is the one on the screen, saved or not); rejects with a plain reason */ onRun: (w: Workflow) => Promise<void> }) {
   const [list, setList] = useState<Workflow[] | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Workflow | null>(null);
@@ -161,7 +110,7 @@ export function Workflows({ project, roles, onOpenBoard, onStart }: { project: P
     if (!project || !draft) return;
     if (!confirmStart) { setConfirmStart(true); return; }
     setBusy(true); setError(null); setConfirmStart(false);
-    try { const made = await startWorkflow(project.folder, draft); setNote(`Raised ${made.length} tickets on the Board, from ${made[0].id} to ${made[made.length - 1].id}.`); } catch (e) { setError(String(e)); }
+    try { await onRun(draft); } catch (e) { setError(String(e).replace(/^Error:\s*/, "")); }
     setBusy(false);
   };
   const remove = async () => {
@@ -179,12 +128,9 @@ export function Workflows({ project, roles, onOpenBoard, onStart }: { project: P
         <h1 className="m-0 text-[26px] leading-8 font-bold">Workflows</h1>
         <Help title="Workflows">
           <p className="m-0">A workflow is the usual list of steps for one kind of work, with a role on each step. A step that comes after another waits for it.</p>
-          <p className="m-0">It is a plan, not a status. Press Start and Kona raises one ticket on the Board for each step; the Board then shows where each piece stands.</p>
-          <p className="m-0">When a ticket is done, the steps that waited for it become Ready by themselves, and "Running now" gives each one a button to start its role.</p>
+          <p className="m-0">It is a plan, not a status. Press Run and the meeting starts: the people of the steps work one after another, in the order of the chart, and each hands their written result to the next. No tickets are made.</p>
           <p className="m-0">Saving also writes a note in the Brain, so the steps can be found by asking. The file lives in this project's .kona folder.</p>
         </Help>
-        <span className="flex-1" />
-        <Button variant="quiet" small onClick={onOpenBoard}>Open the Board</Button>
       </div>
 
       {list === null && !error && <p className="m-0 text-text-tertiary">Reading the workflows…</p>}
@@ -212,8 +158,6 @@ export function Workflows({ project, roles, onOpenBoard, onStart }: { project: P
 
               <Chart steps={draft.steps} roles={roles} pick={pick} onPick={setPick} />
 
-              <Running project={project} workflowId={draft.id} roles={roles} onStart={onStart} onOpenBoard={onOpenBoard} />
-
               <div className="flex flex-wrap items-center gap-2">
                 <Button variant="quiet" small onClick={addStep} disabled={draft.steps.length >= 20}>+ Add a step</Button>
                 <Help title="Steps"><p className="m-0">Click a step in the chart to change it. A step can only come after steps listed before it, so a workflow can never loop. Use the arrows to change the order.</p></Help>
@@ -235,7 +179,7 @@ export function Workflows({ project, roles, onOpenBoard, onStart }: { project: P
                         <label key={o.id} className="flex items-center gap-2 text-[14px]"><input type="checkbox" className="h-4 w-4 accent-[var(--color-accent)]" checked={step.after.includes(o.id)}
                           onChange={(e) => changeStep(step.id, { after: e.target.checked ? [...step.after, o.id] : step.after.filter((a) => a !== o.id) })} />{o.title}</label>))}</div>}
                   </fieldset>
-                  <label className="flex flex-col gap-1"><span className="text-[13px] leading-5 font-bold text-text-secondary">Note for the ticket</span>
+                  <label className="flex flex-col gap-1"><span className="text-[13px] leading-5 font-bold text-text-secondary">Note for this person</span>
                     <textarea value={step.note} onChange={(e) => changeStep(step.id, { note: e.target.value })} rows={2} maxLength={500} className="border border-line-strong bg-inset px-3 py-2 text-[15px] leading-6 text-text" /></label>
                   <div className="flex flex-wrap gap-2">
                     <Button variant="ghost" small onClick={() => move(step.id, -1)} aria-label="Move the step earlier">↑ Earlier</Button>
@@ -249,11 +193,14 @@ export function Workflows({ project, roles, onOpenBoard, onStart }: { project: P
               {error && <p role="alert" className="m-0 flex items-start gap-2 text-[14px] leading-5 font-bold text-state-left"><Glyph state="left" size={16} />{error}</p>}
               {note && <p role="status" className="m-0 flex items-start gap-2 text-[14px] leading-5 text-text-secondary"><Glyph state="done" size={16} />{note}</p>}
 
+              {confirmStart && (
+                <p role="alert" className="m-0 flex items-start gap-2 text-[14px] leading-5 text-text-secondary"><Glyph state="waiting" size={16} />{draft.steps.map((s) => roles.find((r) => r.id === s.role)?.person || s.role).join(", then ")}. Each one works alone, in turn, and this uses your plan. You can stop it at any time.</p>
+              )}
               <div className="flex flex-wrap items-center gap-3">
                 <Button onClick={() => void save()} disabled={busy || (!dirty && !draft.starter)}>{draft.starter ? "Save in this project" : "Save"}</Button>
-                <Button variant={confirmStart ? "primary" : "quiet"} onClick={() => void start()} disabled={busy}>{confirmStart ? `Yes, raise ${draft.steps.length} tickets` : "Start"}</Button>
+                <Button variant={confirmStart ? "primary" : "quiet"} onClick={() => void start()} disabled={busy}>{confirmStart ? `Yes, run ${draft.steps.length} steps` : "Run"}</Button>
                 {confirmStart && <Button variant="ghost" small onClick={() => setConfirmStart(false)}>Not now</Button>}
-                <Help title="Start"><p className="m-0">Raises one ticket on the Board for each step, with the role of the step. The first steps are Ready. A step that comes after others waits in Backlog and shows what it waits for.</p><p className="m-0">It starts from what you see here, saved or not.</p></Help>
+                <Help title="Run"><p className="m-0">Starts the meeting: each person in turn works on their step in this project and hands their written result to the next. You can talk in the meeting, answer a question or a permission when someone asks, and stop it at any time.</p><p className="m-0">It runs what you see here, saved or not. A person who is busy in a conversation has to finish it first.</p></Help>
                 <span className="flex-1" />
                 {!draft.starter && <Button variant={confirmDelete ? "danger" : "ghost"} small onClick={() => void remove()} disabled={busy}>{confirmDelete ? "Yes, delete it" : "Delete"}</Button>}
               </div>

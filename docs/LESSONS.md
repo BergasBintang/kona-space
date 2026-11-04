@@ -274,14 +274,14 @@ Keep the page to short words; put every full explanation behind a "?" (`Help`). 
 
 | Open | How to tackle it |
 |---|---|
-| Room layout on whole tiles | You said you will report what looks wrong. When you do: say the side and send a crop; I fix the rule, then check all four sides. Growing a room means editing `DEFS`; then rerun the build, read every `CHECK:`, check there is no short tall-wall stub, and look at all four sides. |
-| Cat looks | Redrawn after 0.22.0 as a true three-quarter view with shading and a tail (section 2.8); still drawn by script. A hand-drawn LibreSprite cat can replace it, keeping the sheet layout. |
+| Room layout on whole tiles | **Closed 2026-11-04.** The owner looked: it is fine now. |
+| Cat looks | **Closed 2026-11-04** by the owner. The cats stay as drawn by script; a hand-drawn set is not wanted for now. |
 | Font | Jersey 20 was tried on this PC only. If a letter looks wrong, send a crop; `docs/FONTS.md` says how to go back or make the text a little bigger. |
 | Real window | Done once for 0.22.0 on 2026-10-30, with your Kona closed: all 19 smoke checks passed (welcome page, office, every place including Workflows, no content-policy blocks), and a short extra check showed the turn buttons change and remember the side, the Workflows screen has its three suggestions and its chart, and the top bar shows v0.22.0. Run it again after each release (section 6.3). |
-| Workflow follow-ups | Left: roles reading only their own steps, chart lines that skip a column, an optional auto-start. Section 4. |
-| Kibby inside the rooms | He walks the hall only. Rooms need their own ordering checks (furniture, desks); extend `WALK` with a door and a few steps inside, then read the CHECK lines. |
+| Workflow follow-ups | Looked at in the real window on 2026-11-04: Start, the tickets, the waiting steps that become Ready by themselves, Save and Delete all worked. That way of running a workflow has since been replaced (decision 78). The three follow-ups were never built; the owner replaced them with a new idea (a workflow that runs by itself and hands each result to the next person, with no tickets), see decision 78 of `kona-space-app.md`. |
+| Kibby inside the rooms | **Closed 2026-11-04.** The owner says it is done. |
 | Kibby's talk, measured | Measure the cost and the delay of a message, then decide on a longer memory or a saved talk. |
-| Decor on every wall | Windows are on all outer walls; art boards only on three. Add more through the `ART` list in `office.mjs`. |
+| Decor on every wall | **Closed 2026-11-04** by the owner. No more art boards. |
 | Workflows and the Board in the office | A room may later show a "Workflows" tag of its own; today the Board room opens both. |
 
 ---
@@ -604,3 +604,22 @@ The tickets are T-0024 to T-0027; decisions 75 and 76 of `kona-space-app.md`.
 **Left behind by the tests:** nothing. The throwaway projects and their folders were removed by the tests; the test copy of the program was closed; the Haiku proof sessions ran with `--no-session-persistence` in a folder of the scratchpad.
 
 **Not seen:** after a real Send, the session of the design person on the ticket (the test stopped at the ticket check, which had a wrong word in it: the ticket says "the owner", not "owner"), a draft that Haiku gets wrong, a card made through the SQLite skill and then opened in the sheet, and the pins at other display scales.
+
+---
+
+## 17. What was found in the session of 2026-11-04, after 0.34.0 (the meeting room, 0.35.0)
+
+The owner asked for two things: close the old open items, and make a workflow run by itself like real people handing work on, with a meeting room and a group chat. Decision 78 of `kona-space-app.md`.
+
+| Seen | Cause | Keep |
+|---|---|---|
+| The owner marked four open items closed and asked "WHAT?" about the cats and the art boards | I had listed them as open work, but they are only looks and nobody asked for them | Say in one plain line what an item is and whether it needs doing at all before putting it in a list of what is left |
+| "Workflow follow-ups: NOT TESTED IN REAL USAGE" did not mean what I first thought: the three follow-ups were never built | The note listed them as "Left" and the owner read it as "built but unproven" | Before testing something named in a note, look at the code: is it there? I tested what existed (tickets, the chain that becomes Ready) and said plainly the three were not built |
+| A line on the old workflow chart runs behind two boxes (a step that skips a column) | The curve goes straight from the earlier step to the later one | Seen in the real window. Not fixed: the chart is the plan editor now, and a wrong line there is only looks. Fix it if it gets in the way |
+| The owner changed a half-built request twice in one session (tickets out, a meeting room in, a group chat) | The idea grew while I built | When a new idea replaces a screen, stop, list what the old one had, show the picture of what I understood and ask the few choices that change the work (the questions tool, recommended first). Done here: branches, tickets, safety, room, chat, voice, chairs |
+| A new piece of furniture needed five things at once: the catalog kind, the standard office script, the editor's put-back for saved offices, the thumbnail and the tests that every screen has one piece | A piece that opens a screen is wired in many places | Add the kind first (`engine/furniture.ts`), then the standard map (`art/build-standard.mjs`), then run `npm test` and read every failure; look at all four sides with `render-map.mjs` (`SEATED=all` and `CROP=left,top,width,height` were added to it) |
+| A cat on a chair needed no new drawing | The cat of a desk is already drawn from a place and a direction; the chair's place and facing give the same | `seatCat` in `furniture.ts`: a desk without its cat, a cat on a chair, both from the same scene; a seated cat has its own click area |
+| The Run test cannot be done with the window alone | A real run starts real sessions and spends plan | `tests/meeting-live.mjs` writes finished-looking run files and reads the chat (free, passed). `tests/meeting-run.mjs` is the real run, only with `MOCK_TEST_RUN=1` and the owner's word |
+| The smoke test failed on the place that was renamed | It clicks pages by their names | Search the tests for a name when it changes (benchmark: a word change must be searched for everywhere it appears) |
+
+**Not seen yet:** a real run (the hand-over between two live sessions, the cats on the chairs, the owner's note to a person whose turn has not come, a permission card answered in the chat). `tests/meeting-run.mjs` is written for it and waits for the owner's word.

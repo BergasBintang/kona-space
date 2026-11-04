@@ -6,8 +6,8 @@
 //   middle band  Server room | Ops (Sora) | corridor to the front door | Storage | Lounge
 //   bottom band  Admin | Lobby (Kupa, the front door) | Support (Kenn)
 //
-// Who sits near whom, and why: the Library and the Archive are side by side (notes and files), Planning has the cork board (the tickets) and the flow board (workflows) and sits
-// beside Engineering, which has the branch board (worktrees); the Server room and Ops (the gear console, the settings) share a door; the Storage room holds the leftovers bin;
+// Who sits near whom, and why: the Library and the Archive are side by side (notes and files), Planning has the cork board (the tickets) and sits
+// beside Engineering, which has the branch board (worktrees); the Server room and Ops (the gear console, the settings) share a door; the Storage room holds the leftovers bin; the Lounge is the meeting room (the long meeting table, with a chair for each of the eleven people, opens the workflows, and the big screen behind it opens the mockups);
 // Admin has the cash desk (costs) and the staff board; the Lobby has the key cabinet (accounts) by the front door and Kupa's desk facing it; Support is next to the Lobby.
 // Everything that opens a screen is in the room it belongs to. Only outer walls are tall, so the boards and windows hang on those.
 import { writeFileSync } from "node:fs";
@@ -88,9 +88,8 @@ put("sofa", 6, 7, 2);
 put("archive drawers", 10, 1); row("cabinet", 12, 15, 1);
 put("folder table", 11, 4); put("chair", 11, 5, 2); put("chair", 12, 3, 0);
 put("shelf", 15, 4, 1); put("shelf", 15, 5, 1);
-// Planning: Kiki and Nokka side by side on a rug under the cork board, the flow board beside it, a meeting table, a sofa
+// Planning: Kiki and Nokka side by side on a rug under the cork board, a meeting table, a sofa
 rug("Lilac", 18, 3, 6, 3); person("product", 19, 3); person("design", 22, 3);
-put("flow board", 24, 1);
 put("meeting table", 22, 7); put("chair", 22, 6, 0); put("chair", 23, 6, 0); put("chair", 22, 8, 2); put("chair", 23, 8, 2);
 put("sofa", 25, 8, 2);
 // Engineering: four desks facing in pairs on one rug under the branch board, a whiteboard, cabinets
@@ -105,8 +104,8 @@ row("rack", 2, 5, 13); put("cooling unit", 6, 13); row("rack", 2, 5, 18, 2); put
 rug("Slate", 11, 14, 3, 3); person("devops", 12, 14); put("deploy console", 14, 13); put("gear console", 10, 17, 3); put("cabinet", 10, 13);
 // Storage: crates and shelves, the leftovers bin by the side wall
 put("crates", 22, 13); put("crates", 25, 13); put("shelf", 26, 13); put("shelf", 27, 13); put("leftovers bin", 27, 17, 1); put("crates", 22, 18, 2);
-// Lounge: a meeting table with four chairs on a rug, the big screen (the mockups) on the wall behind the table (clear of the doorway to the hall at x 36 and 37), two sofa corners, a water cooler, a whiteboard
-rug("Cream", 33, 14, 5, 4); put("meeting table", 34, 15); put("chair", 34, 14, 0); put("chair", 35, 14, 0); put("chair", 34, 16, 2); put("chair", 35, 16, 2);
+// Lounge, the meeting room: the long meeting table (the workflows) with six chairs along each side, one for each of the eleven people and a spare, on a rug; the big screen (the mockups) on the wall behind the table (clear of the doorway to the hall at x 36 and 37), two sofa corners, a water cooler, a whiteboard
+rug("Cream", 30, 14, 8, 4); put("workflow table", 31, 15); for (let x = 31; x <= 36; x++) { put("chair", x, 14, 0); put("chair", x, 16, 2); }
 put("chart", 30, 13); put("big screen", 33, 13); put("sofa", 39, 13, 0); put("armchair", 41, 13, 0); put("water cooler", 43, 13); put("sofa", 39, 17, 2); put("armchair", 42, 17, 2);
 // Admin: the cash desk and the accounts desk on the back wall, a chair, cabinets
 put("cash desk", 3, 20); put("accounts desk", 5, 20); put("chair", 5, 21, 2); put("chair", 3, 21, 2); put("cabinet", 7, 20); put("cabinet", 8, 20); rug("Sage", 2, 23, 3, 2);

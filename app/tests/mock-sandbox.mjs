@@ -36,7 +36,7 @@ try {
   fs.writeFileSync(path.join(project, "outside.txt"), "OUTSIDE-FILE-OF-THE-PROJECT");
   fs.writeFileSync(path.join(project, ".kona", "tickets", "T-0001.md"), "a ticket");
 
-  const added = await invoke("add_project", { folder: project, name: "kona-mock-probe", github: null, account: null });
+  const added = await invoke("add_project", { folder: project, name: "kona-mock-probe", account: null });
   id = added.project.id;
   const base = await invoke("mock_base");
   note(`address ${base}, project ${id}`);

@@ -17,7 +17,16 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+/// A server that pulls a repo: which server (an id from the same project) and where the read-only key is ON that server. A note: Kona never sees it.
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct Pull {
+    pub server_id: String,
+    pub key_path: String,
+}
+
+/// One entry of the Servers screen: a server, or (`kind` "github") a GitHub repo card. A repo card is a server entry too, so the same checks apply to
+/// it: `host` is the nickname the repo's address uses (an alias in `~\.ssh\config`), `user` is `git`, `key_path` is the read-write key on this PC.
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Host {
     pub id: String,
     pub project_id: String,
@@ -26,7 +35,7 @@ pub struct Host {
     pub host: String,
     pub port: u16,
     pub user: String,
-    /// where the key file is (a reference: Kona never opens it)
+    /// where the key file is (a reference: Kona never opens it). For a repo card: the read-write key on this PC
     pub key_path: String,
     /// SHA256 fingerprints the owner confirmed (a server has one per key type); empty until checked
     #[serde(default)]
@@ -36,6 +45,21 @@ pub struct Host {
     pub roles: Vec<String>,
     #[serde(default)]
     pub notes: String,
+    /// "" for a server, "github" for a GitHub repo card
+    #[serde(default)]
+    pub kind: String,
+    /// the machine name behind `host` when `host` is a nickname from `~\.ssh\config` (a repo card: github.com). It is what the fingerprint is read from
+    #[serde(default)]
+    pub real_host: String,
+    /// repo card: `owner/name`
+    #[serde(default)]
+    pub repo: String,
+    /// repo card: the read-only key file on this PC, the copy that is handed to a server (a reference: never opened)
+    #[serde(default)]
+    pub ro_key_path: String,
+    /// repo card: the servers that pull the repo
+    #[serde(default)]
+    pub pulled_by: Vec<Pull>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -58,6 +82,22 @@ fn clean_line(s: &str, what: &str, max: usize) -> Result<String, String> {
 
 fn valid_host(h: &str) -> bool {
     !h.is_empty() && h.len() <= 255 && h.chars().all(|c| c.is_ascii_alphanumeric() || ".-_:[]".contains(c)) && !h.starts_with('-')
+}
+
+/// A GitHub repo as `owner/name`; a full github.com address (web or ssh form, with or without `.git`) is accepted and shortened.
+fn clean_repo(value: &str) -> Result<String, String> {
+    let v = value.trim().trim_end_matches('/').trim_end_matches(".git");
+    let v = v.strip_prefix("https://github.com/").or_else(|| v.strip_prefix("http://github.com/")).or_else(|| v.strip_prefix("git@github.com:")).unwrap_or(v);
+    let mut it = v.split('/');
+    let (a, b, c) = (it.next().unwrap_or(""), it.next().unwrap_or(""), it.next());
+    let ok = c.is_none() && [a, b].iter().all(|p| !p.is_empty() && p.len() <= 100 && p.chars().all(|ch| ch.is_ascii_alphanumeric() || "._-".contains(ch)));
+    if !ok { return Err("A GitHub repo looks like owner/name, for example BergasBintang/kona-space".into()); }
+    Ok(v.to_string())
+}
+
+fn no_key_text(s: &str) -> Result<(), String> {
+    if s.contains("PRIVATE KEY") || s.contains("BEGIN ") { return Err("That looks like the text of a key. Kona keeps only the path of the key file, never the key itself".into()); }
+    Ok(())
 }
 
 impl Servers {
@@ -84,14 +124,40 @@ impl Servers {
         h.user = clean_line(&h.user, "The user", 64)?;
         h.key_path = clean_line(&h.key_path, "The key file path", 400)?;
         h.notes = h.notes.trim().chars().take(1000).collect();
-        if h.label.is_empty() { return Err("A server needs a name".into()); }
+        h.kind = h.kind.trim().to_string();
+        h.real_host = clean_line(&h.real_host, "The real address", 255)?;
+        h.repo = clean_line(&h.repo, "The repo", 200)?;
+        h.ro_key_path = clean_line(&h.ro_key_path, "The read-only key file path", 400)?;
+        match h.kind.as_str() {
+            "" => { h.real_host.clear(); h.repo.clear(); h.ro_key_path.clear(); h.pulled_by.clear(); }
+            "github" => {
+                h.repo = clean_repo(&h.repo)?;
+                if h.user.is_empty() { h.user = "git".into(); }
+                if h.port == 0 { h.port = 22; }
+                if h.real_host.is_empty() { h.real_host = "github.com".into(); }
+                if !valid_host(&h.real_host) { return Err("The real address may only hold letters, digits, dots, dashes and underscores (for GitHub: github.com)".into()); }
+                no_key_text(&h.ro_key_path)?;
+            }
+            _ => return Err("That kind of entry does not exist".into()),
+        }
+        if h.label.is_empty() { return Err(if h.kind == "github" { "A repo needs a name" } else { "A server needs a name" }.into()); }
         if !valid_host(&h.host) { return Err("The host may only hold letters, digits, dots, dashes and underscores (an address or a name from your ssh config)".into()); }
         if h.user.is_empty() || !h.user.chars().all(|c| c.is_ascii_alphanumeric() || "._-".contains(c)) { return Err("The user may only hold letters, digits, dots, dashes and underscores".into()); }
         if h.port == 0 { return Err("The port must be between 1 and 65535".into()); }
-        if h.key_path.contains("PRIVATE KEY") || h.key_path.contains("BEGIN ") { return Err("That looks like the text of a key. Kona keeps only the path of the key file, never the key itself".into()); }
+        no_key_text(&h.key_path)?;
         h.fingerprints.retain(|f| f.starts_with("SHA256:") && f.len() < 100);
         let mut list = self.list.lock().unwrap();
         if list.iter().any(|x| x.id != h.id && x.project_id == h.project_id && x.label.to_lowercase() == h.label.to_lowercase()) { return Err("Another server of this project has that name".into()); }
+        // the servers that pull the repo: each must be a server (not a repo) of this same project, once; the key's place there is a note
+        let mut pulls: Vec<Pull> = vec![];
+        for p in std::mem::take(&mut h.pulled_by) {
+            if pulls.len() >= 20 || pulls.iter().any(|q| q.server_id == p.server_id) { continue; }
+            if !list.iter().any(|x| x.id == p.server_id && x.project_id == h.project_id && x.kind.is_empty()) { return Err("A server that pulls this repo is not in this project's list any more".into()); }
+            let key_path = clean_line(&p.key_path, "The key path on the server", 400)?;
+            no_key_text(&key_path)?;
+            pulls.push(Pull { server_id: p.server_id, key_path });
+        }
+        h.pulled_by = pulls;
         if h.id.is_empty() {
             h.id = uuid::Uuid::new_v4().to_string();
             list.push(h.clone());
@@ -107,6 +173,7 @@ impl Servers {
     pub fn remove(&self, id: &str) -> Result<(), String> {
         let mut list = self.list.lock().unwrap();
         list.retain(|h| h.id != id);
+        for h in list.iter_mut() { h.pulled_by.retain(|p| p.server_id != id); } // a repo no longer says it is pulled by a server that is gone
         self.save(&list)
     }
 }
@@ -230,11 +297,227 @@ pub fn ask_rules() -> Vec<String> {
 }
 
 // ---- the server's fingerprint ---------------------------------------------------------------------------------
+//
+// Kona reads a server's PUBLIC host keys itself, the way `ssh-keyscan` does, so it needs no tool on the PC. (The tool that comes with Windows,
+// OpenSSH 9.5, fails against modern servers with "unsupported KEX method"; found 2026-11-04.) It connects, trades the version line and the
+// lists of methods, sends the first step of a `curve25519-sha256` key exchange, and the server answers with its public host key. Kona keeps
+// that key, hashes it and hangs up. It never answers the rest of the exchange, never sends a login and never checks the server's signature
+// (it only reads; the owner compares the fingerprint with the server's own record). One connection reads one key type.
+use sha2::{Digest, Sha256};
+use std::io::{Read, Write};
+use std::net::{TcpStream, ToSocketAddrs};
+use std::time::Duration;
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct Fingerprint {
     pub kind: String,
     pub fingerprint: String,
+}
+
+const WAIT: Duration = Duration::from_secs(8);
+
+/// How a failed read should go on: `Network` (nothing answered, so stop and do not try another way), `Protocol` (the server answered but
+/// not in a way this reader handles: stop, but the `ssh-keyscan` tool may still manage) or `NoKey` (the server has no key of this type: try the next).
+#[derive(Debug, PartialEq, Clone, Copy)]
+enum Fail {
+    Network,
+    Protocol,
+    NoKey,
+}
+
+#[derive(Debug)]
+struct ReadErr {
+    fail: Fail,
+    msg: String,
+}
+
+fn fail(fail: Fail, msg: impl Into<String>) -> ReadErr {
+    ReadErr { fail, msg: msg.into() }
+}
+
+fn io_fail(what: &str, e: std::io::Error) -> ReadErr {
+    use std::io::ErrorKind::*;
+    match e.kind() {
+        TimedOut | WouldBlock => fail(Fail::Network, format!("The server stopped answering while Kona was {what} (waited {} seconds)", WAIT.as_secs())),
+        UnexpectedEof | ConnectionReset | ConnectionAborted | BrokenPipe => fail(Fail::Network, format!("The server closed the connection while Kona was {what}")),
+        _ => fail(Fail::Network, format!("The connection failed while Kona was {what}: {e}")),
+    }
+}
+
+/// "SHA256:" and the base64 (no padding) of the SHA256 of the key's public blob: the same text `ssh-keygen -l` prints.
+fn print_of(blob: &[u8]) -> String {
+    use base64::Engine;
+    format!("SHA256:{}", base64::engine::general_purpose::STANDARD_NO_PAD.encode(Sha256::digest(blob)))
+}
+
+/// The name `ssh-keygen -l` puts in brackets, from the key type written in the key.
+fn kind_of(key_type: &str) -> String {
+    match key_type {
+        "ssh-ed25519" => "ED25519".into(),
+        "ssh-rsa" => "RSA".into(),
+        t if t.starts_with("ecdsa-sha2-") => "ECDSA".into(),
+        t => t.to_uppercase(),
+    }
+}
+
+fn put_string(out: &mut Vec<u8>, b: &[u8]) {
+    out.extend((b.len() as u32).to_be_bytes());
+    out.extend(b);
+}
+
+/// One SSH packet before encryption starts: length, padding length, the message, padding (to a multiple of 8, at least 4).
+fn packet(payload: &[u8]) -> Vec<u8> {
+    let mut pad = 8 - (5 + payload.len()) % 8;
+    if pad < 4 { pad += 8; }
+    let mut out = Vec::with_capacity(5 + payload.len() + pad);
+    out.extend(((1 + payload.len() + pad) as u32).to_be_bytes());
+    out.push(pad as u8);
+    out.extend(payload);
+    out.extend(std::iter::repeat_n(0u8, pad));
+    out
+}
+
+fn read_line(s: &mut impl Read) -> Result<Vec<u8>, ReadErr> {
+    let mut line = vec![];
+    let mut b = [0u8; 1];
+    while line.len() < 512 {
+        s.read_exact(&mut b).map_err(|e| io_fail("reading its greeting", e))?;
+        if b[0] == b'\n' { break; }
+        line.push(b[0]);
+    }
+    while line.last() == Some(&b'\r') { line.pop(); }
+    Ok(line)
+}
+
+fn read_packet(s: &mut impl Read, what: &str) -> Result<Vec<u8>, ReadErr> {
+    let mut len = [0u8; 4];
+    s.read_exact(&mut len).map_err(|e| io_fail(what, e))?;
+    let n = u32::from_be_bytes(len) as usize;
+    if !(6..=35_000).contains(&n) { return Err(fail(Fail::Protocol, "The server answered with something that is not an SSH message (wrong port?)")); }
+    let mut body = vec![0u8; n];
+    s.read_exact(&mut body).map_err(|e| io_fail(what, e))?;
+    let pad = body[0] as usize;
+    if 1 + pad > n { return Err(fail(Fail::Protocol, "The server sent a damaged SSH message")); }
+    Ok(body[1..n - pad].to_vec())
+}
+
+/// A reader over the bytes of one message: strings and name lists.
+struct Bytes<'a>(&'a [u8]);
+
+impl<'a> Bytes<'a> {
+    fn take(&mut self, n: usize) -> Option<&'a [u8]> {
+        if self.0.len() < n { return None; }
+        let (a, b) = self.0.split_at(n);
+        self.0 = b;
+        Some(a)
+    }
+    fn string(&mut self) -> Option<&'a [u8]> {
+        let n = u32::from_be_bytes(self.take(4)?.try_into().ok()?) as usize;
+        self.take(n)
+    }
+}
+
+fn damaged() -> ReadErr { fail(Fail::Protocol, "The server sent a damaged SSH message") }
+
+/// The core of the read, on any connection: returns the server's host key (the blob) for the first of `algs` that the server has.
+fn exchange<S: Read + Write>(s: &mut S, algs: &str) -> Result<Vec<u8>, ReadErr> {
+    s.write_all(b"SSH-2.0-Kona_HostKeyRead\r\n").map_err(|e| io_fail("greeting it", e))?;
+    // its greeting (some servers send lines of text first)
+    let mut id = None;
+    for _ in 0..20 {
+        let l = read_line(s)?;
+        if l.starts_with(b"SSH-") { id = Some(String::from_utf8_lossy(&l).to_string()); break; }
+    }
+    let Some(id) = id else { return Err(fail(Fail::Protocol, "The server answered, but not like an SSH server (wrong port?)")); };
+    if !(id.starts_with("SSH-2.0-") || id.starts_with("SSH-1.99-")) { return Err(fail(Fail::Protocol, format!("The server speaks an SSH version Kona cannot read ({id})"))); }
+
+    // its lists of methods
+    let theirs = read_packet(s, "waiting for its list of methods")?;
+    if theirs.first() == Some(&1) { return Err(disconnect_reason(&theirs)); }
+    if theirs.first() != Some(&20) { return Err(fail(Fail::Protocol, "The server did not start with its list of methods")); }
+    let mut r = Bytes(&theirs[17.min(theirs.len())..]);
+    let kex = String::from_utf8_lossy(r.string().ok_or_else(damaged)?).to_string();
+    let hostkeys = String::from_utf8_lossy(r.string().ok_or_else(damaged)?).to_string();
+    let curve = ["curve25519-sha256", "curve25519-sha256@libssh.org"].into_iter().find(|k| kex.split(',').any(|x| x == *k));
+    if curve.is_none() { return Err(fail(Fail::Protocol, "The server does not offer the key exchange curve25519-sha256, which Kona's reader needs")); }
+    if !algs.split(',').any(|a| hostkeys.split(',').any(|x| x == a)) { return Err(fail(Fail::NoKey, "The server has no host key of this type")); }
+
+    // ours: one host key type, the common methods for the rest (they are never used)
+    let mut k = vec![20u8];
+    k.extend(&uuid::Uuid::new_v4().as_bytes()[..]);
+    for list in ["curve25519-sha256,curve25519-sha256@libssh.org", algs, "aes128-ctr,aes256-ctr,chacha20-poly1305@openssh.com,aes128-gcm@openssh.com", "aes128-ctr,aes256-ctr,chacha20-poly1305@openssh.com,aes128-gcm@openssh.com", "hmac-sha2-256,hmac-sha2-512,hmac-sha1", "hmac-sha2-256,hmac-sha2-512,hmac-sha1", "none", "none", "", ""] {
+        put_string(&mut k, list.as_bytes());
+    }
+    k.push(0);
+    k.extend([0u8; 4]);
+    s.write_all(&packet(&k)).map_err(|e| io_fail("sending its own list of methods", e))?;
+    // the first step of the key exchange: a throwaway public value (the shared secret is never computed)
+    let mut init = vec![30u8];
+    let mut q = uuid::Uuid::new_v4().as_bytes().to_vec();
+    q.extend(uuid::Uuid::new_v4().as_bytes());
+    q[31] &= 0x7f;
+    put_string(&mut init, &q);
+    s.write_all(&packet(&init)).map_err(|e| io_fail("starting the key exchange", e))?;
+
+    // the answer carries the server's public host key
+    for _ in 0..10 {
+        let m = read_packet(s, "waiting for its host key")?;
+        match m.first() {
+            Some(31) => {
+                let blob = Bytes(&m[1..]).string().ok_or_else(damaged)?.to_vec();
+                if blob.is_empty() || blob.len() > 16_384 { return Err(damaged()); }
+                // a polite goodbye (disconnect, "by application"); nothing depends on it
+                let mut bye = vec![1u8];
+                bye.extend(11u32.to_be_bytes());
+                put_string(&mut bye, b"done");
+                put_string(&mut bye, b"");
+                let _ = s.write_all(&packet(&bye));
+                return Ok(blob);
+            }
+            Some(1) => return Err(disconnect_reason(&m)),
+            Some(2) | Some(4) | Some(7) => continue, // ignore, debug, extension info
+            _ => return Err(fail(Fail::Protocol, "The server answered the key exchange with a message Kona does not know")),
+        }
+    }
+    Err(fail(Fail::Protocol, "The server did not send its host key"))
+}
+
+fn disconnect_reason(m: &[u8]) -> ReadErr {
+    let mut r = Bytes(&m[1.min(m.len())..]);
+    let _code = r.take(4);
+    let why = r.string().map(|s| String::from_utf8_lossy(s).trim().chars().take(160).collect::<String>()).unwrap_or_default();
+    fail(Fail::Protocol, if why.is_empty() { "The server ended the connection".to_string() } else { format!("The server ended the connection: {why}") })
+}
+
+fn connect(host: &str, port: u16) -> Result<TcpStream, ReadErr> {
+    let bare = host.trim_matches(|c| c == '[' || c == ']');
+    let addrs: Vec<_> = (bare, port).to_socket_addrs().map_err(|_| fail(Fail::Network, format!("Could not find a server called {host}. Is the name right?")))?.take(4).collect();
+    let mut last = None;
+    for a in addrs {
+        match TcpStream::connect_timeout(&a, WAIT) {
+            Ok(s) => {
+                let _ = s.set_read_timeout(Some(WAIT));
+                let _ = s.set_write_timeout(Some(WAIT));
+                let _ = s.set_nodelay(true);
+                return Ok(s);
+            }
+            Err(e) => last = Some(e),
+        }
+    }
+    use std::io::ErrorKind::*;
+    Err(fail(Fail::Network, match last {
+        Some(e) if matches!(e.kind(), TimedOut | WouldBlock) => format!("{host}:{port} did not answer within {} seconds. Is the address right, and is a firewall in the way?", WAIT.as_secs()),
+        Some(e) if e.kind() == ConnectionRefused => format!("{host}:{port} refused the connection. Is SSH running on that port?"),
+        Some(e) => format!("Could not connect to {host}:{port}: {e}"),
+        None => format!("{host} has no address to connect to"),
+    }))
+}
+
+fn read_one(host: &str, port: u16, algs: &str) -> Result<Fingerprint, ReadErr> {
+    let mut s = connect(host, port)?;
+    let blob = exchange(&mut s, algs)?;
+    let key_type = Bytes(&blob).string().map(|t| String::from_utf8_lossy(t).to_string()).ok_or_else(damaged)?;
+    Ok(Fingerprint { kind: kind_of(&key_type), fingerprint: print_of(&blob) })
 }
 
 fn tool(name: &str) -> Command {
@@ -243,29 +526,59 @@ fn tool(name: &str) -> Command {
     c
 }
 
-/// Read the server's PUBLIC host keys with `ssh-keyscan` (it connects to the port, reads the keys and leaves; it sends no login) and turn each
-/// into a SHA256 fingerprint with `ssh-keygen`. Nothing is saved here.
+/// The old way, kept as a second try: the `ssh-keyscan` tool (the one on the PATH, then the one that comes with Git for Windows). Returns what it
+/// read, and the first complaint it printed, if it read nothing (the real reason, not a guess).
+fn scan_with_tool(host: &str, port: u16) -> (Vec<Fingerprint>, Option<String>) {
+    use base64::Engine;
+    let mut complaint = None;
+    for exe in ["ssh-keyscan", r"C:\Program Files\Git\usr\bin\ssh-keyscan.exe"] {
+        let Ok(o) = tool(exe).args(["-T", "8", "-p", &port.to_string(), host]).stdin(Stdio::null()).output() else { continue };
+        let mut out: Vec<Fingerprint> = vec![];
+        for l in String::from_utf8_lossy(&o.stdout).lines().filter(|l| !l.starts_with('#')) {
+            let mut it = l.split_whitespace();
+            let (_host, kt, b64) = (it.next(), it.next(), it.next());
+            if let (Some(kt), Some(b64)) = (kt, b64)
+                && let Ok(blob) = base64::engine::general_purpose::STANDARD.decode(b64)
+            {
+                let f = print_of(&blob);
+                if !out.iter().any(|x| x.fingerprint == f) { out.push(Fingerprint { kind: kind_of(kt), fingerprint: f }); }
+            }
+        }
+        if !out.is_empty() { return (out, None); }
+        if complaint.is_none() {
+            complaint = String::from_utf8_lossy(&o.stderr).lines().map(str::trim).find(|l| !l.is_empty() && !l.starts_with('#')).map(|l| l.chars().take(200).collect::<String>());
+        }
+    }
+    (vec![], complaint)
+}
+
+/// Read the server's PUBLIC host keys and their SHA256 fingerprints. Nothing is saved here. When it fails, the error says why.
 pub fn fingerprints(host: &str, port: u16) -> Result<Vec<Fingerprint>, String> {
     if !valid_host(host) { return Err("That host is not valid".into()); }
-    let scan = tool("ssh-keyscan").args(["-T", "8", "-p", &port.to_string(), host]).stdin(Stdio::null()).output().map_err(|e| format!("Could not run ssh-keyscan: {e}. Is the OpenSSH client installed?"))?;
-    let text = String::from_utf8_lossy(&scan.stdout).to_string();
-    let lines: Vec<&str> = text.lines().filter(|l| !l.starts_with('#') && !l.trim().is_empty()).collect();
-    if lines.is_empty() { return Err(format!("{host}:{port} did not answer with a host key (is the name right, and is the server reachable?)")); }
-    let mut out = vec![];
-    for l in lines {
-        let mut child = tool("ssh-keygen").args(["-lf", "-"]).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().map_err(|e| format!("Could not run ssh-keygen: {e}"))?;
-        use std::io::Write;
-        if let Some(mut si) = child.stdin.take() { let _ = si.write_all(l.as_bytes()); let _ = si.write_all(b"\n"); }
-        let o = child.wait_with_output().map_err(|e| e.to_string())?;
-        let s = String::from_utf8_lossy(&o.stdout).to_string();
-        // "256 SHA256:abc host (ED25519)"
-        let mut it = s.split_whitespace();
-        let (_bits, fp) = (it.next(), it.next());
-        let kind = s.rsplit_once('(').and_then(|(_, k)| k.split(')').next()).unwrap_or("?").to_string();
-        if let Some(fp) = fp.filter(|f| f.starts_with("SHA256:")) { out.push(Fingerprint { kind, fingerprint: fp.to_string() }); }
+    let mut out: Vec<Fingerprint> = vec![];
+    let mut first: Option<ReadErr> = None;
+    for algs in ["ssh-ed25519", "ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521", "rsa-sha2-512,rsa-sha2-256,ssh-rsa"] {
+        match read_one(host, port, algs) {
+            Ok(f) => { if !out.iter().any(|x| x.fingerprint == f.fingerprint) { out.push(f); } }
+            Err(e) => {
+                let stop = e.fail != Fail::NoKey;
+                if first.is_none() || (first.as_ref().is_some_and(|f| f.fail == Fail::NoKey) && e.fail != Fail::NoKey) { first = Some(e); }
+                if stop { break; }
+            }
+        }
     }
-    if out.is_empty() { return Err("Could not read the fingerprint".into()); }
-    Ok(out)
+    if !out.is_empty() { return Ok(out); }
+    let own = first.unwrap_or_else(|| fail(Fail::Protocol, "No host key could be read"));
+    // one full stop or question mark at the end, never "?." or ".."
+    let reason = if own.msg.ends_with('?') { own.msg.clone() } else { format!("{}.", own.msg.trim_end_matches('.')) };
+    if own.fail == Fail::Network { return Err(reason); }
+    // the server answered but this reader could not finish: let the `ssh-keyscan` tool try, and report what it says
+    let (found, complaint) = scan_with_tool(host, port);
+    if !found.is_empty() { return Ok(found); }
+    Err(match complaint {
+        Some(c) => format!("{reason} The ssh-keyscan tool on this PC also failed: {c}"),
+        None => reason,
+    })
 }
 
 // ---- the key file, as a reference -----------------------------------------------------------------------------
@@ -297,7 +610,81 @@ mod tests {
     use super::*;
 
     fn host(label: &str, h: &str, user: &str, roles: &[&str]) -> Host {
-        Host { id: label.into(), project_id: "p".into(), label: label.into(), host: h.into(), port: 22, user: user.into(), key_path: "k".into(), fingerprints: vec![], roles: roles.iter().map(|s| s.to_string()).collect(), notes: String::new() }
+        Host { id: label.into(), project_id: "p".into(), label: label.into(), host: h.into(), port: 22, user: user.into(), key_path: "k".into(), fingerprints: vec![], roles: roles.iter().map(|s| s.to_string()).collect(), notes: String::new(), ..Default::default() }
+    }
+
+    fn fresh(name: &str) -> Servers {
+        Servers::load(&std::env::temp_dir().join(format!("kona-ssh-{name}-{}", std::process::id())))
+    }
+
+    fn repo_card(label: &str, alias: &str, repo: &str) -> Host {
+        Host { project_id: "p".into(), label: label.into(), host: alias.into(), kind: "github".into(), repo: repo.into(), key_path: "C:\\k\\rw".into(), ..Default::default() }
+    }
+
+    #[test]
+    fn a_repo_card_gets_its_defaults_and_a_clean_repo_name() {
+        let s = fresh("repo");
+        let h = s.save_host(repo_card("Kona", "github-kona", "https://github.com/Owner/kona-space.git")).unwrap();
+        assert_eq!((h.repo.as_str(), h.user.as_str(), h.real_host.as_str(), h.port), ("Owner/kona-space", "git", "github.com", 22));
+        assert!(s.save_host(repo_card("Bad", "github-bad", "just-a-name")).is_err());
+        assert!(s.save_host(repo_card("Bad2", "github-bad2", "a b/c")).is_err());
+        let mut k = repo_card("Key", "github-key", "o/n");
+        k.ro_key_path = "-----BEGIN OPENSSH PRIVATE KEY-----".into();
+        assert!(s.save_host(k).unwrap_err().contains("only the path"));
+        let mut k = repo_card("Kind", "github-kind", "o/n");
+        k.kind = "other".into();
+        assert!(s.save_host(k).is_err());
+        let mut plain = host("Web", "web.example.test", "deploy", &[]);
+        plain.id = String::new();
+        plain.repo = "x/y".into();
+        plain.real_host = "elsewhere".into();
+        plain.ro_key_path = "k".into();
+        let saved = s.save_host(plain).unwrap();
+        assert!(saved.repo.is_empty() && saved.real_host.is_empty() && saved.ro_key_path.is_empty(), "a server keeps no repo fields");
+    }
+
+    #[test]
+    fn a_pull_names_a_server_of_the_same_project_and_goes_with_it() {
+        let s = fresh("pull");
+        let mut web = host("Web", "web.example.test", "deploy", &[]);
+        web.id = String::new();
+        let web = s.save_host(web).unwrap();
+        let mut other = host("Other", "other.example.test", "deploy", &[]);
+        other.id = String::new();
+        other.project_id = "another-project".into();
+        let other = s.save_host(other).unwrap();
+        let mut r = repo_card("Kona", "github-kona", "o/n");
+        r.pulled_by = vec![Pull { server_id: web.id.clone(), key_path: "~/.ssh/kona_ro".into() }, Pull { server_id: web.id.clone(), key_path: "~/.ssh/again".into() }];
+        let r = s.save_host(r).unwrap();
+        assert_eq!(r.pulled_by.len(), 1, "the same server twice is kept once");
+        assert_eq!(r.pulled_by[0].key_path, "~/.ssh/kona_ro");
+        let mut bad = repo_card("Bad", "github-bad", "o/n");
+        bad.pulled_by = vec![Pull { server_id: other.id.clone(), key_path: "k".into() }];
+        assert!(s.save_host(bad).unwrap_err().contains("not in this project"), "a server of another project cannot pull it");
+        let mut bad = repo_card("Bad2", "github-bad2", "o/n");
+        bad.pulled_by = vec![Pull { server_id: r.id.clone(), key_path: "k".into() }];
+        assert!(s.save_host(bad).is_err(), "a repo card cannot be a pulling server");
+        s.remove(&web.id).unwrap();
+        assert!(s.for_project("p").iter().find(|h| h.id == r.id).unwrap().pulled_by.is_empty(), "the pull goes when its server goes");
+    }
+
+    #[test]
+    fn a_repo_card_is_checked_like_a_server() {
+        // the nickname is the host a command names, so a role may use it only when the card lists the role
+        let mut card = repo_card("Kona", "github-kona", "o/n");
+        card.roles = vec!["devops".into()];
+        card.user = "git".into();
+        let hosts = vec![card];
+        assert!(matches!(decide(&hosts, Some("devops"), "ssh -T git@github-kona"), Decision::Ask(_)));
+        assert!(matches!(decide(&hosts, Some("qa"), "ssh -T git@github-kona"), Decision::Deny(_)));
+        assert!(matches!(decide(&hosts, Some("devops"), "ssh -T git@github.com"), Decision::Deny(m) if m.contains("not in this project's server list")));
+    }
+
+    #[test]
+    fn files_saved_before_repo_cards_still_load() {
+        let old = r#"{"version":1,"hosts":[{"id":"a","project_id":"p","label":"Web","host":"h.example.test","port":22,"user":"deploy","key_path":"k","fingerprints":[],"roles":[],"notes":""}]}"#;
+        let d: FileData = serde_json::from_str(old).unwrap();
+        assert!(d.hosts[0].kind.is_empty() && d.hosts[0].pulled_by.is_empty() && d.hosts[0].real_host.is_empty());
     }
 
     fn t(h: &str, u: Option<&str>) -> Target { Target { host: h.into(), user: u.map(String::from) } }
@@ -370,5 +757,154 @@ mod tests {
         let saved = s.save_host(h).unwrap();
         assert_eq!(saved.fingerprints, vec!["SHA256:abc".to_string()]);
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    // ---- reading the host key: against a fake server on this PC ---------------------------------------------------
+
+    fn blob_of(key_type: &str, key: &[u8]) -> Vec<u8> {
+        let mut b = vec![];
+        put_string(&mut b, key_type.as_bytes());
+        put_string(&mut b, key);
+        b
+    }
+
+    fn reply_with(blob: &[u8]) -> Vec<u8> {
+        let mut r = vec![31u8];
+        put_string(&mut r, blob);
+        put_string(&mut r, &[1u8; 32]);
+        put_string(&mut r, &[2u8; 16]);
+        r
+    }
+
+    /// A fake SSH server: greets, lists its methods, waits for the first step of the key exchange and sends `reply`. Returns its port.
+    fn fake_server(kex: &'static str, hostkeys: &'static str, reply: Vec<u8>) -> u16 {
+        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = l.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            let _ = (|| -> Result<(), Box<dyn std::error::Error>> {
+                let (mut s, _) = l.accept()?;
+                s.set_read_timeout(Some(Duration::from_secs(5)))?;
+                s.write_all(b"Welcome\r\nSSH-2.0-FakeSSH_1.0\r\n")?;
+                let mut ki = vec![20u8];
+                ki.extend([7u8; 16]);
+                for list in [kex, hostkeys, "aes128-ctr", "aes128-ctr", "hmac-sha2-256", "hmac-sha2-256", "none", "none", "", ""] { put_string(&mut ki, list.as_bytes()); }
+                ki.push(0);
+                ki.extend([0u8; 4]);
+                s.write_all(&packet(&ki))?;
+                let hello = read_line(&mut s).map_err(|e| e.msg)?;
+                assert_eq!(hello, b"SSH-2.0-Kona_HostKeyRead".to_vec());
+                let ours = read_packet(&mut s, "x").map_err(|e| e.msg)?;
+                assert_eq!(ours[0], 20);
+                let init = read_packet(&mut s, "x").map_err(|e| e.msg)?;
+                assert_eq!(init[0], 30);
+                assert_eq!(init.len(), 1 + 4 + 32, "a 32 byte public value");
+                s.write_all(&packet(&reply))?;
+                let mut rest = vec![];
+                let _ = s.read_to_end(&mut rest); // wait for the goodbye, so closing does not throw the answer away
+                Ok(())
+            })();
+        });
+        port
+    }
+
+    #[test]
+    fn a_fingerprint_is_what_ssh_keygen_prints() {
+        // an ED25519 key made of the bytes 0 to 31 (a made-up key); `ssh-keygen -lf` printed the same text for it
+        let key: Vec<u8> = (0u8..32).collect();
+        assert_eq!(print_of(&blob_of("ssh-ed25519", &key)), "SHA256:ZkAslGjFiUHdGf/WUL8rQvkib4PTvQatUV0OUQSncCA");
+        assert_eq!(kind_of("ssh-ed25519"), "ED25519");
+        assert_eq!(kind_of("ecdsa-sha2-nistp256"), "ECDSA");
+        assert_eq!(kind_of("ssh-rsa"), "RSA");
+    }
+
+    #[test]
+    fn packets_are_padded_to_eight_with_at_least_four() {
+        for n in 0..70 {
+            let p = packet(&vec![9u8; n]);
+            let pad = p[4] as usize;
+            assert_eq!(p.len() % 8, 0, "{n}");
+            assert!(pad >= 4, "{n}");
+            assert_eq!(u32::from_be_bytes(p[..4].try_into().unwrap()) as usize, p.len() - 4);
+        }
+    }
+
+    #[test]
+    fn reads_a_host_key_from_a_server_without_logging_in() {
+        let key: Vec<u8> = (0u8..32).collect();
+        let port = fake_server("sntrup761x25519-sha512@openssh.com,curve25519-sha256", "ssh-ed25519,rsa-sha2-512", reply_with(&blob_of("ssh-ed25519", &key)));
+        let f = read_one("127.0.0.1", port, "ssh-ed25519").unwrap();
+        assert_eq!(f.kind, "ED25519");
+        assert_eq!(f.fingerprint, "SHA256:ZkAslGjFiUHdGf/WUL8rQvkib4PTvQatUV0OUQSncCA");
+    }
+
+    #[test]
+    fn says_so_when_the_server_has_no_key_of_the_asked_type() {
+        let port = fake_server("curve25519-sha256", "ssh-ed25519", vec![]);
+        let e = read_one("127.0.0.1", port, "rsa-sha2-512,rsa-sha2-256,ssh-rsa").unwrap_err();
+        assert_eq!(e.fail, Fail::NoKey);
+        assert!(e.msg.contains("no host key of this type"), "{}", e.msg);
+    }
+
+    #[test]
+    fn says_so_when_the_server_offers_no_curve25519() {
+        let port = fake_server("diffie-hellman-group14-sha256", "ssh-ed25519", vec![]);
+        let e = read_one("127.0.0.1", port, "ssh-ed25519").unwrap_err();
+        assert_eq!(e.fail, Fail::Protocol);
+        assert!(e.msg.contains("curve25519-sha256"), "{}", e.msg);
+    }
+
+    #[test]
+    fn shows_the_reason_when_the_server_ends_the_connection() {
+        let mut bye = vec![1u8];
+        bye.extend(2u32.to_be_bytes());
+        put_string(&mut bye, b"not allowed from here");
+        put_string(&mut bye, b"");
+        let port = fake_server("curve25519-sha256", "ssh-ed25519", bye);
+        let e = read_one("127.0.0.1", port, "ssh-ed25519").unwrap_err();
+        assert!(e.msg.contains("ended the connection: not allowed from here"), "{}", e.msg);
+    }
+
+    #[test]
+    fn a_closed_port_is_reported_as_refused() {
+        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = l.local_addr().unwrap().port();
+        drop(l);
+        let e = read_one("127.0.0.1", port, "ssh-ed25519").unwrap_err();
+        assert_eq!(e.fail, Fail::Network);
+        assert!(e.msg.contains("refused the connection"), "{}", e.msg);
+    }
+
+    #[test]
+    fn a_plain_web_server_is_not_taken_for_ssh() {
+        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = l.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            if let Ok((mut s, _)) = l.accept() {
+                let _ = s.write_all(b"HTTP/1.1 400 Bad Request\r\nServer: x\r\n\r\n");
+            }
+        });
+        let e = read_one("127.0.0.1", port, "ssh-ed25519").unwrap_err();
+        assert!(e.msg.contains("not like an SSH server") || e.msg.contains("closed the connection"), "{}", e.msg);
+    }
+
+    #[test]
+    fn the_error_ends_with_one_full_stop_or_question_mark() {
+        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = l.local_addr().unwrap().port();
+        drop(l);
+        let e = fingerprints("127.0.0.1", port).unwrap_err();
+        assert_eq!(e, format!("127.0.0.1:{port} refused the connection. Is SSH running on that port?"));
+    }
+
+    /// Run by hand against a real server (read-only, no login): set KONA_TEST_SSH_HOST (and KONA_TEST_SSH_PORT if not 22), then
+    /// `cargo test --lib live_read -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn live_read_of_a_real_server() {
+        let Ok(host) = std::env::var("KONA_TEST_SSH_HOST") else { return };
+        let port = std::env::var("KONA_TEST_SSH_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(22);
+        let r = fingerprints(&host, port);
+        println!("{r:#?}");
+        assert!(r.is_ok());
     }
 }

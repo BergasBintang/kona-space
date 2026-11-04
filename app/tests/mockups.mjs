@@ -78,7 +78,7 @@ v.play().catch((e) => say('playfailed', { why: String(e) }));`);
   fs.mkdirSync(path.join(root, "project", ".kona"), { recursive: true });
   fs.writeFileSync(path.join(root, "project", ".kona", "office-map.json"), JSON.stringify(old));
 
-  id = (await invoke("add_project", { folder: path.join(root, "project"), name: NAME, github: null, account })).project.id;
+  id = (await invoke("add_project", { folder: path.join(root, "project"), name: NAME, account })).project.id;
   note(`throwaway project ${id}, account ${account}`);
   await c.send("Page.reload");
   await wait(1500);

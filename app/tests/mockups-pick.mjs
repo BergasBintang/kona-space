@@ -73,7 +73,7 @@ try {
   write("login", "index.html", page); write("login", "style.css", css); write("login", "app.js", PAGE_JS);
   write("login", "about.html", page.replace("<title>login</title>", "<title>about</title>").replace('<h1 id="t" data-part="page-title">Login</h1>', '<h1 id="t" data-part="about-title">About us</h1>'));
   write("login", "mockup.json", JSON.stringify({ name: "Login pages", entry: "index.html" }));
-  id = (await invoke("add_project", { folder: path.join(root, "project"), name: NAME, github: null, account })).project.id;
+  id = (await invoke("add_project", { folder: path.join(root, "project"), name: NAME, account })).project.id;
   note(`throwaway project ${id}, account ${account}`);
   await c.send("Page.reload");
   await wait(1500);

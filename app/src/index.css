@@ -121,7 +121,7 @@ body {
   .px-btn-teal:active:not(:disabled) { border-image-source: url("./assets/frames/frame-teal-sm-pressed.png"); background-color: var(--color-accent-pressed); }
   .px-btn-red:hover:not(:disabled) { border-image-source: url("./assets/frames/frame-red-sm-hover.png"); }
   .px-btn-red:active:not(:disabled) { border-image-source: url("./assets/frames/frame-red-sm-pressed.png"); }
-  .px-btn:disabled, .px-field:disabled { opacity: 0.55; cursor: not-allowed; }
+  .px-btn:disabled, .px-field:disabled { opacity: 0.55; filter: grayscale(1); cursor: not-allowed; } /* greyed, so a button that cannot be pressed never looks like one that can */
   .px-btn:active:not(:disabled) { padding-top: 2px; } /* a pressed button sits one pixel lower */
   .px-field:focus-visible, .px-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
   /* the text boxes get the field frame without each one asking for it */

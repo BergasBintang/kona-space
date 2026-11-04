@@ -37,7 +37,7 @@ const account = before.find((p) => p.account)?.account ?? null;
 try {
   if (!account) { note("SKIP no project with an account to borrow"); process.exit(0); }
   fs.mkdirSync(path.join(root, "project"), { recursive: true });
-  id = (await invoke("add_project", { folder: path.join(root, "project"), name: NAME, github: null, account })).project.id;
+  id = (await invoke("add_project", { folder: path.join(root, "project"), name: NAME, account })).project.id;
   await invoke("workflow_save", { folder: path.join(root, "project"), workflow });
   await c.send("Page.reload"); await wait(1500);
   ok("the welcome page is back", await c.waitFor("document.body.innerText.includes('Welcome to Kona')", 20000, 200));

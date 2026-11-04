@@ -3,8 +3,8 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { Button, Glyph } from "./ui";
 
-export function Confirm({ title, children, confirmLabel, danger = false, busy = false, disabled = false, error, onConfirm, onCancel }: {
-  title: string; children: ReactNode; confirmLabel: string; danger?: boolean; busy?: boolean; disabled?: boolean; error?: string | null; onConfirm: () => void; onCancel: () => void;
+export function Confirm({ title, children, confirmLabel, cancelLabel = "Cancel", noConfirm = false, danger = false, busy = false, disabled = false, error, onConfirm, onCancel }: {
+  title: string; children: ReactNode; confirmLabel: string; /** the safe button's word, and `noConfirm` leaves only that button (nothing to confirm) */ cancelLabel?: string; noConfirm?: boolean; danger?: boolean; busy?: boolean; disabled?: boolean; error?: string | null; onConfirm: () => void; onCancel: () => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const cancel = useRef<HTMLButtonElement>(null);
@@ -28,8 +28,8 @@ export function Confirm({ title, children, confirmLabel, danger = false, busy = 
         <div className="flex flex-col gap-3 text-[15px] leading-6 text-text-secondary">{children}</div>
         {error && <div className="flex items-start gap-2.5 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
         <div className="flex justify-end gap-3 pt-1">
-          <Button ref={cancel} variant="quiet" onClick={onCancel}>Cancel</Button>
-          <Button variant={danger ? "danger" : "primary"} onClick={onConfirm} disabled={disabled || busy}>{busy ? "Working…" : confirmLabel}</Button>
+          <Button ref={cancel} variant="quiet" onClick={onCancel}>{cancelLabel}</Button>
+          {!noConfirm && <Button variant={danger ? "danger" : "primary"} onClick={onConfirm} disabled={disabled || busy}>{busy ? "Working…" : confirmLabel}</Button>}
         </div>
       </div>
     </div>

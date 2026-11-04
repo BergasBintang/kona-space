@@ -2,6 +2,17 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.35.1, 2026-11-04
+
+Reading a server's fingerprint works again, and a GitHub repo now has a card of its own on the Servers screen.
+
+- **The fingerprint is read by Kona itself.** On Windows it failed against modern servers with "did not answer with a host key", because the ssh tool that comes with Windows is too old to talk to them. Kona now reads the server's public keys by itself and needs no tool on the PC. It still sends no login and runs nothing on the server, and it asks first.
+- **A failure says why.** Connection refused, no answer within 8 seconds, no common method, or the reason the server gave. When nothing could be read, the dialog says "Could not read the fingerprint" and has only a Close button, so there is nothing to trust.
+- **GitHub repo cards.** On the Servers screen, Add a GitHub repo. A card holds the repo (`owner/name`), the nickname your ssh config uses for it, the real address behind the nickname (github.com), the key for read and write on this PC, the read-only key you hand to a server, and the servers that pull the repo with where the read-only key sits on each. Buttons copy the git address, the ssh config entry, and the entry for a pulling server. The fingerprint is read from the real address.
+- **The GitHub address box is gone** from Settings, Projects and from Add a project. Nothing used it. A saved value stays in the file, unread.
+- **Buttons that cannot be pressed are grey,** not only faded.
+- **Good to know.** A repo card is checked like a server: a role may use its nickname only when the card lists the role. Kona cannot tell whether GitHub marks a key read only (that needs a login), and it does not lock `git push`.
+
 ## 0.35.0, 2026-11-04
 
 A meeting room: a workflow now runs by itself, and the people talk in one group chat.

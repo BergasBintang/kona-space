@@ -9,7 +9,6 @@ import { KonaMark } from "./KonaMark";
 export function AddProject({ first, accounts, onDone, onCancel, onOpenAccounts }: { first: boolean; accounts: Account[]; onDone: (r: AddResult) => void; onCancel: () => void; onOpenAccounts: () => void }) {
   const [folder, setFolder] = useState("");
   const [name, setName] = useState("");
-  const [github, setGithub] = useState("");
   const [account, setAccount] = useState("");
   const [status, setStatus] = useState<Record<string, AccountStatus>>({}); // an account with no entry has not answered yet
   useEffect(() => {
@@ -27,7 +26,7 @@ export function AddProject({ first, accounts, onDone, onCancel, onOpenAccounts }
   };
   const add = async () => {
     setBusy(true); setError(null);
-    try { onDone(await addProject(folder, name.trim() || undefined, github.trim() || undefined, account)); }
+    try { onDone(await addProject(folder, name.trim() || undefined, account)); }
     catch (e) { setError(String(e)); }
     finally { setBusy(false); }
   };
@@ -48,10 +47,6 @@ export function AddProject({ first, accounts, onDone, onCancel, onOpenAccounts }
         <label className="flex flex-col gap-2">
           <span className="text-[13px] leading-5 font-bold text-text-secondary">Name</span>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="shop-api" className="h-11 border border-line-strong bg-inset px-3.5 text-[15px] text-text placeholder:text-text-tertiary" />
-        </label>
-        <label className="flex flex-col gap-2">
-          <span className="text-[13px] leading-5 font-bold text-text-secondary">GitHub address (optional)</span>
-          <input value={github} onChange={(e) => setGithub(e.target.value)} placeholder="owner/name" aria-label="GitHub address" className="h-11 border border-line-strong bg-inset px-3.5 font-mono text-[15px] text-text placeholder:text-text-tertiary" />
         </label>
         <div className="flex flex-col gap-2">
           {signedIn.length > 0 || asking

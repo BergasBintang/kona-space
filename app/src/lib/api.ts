@@ -2,7 +2,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { Branch } from "./skilltree.ts";
 
-export type Project = { id: string; name: string; folder: string; github?: string | null; account?: string | null };
+export type Project = { id: string; name: string; folder: string; account?: string | null };
 export type AddResult = { project: Project; hidden_folder: boolean; git_ignored: boolean };
 export type Role = { id: string; /** the person's own name: Kiki */ person: string; /** the job: Product */ name: string; group: string; model: string; mode: string; brief: string; persona?: string; voice: VoiceSettings; needs: string[]; own_copy?: boolean };
 /** "Kiki, Product": the person and the job (decision 62). */
@@ -47,7 +47,10 @@ export type TempInfo = { session_id: string; path: string; bytes: number; files:
 export type BrainNote = { id: string; layer: string; text: string; path: string; mtime: number; readonly: boolean };
 export type BrainData = { notes: BrainNote[]; memory_dir: string | null };
 export type Wanted = { question: string; count: number; first: string; last: string };
-export type Server = { id: string; project_id: string; label: string; host: string; port: number; user: string; key_path: string; fingerprints: string[]; roles: string[]; notes: string };
+/** A server that pulls a repo: which one, and where the read-only key is ON that server (a note: Kona never sees it) */
+export type Pull = { server_id: string; key_path: string };
+/** A server, or (kind "github") a GitHub repo card: host is the nickname from the ssh config, real_host the machine behind it, key_path the read-write key on this PC */
+export type Server = { id: string; project_id: string; label: string; host: string; port: number; user: string; key_path: string; fingerprints: string[]; roles: string[]; notes: string; kind: string; real_host: string; repo: string; ro_key_path: string; pulled_by: Pull[] };
 export type Fingerprint = { kind: string; fingerprint: string };
 export type KeyState = { exists: boolean; is_file: boolean; inside_a_project: boolean; synced_folder: boolean };
 export type Settings = { max_sessions: number; check_updates: boolean };
@@ -62,7 +65,7 @@ export type FileView =
   | { kind: "toolarge"; size: number };
 
 export const listProjects = () => invoke<Project[]>("list_projects");
-export const addProject = (folder: string, name?: string, github?: string, account?: string) => invoke<AddResult>("add_project", { folder, name: name ?? null, github: github ?? null, account: account ?? null });
+export const addProject = (folder: string, name?: string, account?: string) => invoke<AddResult>("add_project", { folder, name: name ?? null, account: account ?? null });
 export const setProjectAccount = (id: string, account: string) => invoke<Project>("set_project_account", { id, account });
 export const removeProject = (id: string) => invoke<void>("remove_project", { id });
 export const listTools = () => invoke<ToolInfo[]>("list_tools");
@@ -106,7 +109,6 @@ export const setSettings = (value: Settings) => invoke<Settings>("set_settings",
 export const backupNow = () => invoke<BackupInfo>("backup_now");
 export const listBackups = () => invoke<BackupInfo[]>("list_backups");
 export const deleteBackup = (name: string) => invoke<void>("delete_backup", { name });
-export const setProjectGithub = (id: string, github: string) => invoke<Project>("set_project_github", { id, github });
 export const earlierSessions = (projectId: string) => invoke<Earlier[]>("earlier_sessions", { projectId });
 export const costRows = (sinceDay: string | null) => invoke<CostRow[]>("cost_rows", { sinceDay });
 export const listRoles = () => invoke<Role[]>("list_roles");

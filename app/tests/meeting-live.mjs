@@ -49,7 +49,7 @@ try {
   fs.writeFileSync(path.join(runs, staleRun.id + ".json"), JSON.stringify(staleRun));
   await wait(1100);
   fs.writeFileSync(path.join(runs, doneRun.id + ".json"), JSON.stringify(doneRun));
-  id = (await invoke("add_project", { folder: path.join(root, "project"), name: NAME, github: null, account })).project.id;
+  id = (await invoke("add_project", { folder: path.join(root, "project"), name: NAME, account })).project.id;
   await c.send("Page.reload"); await wait(1500);
   ok("the welcome page is back", await c.waitFor("document.body.innerText.includes('Welcome to Kona')", 20000, 200));
   ok("the throwaway project opens", await c.ev(`(() => { const opens = [...document.querySelectorAll('button')].filter((x) => x.textContent.trim() === 'Open'); for (const b of opens) { let n = b.parentElement; for (let k = 0; k < 8 && n; k++, n = n.parentElement) { if (n.innerText && n.innerText.includes(${JSON.stringify(NAME)})) { if ([...n.querySelectorAll('button')].filter((x) => x.textContent.trim() === 'Open').length === 1 && !b.disabled) { b.click(); return true; } break; } } } return false; })()`));

@@ -1,8 +1,8 @@
-// The Settings place: how many sessions may run at once, the projects (their GitHub address, and removing one), backups, and where Kona keeps
+// The Settings place: how many sessions may run at once, the projects (removing one), backups, and where Kona keeps
 // its things. Nothing here changes a project's own files.
 import { useCallback, useEffect, useState } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { backupNow, deleteBackup, getSettings, listBackups, removeProject, setProjectGithub, setSettings, type BackupInfo, type Project, type Settings as SettingsT } from "../lib/api";
+import { backupNow, deleteBackup, getSettings, listBackups, removeProject, setSettings, type BackupInfo, type Project, type Settings as SettingsT } from "../lib/api";
 import { Button, Glyph } from "./ui";
 import { Confirm } from "./Confirm";
 import { Help } from "./Help";
@@ -13,7 +13,6 @@ import { KonaMark } from "./KonaMark";
 
 const size = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
 const when = (name: string) => name.replace(/^(\d{4}-\d{2}-\d{2})-(\d{2})-(\d{2})$/, "$1 $2:$3");
-const field = "h-11 border border-line-strong bg-inset px-3.5 text-[15px] text-text placeholder:text-text-tertiary";
 
 export function Settings({ projects, version, onProjects }: { projects: Project[]; version: string; onProjects: (next: Project[]) => void }) {
   const [s, setS] = useState<SettingsT | null>(null);
@@ -23,7 +22,6 @@ export function Settings({ projects, version, onProjects }: { projects: Project[
   const [busy, setBusy] = useState(false);
   const [dropBackup, setDropBackup] = useState<BackupInfo | null>(null);
   const [dropProject, setDropProject] = useState<Project | null>(null);
-  const [github, setGithub] = useState<Record<string, string>>({});
   const [zoom, setZoomState] = useState<Zoom>(getZoom());
   useEffect(() => onZoom(setZoomState), []);
   const update = useUpdate();
@@ -31,13 +29,6 @@ export function Settings({ projects, version, onProjects }: { projects: Project[
   const load = useCallback(() => { getSettings().then(setS).catch(() => {}); listBackups().then(setBackups).catch(() => setBackups([])); }, []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(null), 9000); return () => clearTimeout(t); }, [notice]);
-  useEffect(() => { setGithub(Object.fromEntries(projects.map((p) => [p.id, p.github ?? ""]))); }, [projects]);
-
-  const saveGithub = async (p: Project) => {
-    setError(null);
-    try { const out = await setProjectGithub(p.id, github[p.id] ?? ""); onProjects(projects.map((x) => (x.id === out.id ? out : x))); setNotice(out.github ? `Saved the GitHub address of ${p.name}.` : `Cleared the GitHub address of ${p.name}.`); }
-    catch (e) { setError(String(e)); }
-  };
   const doBackup = async () => {
     setBusy(true); setError(null);
     try { const b = await backupNow(); setNotice(`Backed up ${b.files} files (${size(b.bytes)}) to ${b.path}`); load(); } catch (e) { setError(String(e)); } finally { setBusy(false); }
@@ -84,10 +75,6 @@ export function Settings({ projects, version, onProjects }: { projects: Project[
               <div className="flex items-start justify-between gap-4">
                 <div className="flex min-w-0 flex-col"><span className="truncate font-bold">{p.name}</span><span className="truncate font-mono text-[12px] leading-5 text-text-tertiary" title={p.folder}>{p.folder}</span></div>
                 <Button variant="ghost" small onClick={() => setDropProject(p)}>Remove…</Button>
-              </div>
-              <div className="flex gap-3">
-                <input value={github[p.id] ?? ""} onChange={(e) => setGithub((g) => ({ ...g, [p.id]: e.target.value }))} placeholder="GitHub address: owner/name" aria-label={`GitHub address of ${p.name}`} className={`${field} min-w-0 flex-1 font-mono`} />
-                <Button variant="quiet" onClick={() => void saveGithub(p)} disabled={(github[p.id] ?? "") === (p.github ?? "")}>Save</Button>
               </div>
             </div>
           ))}

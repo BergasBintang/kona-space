@@ -34,7 +34,7 @@ import { localDate, redact } from "./lib/brain/text.ts";
 import { loadZoom, stepZoom } from "./lib/zoom";
 import { checkForUpdate } from "./lib/update";
 import { UpdateCard } from "./components/UpdateCard";
-import { getSettings, earlierSessions, costRows, saveNote, wantedRemove, officeSay, officeMapLoad, officeMapSave, officeMapReset, type Earlier } from "./lib/api";
+import { getSettings, earlierSessions, costRows, saveNote, wantedRemove, officeSay, officeMapLoad, officeMapSave, officeMapReset, mockupTicketDraft, type Earlier } from "./lib/api";
 
 const remembered = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const remember = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* the choice is just not kept */ } };
@@ -300,6 +300,16 @@ export default function App() {
     return officeSay(project.id, accountId, who, history, message);
   };
 
+  // Send from the Mockups sheet: the draft of a ticket from the pins is one cheap call through the project's account
+  const draftMockupTicket = async (prompt: string) => {
+    if (!project) throw new Error("Open a project first");
+    const accountId = accountOf(project);
+    if (!accountId) throw new Error(NO_ACCOUNT);
+    const status = await accountStatus(accountId);
+    if (!status.logged_in) throw new Error("That account is not signed in. Open Accounts to sign in.");
+    return mockupTicketDraft(project.id, accountId, prompt);
+  };
+
   // Ask a question from the Brain: the Secretary (general questions) takes it, in a new session in plan-only mode (it can read, not change), with the question sent at once.
   const askClaude = async (question: string) => {
     if (!project) return;
@@ -360,7 +370,7 @@ export default function App() {
     switch (which) {
       case "accounts": return <Accounts accounts={accounts} onChanged={setAccounts} />;
       case "files": return <Files project={project} />;
-      case "mockups": return <Mockups project={project} />;
+      case "mockups": return <Mockups project={project} send={{ designer: roles.find((r) => r.id === "design")?.person || "the designer", draft: draftMockupTicket, start: startTicket }} />;
       case "settings": return <Settings projects={projects} version={version} onProjects={(next) => { setProjects(next); if (projectId && !next.some((p) => p.id === projectId)) { setProjectId(next[0]?.id ?? null); remember("kona.project", next[0]?.id ?? ""); } }} />;
       case "servers": return <Servers project={project} roles={roles} />;
       case "brain": return <BrainPlace project={project} tab={brainTab} onTab={setBrainTab} onAsk={askClaude} />;

@@ -4,11 +4,19 @@
 // The sums (fit, zoom, the address, what a page may say) are in lib/mockview.ts, with tests.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import devicesJson from "../assets/devices/devices.json";
-import { mockBase, mockCards, mockFiles, type MockCard, type Project } from "../lib/api";
+import { createTicket, mockBase, mockCards, mockFiles, type MockCard, type Project, type TicketView } from "../lib/api";
+import { buildPrompt, fallbackDraft, parseDraft, type Draft, type DraftContext } from "../lib/mockdraft";
+import { Confirm } from "./Confirm";
 import { MARGIN, MAX_ZOOM, clampZoom, filesSignature, fitScale, frameMessage, layout, pageUrl, percent, stepZoom, wheelZoom, type Device } from "../lib/mockview";
+import { NOTE_MAX, addPin, editPin, measureLine, pageFile, partLabel, pickMessage, pinsForPage, placeNote, removePin, toScreen, type Box, type Part, type Pin } from "../lib/mockpick";
 import { Help } from "./Help";
 import { IconButton, type IconName } from "./Icon";
-import { ago } from "./ui";
+import { Button, ago } from "./ui";
+
+// pins stay while the app is open, so leaving a mockup by mistake does not lose them (they are not written to disk)
+const kept = new Map<string, Pin[]>();
+const NOTE_SIZE = { w: 280, h: 190 };
+const field = "border border-line-strong bg-inset px-3 text-[14px] text-text placeholder:text-text-tertiary";
 
 const PICTURES = import.meta.glob("../assets/devices/*.png", { eager: true, query: "?url", import: "default" }) as Record<string, string>;
 const picture = (file: string) => PICTURES[`../assets/devices/${file}`] ?? "";
@@ -21,12 +29,15 @@ const savePref = (k: string, v: string) => { try { localStorage.setItem(`kona.mo
 const px = (n: number) => `${n}px`;
 const visible = () => document.visibilityState === "visible";
 
-export function Mockups({ project }: { project: Project | null }) {
+/** What App gives the sheet for Send: the name of the person who changes mockups, the cheap model call (it checks the account), and the start of a session on a ticket. */
+export type MockSend = { designer: string; draft: (prompt: string) => Promise<string>; start: (t: TicketView) => Promise<void> };
+
+export function Mockups({ project, send }: { project: Project | null; send: MockSend }) {
   const [base, setBase] = useState<string | null>(null);
   const [card, setCard] = useState<MockCard | null>(null);
   useEffect(() => { void mockBase().then(setBase).catch(() => setBase("")); }, []);
   if (!project || base === null) return null;
-  if (card) return <MockupView key={card.id} project={project} card={card} base={base} onBack={() => setCard(null)} />;
+  if (card) return <MockupView key={card.id} project={project} card={card} base={base} send={send} onBack={() => setCard(null)} />;
   return <Cards project={project} onOpen={setCard} />;
 }
 
@@ -71,7 +82,10 @@ function Cards({ project, onOpen }: { project: Project; onOpen: (c: MockCard) =>
   );
 }
 
-function MockupView({ project, card, base, onBack }: { project: Project; card: MockCard; base: string; onBack: () => void }) {
+/** The Send dialog: writing the draft, or the draft to read and change (the model's, or a plain list when it could not be reached) */
+type SendState = { phase: "writing" } | { phase: "draft"; draft: Draft; line: string | null };
+
+function MockupView({ project, card, base, send, onBack }: { project: Project; card: MockCard; base: string; send: MockSend; onBack: () => void }) {
   const [deviceId, setDeviceId] = useState(() => { const v = pref("device", "laptop"); return DEVICES.some((d) => d.id === v) ? v : "laptop"; });
   const [turned, setTurned] = useState(() => pref("turned", "0") === "1");
   const [theme, setTheme] = useState<"light" | "dark">(() => (pref("theme", "light") === "dark" ? "dark" : "light"));
@@ -85,14 +99,24 @@ function MockupView({ project, card, base, onBack }: { project: Project; card: M
   const frame = useRef<HTMLIFrameElement>(null);
   const anchor = useRef<{ fx: number; fy: number; px: number; py: number } | null>(null);
   const drag = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
+  const wrap = useRef<HTMLDivElement>(null);
+  // pick mode (T-0024): the page's helper reports the part under the pointer; a click opens a note box beside it; notes pile up as numbered pins
+  const keptKey = `${project.id}/${card.id}`;
+  const [picking, setPicking] = useState(false);
+  const [pins, setPins] = useState<Pin[]>(() => kept.get(keptKey) ?? []);
+  const [hover, setHover] = useState<Part | null>(null);
+  const [target, setTarget] = useState<{ part: Part; box: Box } | null>(null);
+  const [noteText, setNoteText] = useState("");
+  const [, bump] = useState(0); // a new number draws the note box again (the sheet was moved under it)
+  const nextId = useRef(pins.reduce((m, p) => Math.max(m, p.id), 0) + 1);
 
   const device = DEVICES.find((d) => d.id === deviceId) ?? DEVICES[0];
   const isTurned = turned && device.turns;
   const lay = useMemo(() => layout(device, isTurned), [device, isTurned]);
   const fit = fitScale(lay, room);
   const scale = zoom === null ? fit : clampZoom(zoom, fit);
-  const now = useRef({ scale, fit, theme });
-  now.current = { scale, fit, theme };
+  const now = useRef({ scale, fit, theme, picking, pins, target });
+  now.current = { scale, fit, theme, picking, pins, target };
   const back = useRef(onBack);
   back.current = onBack;
 
@@ -107,8 +131,61 @@ function MockupView({ project, card, base, onBack }: { project: Project; card: M
   // the page starts in the theme that is chosen now; a later change goes to the running page by a message, so it does not start again
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const url = useMemo(() => (card.entry ? pageUrl(base, project.id, card.id, card.entry, now.current.theme) : null), [base, project.id, card.id, card.entry, rev]);
-  const tell = useCallback(() => { frame.current?.contentWindow?.postMessage({ kona: "theme", value: now.current.theme }, "*"); }, []);
-  useEffect(() => { tell(); }, [theme, tell]);
+  // what the page's helper is told: the theme, whether pick mode is on, and the pins (it draws them inside the page, so they follow it when it scrolls)
+  const tell = useCallback(() => {
+    const w = frame.current?.contentWindow;
+    if (!w) return;
+    w.postMessage({ kona: "theme", value: now.current.theme }, "*");
+    w.postMessage({ kona: "pick", on: now.current.picking }, "*");
+    w.postMessage({ kona: "pins", list: pinsForPage(now.current.pins) }, "*");
+  }, []);
+  useEffect(() => { tell(); }, [theme, picking, pins, tell]);
+  useEffect(() => { kept.set(keptKey, pins); }, [keptKey, pins]);
+  const closeNote = useCallback(() => { setTarget(null); setNoteText(""); frame.current?.contentWindow?.postMessage({ kona: "clear" }, "*"); }, []);
+  /** Esc: first the open note, then pick mode, then the sheet goes back to the cards */
+  const escape = useCallback(() => {
+    if (document.querySelector("[role=dialog]")) return;
+    if (now.current.target) closeNote();
+    else if (now.current.picking) { setPicking(false); setHover(null); }
+    else back.current();
+  }, [closeNote]);
+  const addNote = () => {
+    if (!target) return;
+    const next = addPin(pins, target.part, noteText, nextId.current);
+    if (next !== pins) { nextId.current++; setPins(next); }
+    closeNote();
+  };
+
+  // Send (T-0025): the pins become a ticket draft (one cheap model call, or a plain list when it fails); the owner reads and changes it; one button makes the ticket for the designer and starts her
+  const [sending, setSending] = useState<SendState | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sentLine, setSentLine] = useState<string | null>(null);
+  const cancelled = useRef(false);
+  const context = (): DraftContext => ({ cardId: card.id, cardName: card.name, device: device.label, width: lay.screen.w, theme });
+  const startSend = async () => {
+    if (pins.length === 0) return;
+    const ctx = context(), mine = pins;
+    cancelled.current = false;
+    setSendError(null); setSentLine(null); setSending({ phase: "writing" });
+    let draft: Draft | null = null, line: string | null = null;
+    try {
+      const { prompt, hidden } = buildPrompt(ctx, mine);
+      draft = parseDraft(await send.draft(prompt), ctx);
+      line = !draft ? "The answer could not be read as a ticket, so this is a plain list of your notes." : hidden.length ? `Hidden before sending: ${hidden.join(", ")}.` : null;
+    } catch (e) { line = `${String(e).replace(/^Error: /, "")} This is a plain list of your notes instead.`; }
+    if (cancelled.current) return;
+    setSending({ phase: "draft", draft: draft ?? fallbackDraft(ctx, mine), line });
+  };
+  const cancelSend = () => { cancelled.current = true; setSending(null); setSendError(null); };
+  const makeTicket = async (d: Draft) => {
+    try {
+      const t = await createTicket(project.id, { title: d.title.trim(), description: d.description, acceptance: d.acceptance, role: "design", status: "ready", next: "Read the numbered notes in the description and change the mockup", own_copy: "no" });
+      setPins([]); setSending(null); setSendError(null); setPicking(false); setHover(null);
+      try { await send.start({ ...t, cost: 0 }); }
+      catch (e) { setSentLine(`Ticket ${t.id} is waiting in Ready on the Board. ${String(e).replace(/^Error: /, "")}`); return; }
+      setSentLine(`Ticket ${t.id} was made and ${send.designer} has started on it.`);
+    } catch (e) { setSendError(String(e).replace(/^Error: /, "")); }
+  };
 
   /** Go to `next`, keeping the spot under (x, y) (the middle of the sheet when not given) where it is. */
   const zoomTo = useCallback((next: number, x?: number, y?: number) => {
@@ -144,22 +221,31 @@ function MockupView({ project, card, base, onBack }: { project: Project; card: M
       const f = frame.current;
       if (!f || e.source !== f.contentWindow) return;
       const m = frameMessage(e.data);
-      if (!m) return;
-      if (m.kind === "ready") tell();
-      else if (m.kind === "escape") { if (!document.querySelector("[role=dialog]")) back.current(); } // Esc inside the page: back to the cards, as Esc on the sheet does
+      if (!m) {
+        const p = pickMessage(e.data);
+        if (!p || !now.current.picking && p.kind !== "gone") return; // a report only counts while pick mode is on
+        if (p.kind === "hover") { const { kind: _k, ...part } = p; setHover(part); }
+        else if (p.kind === "hover-none") setHover(null);
+        else if (p.kind === "pick") { const { kind: _k, box, vw: _w, vh: _h, ...part } = p; setTarget({ part, box }); setNoteText(""); }
+        else if (p.kind === "rect") setTarget((t) => (t ? { ...t, box: p.box } : t));
+        else setTarget(null);
+        return;
+      }
+      if (m.kind === "ready") { setTarget(null); setHover(null); tell(); }
+      else if (m.kind === "escape") escape(); // Esc inside the page, as Esc on the sheet
       else { const r = f.getBoundingClientRect(); zoomTo(wheelZoom(now.current.scale, m.dy, now.current.fit), r.left + m.x * (r.width / f.offsetWidth), r.top + m.y * (r.height / f.offsetHeight)); }
     };
     window.addEventListener("message", on);
     return () => window.removeEventListener("message", on);
-  }, [tell, zoomTo]);
+  }, [tell, zoomTo, escape]);
 
   // Esc goes back to the cards; on the cards it closes the sheet (the sheet's own handler runs when this one does not take it). This listener is in the capture phase, so it comes
   // before the sheet's, which was added earlier; and it leaves Esc alone while a dialog is open (the help closes first).
   useEffect(() => {
-    const key = (e: KeyboardEvent) => { if (e.key === "Escape" && !e.defaultPrevented && !document.querySelector("[role=dialog]")) { e.preventDefault(); onBack(); } };
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape" && !e.defaultPrevented && !document.querySelector("[role=dialog]")) { e.preventDefault(); escape(); } };
     window.addEventListener("keydown", key, true);
     return () => window.removeEventListener("keydown", key, true);
-  }, [onBack]);
+  }, [escape]);
 
   // the page loads again by itself when one of its files changes (checked every 3 seconds, and not while the window is hidden)
   const seen = useRef<string | null>(null);
@@ -204,6 +290,14 @@ function MockupView({ project, card, base, onBack }: { project: Project; card: M
     borderImage: `url(${picture(lay.frame.image)}) ${lay.frame.slice.join(" ")} / ${lay.bezel.map(px).join(" ")} repeat`, imageRendering: "pixelated", backgroundColor: device.backdrop, backgroundClip: "padding-box",
   };
   const base_ = device.base;
+  // where the note box goes: beside the part that was clicked (the page reports the part's box in its own pixels; the frame's place and scale put it on the screen)
+  const noteAt = (() => {
+    const f = frame.current, w = wrap.current;
+    if (!target || !f || !w || f.offsetWidth === 0) return null;
+    const fr = f.getBoundingClientRect(), wr = w.getBoundingClientRect();
+    const part = toScreen(target.box, { left: fr.left - wr.left, top: fr.top - wr.top, scale: fr.width / f.offsetWidth });
+    return placeNote(part, { w: wr.width, h: wr.height }, NOTE_SIZE);
+  })();
 
   useLayoutEffect(() => {
     const f = frame.current;
@@ -224,6 +318,7 @@ function MockupView({ project, card, base, onBack }: { project: Project; card: M
           <Help title={card.name}>
             <p className="m-0">The page runs at the true size of the device you pick, and is shown smaller to fit the sheet. Zoom in with the buttons, or with Ctrl and the mouse wheel; drag the sheet around to move.</p>
             <p className="m-0">Start again puts the page back to its beginning. The page also loads again by itself when one of its files changes. Esc goes back to the mockups.</p>
+            <p className="m-0">The arrow turns on picking: the page stops answering clicks, the part under the pointer is outlined with its sizes, and a click opens a box for a note. Each note becomes a numbered pin on the page. Esc closes the box, then picking.</p>
           </Help>
         </div>
         <div className="flex-1" />
@@ -233,6 +328,8 @@ function MockupView({ project, card, base, onBack }: { project: Project; card: M
           ))}
         </div>
         {device.turns && <IconButton icon="rotate" label={isTurned ? "Stand the device up again" : "Turn the device on its side"} variant={isTurned ? "primary" : "quiet"} aria-pressed={isTurned} onClick={turn} />}
+        <IconButton icon="select" label={picking ? "Stop picking parts (Esc)" : "Pick a part and leave a note"} variant={picking ? "primary" : "quiet"} aria-pressed={picking}
+          onClick={() => { if (picking) { setPicking(false); setHover(null); closeNote(); } else { setSentLine(null); setPicking(true); } }} />
         <IconButton icon={theme === "dark" ? "sun" : "moon"} label={theme === "dark" ? "Show the page light" : "Show the page dark"} onClick={flipTheme} />
         <div role="group" aria-label="Zoom" className="flex items-center gap-1.5">
           <IconButton icon="zoomOut" label="Zoom out (Ctrl and the mouse wheel)" disabled={scale <= fit + 1e-6} onClick={() => zoomTo(stepZoom(scale, -1, fit))} />
@@ -242,8 +339,11 @@ function MockupView({ project, card, base, onBack }: { project: Project; card: M
         </div>
         <IconButton icon="turnRight" label="Start the page again" onClick={() => setRev((n) => n + 1)} />
       </div>
+      <div className="flex min-h-0 min-w-0 flex-1">
+      <div ref={wrap} className="relative flex min-h-0 min-w-0 flex-1">
       <div
         ref={box}
+        onScroll={() => { if (now.current.target) bump((n) => n + 1); }}
         className={`relative flex min-h-0 min-w-0 flex-1 overflow-auto bg-inset ${canPan ? (dragging ? "cursor-grabbing" : "cursor-grab") : ""}`}
         onPointerDown={(e) => { if (e.button !== 0 || !canPan || !box.current) return; drag.current = { x: e.clientX, y: e.clientY, left: box.current.scrollLeft, top: box.current.scrollTop }; setDragging(true); e.currentTarget.setPointerCapture(e.pointerId); }}
         onPointerMove={(e) => { const d = drag.current, el = box.current; if (d && el) { el.scrollLeft = d.left - (e.clientX - d.x); el.scrollTop = d.top - (e.clientY - d.y); } }}
@@ -279,6 +379,62 @@ function MockupView({ project, card, base, onBack }: { project: Project; card: M
           {device.stand && <img src={picture(device.stand.image)} alt="" draggable={false} style={{ width: device.stand.size[0] * lay.k, height: device.stand.size[1] * lay.k, imageRendering: "pixelated" }} />}
         </div>
       </div>
+      {sentLine && !picking && (
+        <p role="status" className="absolute bottom-3 left-3 m-0 max-w-[calc(100%-24px)] border border-line-strong bg-surface-1 px-2.5 py-1 text-[13px] leading-5">{sentLine}</p>
+      )}
+      {picking && !target && hover && (
+        <p aria-live="off" className="pointer-events-none absolute bottom-3 left-3 m-0 max-w-[calc(100%-24px)] truncate border border-line-strong bg-surface-1 px-2.5 py-1 text-[13px] leading-5">
+          <b>{partLabel(hover)}</b><span className="text-text-secondary"> · {measureLine(hover)}</span>
+        </p>
+      )}
+      {target && noteAt && (
+        <div role="group" aria-label="Note for this part" className="px-card absolute z-10 flex flex-col gap-1.5 p-2" style={{ left: noteAt.left, top: noteAt.top, width: NOTE_SIZE.w }}>
+          <span className="truncate text-[14px] leading-5 font-bold">{partLabel(target.part)}</span>
+          <span className="truncate text-[12px] leading-4 text-text-secondary">{measureLine(target.part)}</span>
+          <textarea autoFocus value={noteText} onChange={(e) => setNoteText(e.target.value.slice(0, NOTE_MAX))} rows={3} aria-label="What should change here?" placeholder="What should change here?"
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addNote(); } }} className={`py-2 leading-5 ${field}`} />
+          <div className="flex justify-end gap-2">
+            <Button small variant="ghost" onClick={closeNote}>Cancel</Button>
+            <Button small disabled={noteText.trim() === ""} onClick={addNote}>Add note</Button>
+          </div>
+        </div>
+      )}
+      </div>
+      {pins.length > 0 && (
+        <aside aria-label="Notes" className="flex w-[300px] shrink-0 flex-col gap-2 overflow-y-auto border-l border-line-subtle bg-surface-1 p-3">
+          <div className="flex items-center gap-2">
+            <h2 className="m-0 min-w-0 flex-1 text-[15px] leading-6 font-bold">Notes ({pins.length})</h2>
+            <IconButton icon="send" label={`Turn the notes into a ticket for ${send.designer}`} variant="primary" disabled={sending !== null} onClick={() => void startSend()} />
+          </div>
+          <ol className="m-0 flex list-none flex-col gap-2 p-0">
+            {pins.map((p, i) => (
+              <li key={p.id} className="flex flex-col gap-1 border border-line-subtle bg-inset p-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-pixel flex h-6 w-6 shrink-0 items-center justify-center bg-text text-[13px] font-bold text-surface-1" aria-hidden="true">{i + 1}</span>
+                  <span className="min-w-0 flex-1 truncate text-[13px] leading-5 font-bold" title={`${partLabel(p)} · ${pageFile(p.page)}`}>{partLabel(p)}</span>
+                  <IconButton icon="trash" label={`Remove note ${i + 1}`} variant="ghost" onClick={() => setPins((cur) => removePin(cur, p.id))} />
+                </div>
+                <span className="truncate text-[12px] leading-4 text-text-tertiary">{pageFile(p.page)}</span>
+                <textarea value={p.note} rows={2} aria-label={`Note ${i + 1}`} onChange={(e) => setPins((cur) => editPin(cur, p.id, e.target.value))} className={`py-1.5 leading-5 ${field}`} />
+              </li>
+            ))}
+          </ol>
+        </aside>
+      )}
+      </div>
+      {sending && (
+        <Confirm title={`Ticket for ${send.designer}`} confirmLabel={`Create ticket for ${send.designer}`} disabled={sending.phase === "writing" || sending.draft.title.trim() === ""} error={sendError}
+          onConfirm={() => { if (sending.phase === "draft") void makeTicket(sending.draft); }} onCancel={cancelSend}>
+          {sending.phase === "writing" ? <p className="m-0" role="status">Writing the ticket from your notes…</p> : (
+            <>
+              {sending.line && <p className="m-0 text-[13px] leading-5" role="status">{sending.line}</p>}
+              <input value={sending.draft.title} aria-label="Title" maxLength={100} onChange={(e) => setSending({ ...sending, draft: { ...sending.draft, title: e.target.value } })} className={`h-10 ${field}`} />
+              <textarea value={sending.draft.description} rows={9} aria-label="What needs doing" onChange={(e) => setSending({ ...sending, draft: { ...sending.draft, description: e.target.value } })} className={`max-h-[40vh] py-2 leading-5 ${field}`} />
+              <textarea value={sending.draft.acceptance} rows={3} aria-label="Done when" onChange={(e) => setSending({ ...sending, draft: { ...sending.draft, acceptance: e.target.value } })} className={`py-2 leading-5 ${field}`} />
+            </>
+          )}
+        </Confirm>
+      )}
     </div>
   );
 }

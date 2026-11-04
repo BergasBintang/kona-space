@@ -195,3 +195,5 @@ export async function pickFolder(title: string): Promise<string | null> {
   const p = await open({ directory: true, multiple: false, title });
   return typeof p === "string" ? p : null;
 }
+/** The pins of a mockup written into a ticket draft by one cheap Haiku call (the prompt is built and cleaned in lib/mockdraft.ts). */
+export const mockupTicketDraft = (projectId: string, accountId: string, prompt: string) => invoke<string>("mockup_ticket_draft", { projectId, accountId, prompt });

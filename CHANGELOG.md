@@ -2,6 +2,17 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.34.0, 2026-11-04
+
+Mockups: pick a part of a page, leave a note, and turn the notes into a ticket for the designer.
+
+- **Pick a part.** A pointer button in the Mockups toolbar turns pick mode on. The page stops answering clicks and links, the part under the pointer is outlined and named with its padding, gap, radius, border and size, and a click opens a box beside it that asks what should change. Works on a state you reached by clicking, such as after a sign-in. Esc closes the box, then pick mode, then goes back to the cards.
+- **Numbered notes.** Each note becomes a numbered pin on the page. A column on the right lists them; a note can be changed there, or removed, and the numbers close up. They stay while Kona is open, also if you go back to the cards and return.
+- **Send.** The arrow above the notes turns them into a ticket for the design person. One cheap Haiku call writes a draft that only uses what you pinned; you read it and change it; one button makes the ticket (Ready, worked on in the main folder) and starts her. If she is busy the ticket waits in Ready and a line says so. If Haiku cannot be reached, the draft is a plain list of your own notes. The page's text goes to Haiku only as quoted data, with anything that looks like a key hidden first. The cost is counted as a ticket draft.
+- **A page that replaces its whole document still works.** The helper puts itself back after the page does that.
+- **SQLite, if a mockup needs it.** The make-a-mockup skill can now give a card a small database in the page (sql.js, MIT; in memory, nothing is saved) for search, sort, unique values and linked tables with their real rules. A mockup still needs only HTML and CSS.
+- **Good to know.** The pins are not shown on a picture, only on the live page. Copying the SQLite files into a card is a shell command that you are asked to approve.
+
 ## 0.33.0, 2026-11-04
 
 Three new skills for drawing and building pages, and the window opens full screen at an 80 percent view.

@@ -19,6 +19,13 @@ A mockup is a small web page that runs by itself, with made-up data, so the owne
 - **CSS is required.** One style sheet. It opens with the design values as variables, the dark values included. If the project already has a style sheet or design values, read them first and reuse them (copy the values in; never point outside the card). Open `templates/style.css` for the layout of the file.
 - **JavaScript is optional.** Use it only when something must be tried live, such as a wrong password, a search or a menu. Keep it in plain files with no framework: `api.js` is a fake of the project's real API, with the same function names and answer shapes. `data.js` holds made-up people and lists. `app.js` holds the behaviour. Open `templates/api.js`, `templates/data.js` and `templates/app.js`.
 
+- **SQLite is optional, and rarer still.** Use it only when the mockup must show real database rules: a search that filters, a sort, a unique email that is refused, a list joined from two tables. If plain `data.js` shows what the owner needs, do not add it. To use it, make a folder `sqlite/` in the card and copy four files into it, each under the name shown:
+  - Open `templates/sqlite-sql-wasm.js` and copy it as `sqlite/sql-wasm.js`.
+  - Open `templates/sqlite-sql-wasm-data.js` and copy it as `sqlite/sql-wasm-data.js`. It is one very long line: copy it whole, never read it or change it.
+  - Open `templates/sqlite-db.js` and copy it as `sqlite/db.js`. Its comment at the top shows the few lines of use.
+  - Open `templates/sqlite-LICENSE.txt` and copy it as `sqlite/LICENSE.txt`. The program inside is sql.js, under the MIT licence, which asks for this file to stay with it.
+  Then add three scripts at the end of the page, in this order: `sqlite/sql-wasm.js`, `sqlite/sql-wasm-data.js`, `sqlite/db.js`. `openDb(schema, seed)` gives a database in memory (nothing is saved; Refresh starts it again) with `db.all(sql, params)` and `db.run(sql, params)`. Write the schema from the project's real tables (their names, types, keys and unique rules) and the seed from made-up people only, and let a broken rule show its message on the page. The copy needs a shell command (`cp`, one file at a time) and the owner is asked to approve it; say first that you will ask. If it is refused, say which files are still missing and that the page cannot run without them, and do not write them out by hand.
+
 ## Where a mockup runs
 
 It runs in a sandbox, so some things that work in a browser do not here.

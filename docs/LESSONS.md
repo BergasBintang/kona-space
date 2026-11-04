@@ -582,6 +582,25 @@ What the owner said is printed by `node tests/owner-said.mjs` in `app/`. The tic
 | The permission check refused my script that sent restore and maximise messages to the window | It looked like driving another program | I did not look for another way round it. The owner tried the window by hand: "the view is good" |
 | The window restore rule is half the screen's usable width and height, centred; Kona opens full screen at an 80 percent view; the saved percent of older installs is dropped once | Owner's word of 2026-11-04 | Decision 77. The stored percent was always 100 because every start saved it, so a one-time reset (`kona.zoom.v2`) was the only way to give older installs the new default |
 
-**Left behind by the tests (not deleted, say so):** an empty folder `D--temp-kona-e2e-project` in `.claude\projects` that dates from 2026-10-30. Everything this session made was removed: the throwaway project and its folder, the test copy of the program was closed, and no transcripts exist (the test sessions ran with `--no-session-persistence`).
+**Left behind by the tests:** nothing. An empty folder `D--temp-kona-e2e-project` in `.claude\projects` (from 2026-10-30, holding only an empty `memory` folder that Claude Code makes by itself) was looked at, judged safe and removed on 2026-11-04. Everything this session made was removed: the throwaway project and its folder, the test copy of the program was closed, and no transcripts exist (the test sessions ran with `--no-session-persistence`).
 
 **Not seen:** a session started from the Kona window with the new read rules (the card path), Jiro building from a card that Nokka made, and the pages opened on a screen with a different display scale.
+
+---
+
+## 16. What was found in the session of 2026-11-04, last (0.34.0: pick mode, Send, SQLite)
+
+The tickets are T-0024 to T-0027; decisions 75 and 76 of `kona-space-app.md`.
+
+| Seen | Cause | Keep |
+|---|---|---|
+| A test meant to make the model call fail made a REAL Haiku call and then waited on it | The window's `invoke` is read-only (`__TAURI_INTERNALS__.invoke` is not writable), so my stub was silently ignored, and the page took the real path | Before a test relies on a stub, read it back (`Object.getOwnPropertyDescriptor`). A test that could spend money runs only behind an explicit switch (`MOCK_TEST_SEND=1`) and after the owner's word, as the ticket said. I told the owner afterwards; it was one cheap call |
+| The pick helper stopped working after a page replaced its whole document | `document.open()` erases the listeners of the page's window, and the helper's overlay was in the old document | The helper keeps its listeners in a table, puts them back after `document.open` (it wraps `Document.prototype.open`) and says `ready` again, so the sheet sends pick mode and the pins once more. Seen in the real window with a page that calls `document.open` |
+| The SQLite files would not go into a skill folder | The skills table is made of text files (`include_str!`), a skill folder is one level deep, and a test wants every file named by an order to "open" it | The WebAssembly program is written as one base64 line in a `.js` file and the four files sit flat in `templates/` with a `sqlite-` prefix; the skill says to copy them under their short names. A binary file in a skill needs a change to `build.rs` first |
+| Haiku followed the SQLite skill, used `openDb`, `db.all` and `db.run` correctly, plain buttons and `keydown`, but could not copy the three big files | Claude Code asks before a shell command that reads outside the working folder, and a non-interactive run has nobody to ask | The skill says to ask, to copy one file at a time, and never to write the big file by hand. Not seen: the copy approved in a real Kona session |
+| A regular expression written through a shell heredoc lost its backslash (`[\d.]` became `[d.]`) and the test kept failing for the wrong reason | Benchmark 22 again | Write test files with the file tools; when a check fails, print what it was checking before blaming the page |
+| The real Haiku draft was good | One call (a few hundred tokens): it named each part, its page and the measured width, and wrote a "done when" for each pin, without inventing a colour | The fixed instruction that nothing may be invented, plus the facts as JSON, is enough. The program itself writes the line that says where the mockup is, so that line cannot be wrong |
+
+**Left behind by the tests:** nothing. The throwaway projects and their folders were removed by the tests; the test copy of the program was closed; the Haiku proof sessions ran with `--no-session-persistence` in a folder of the scratchpad.
+
+**Not seen:** after a real Send, the session of the design person on the ticket (the test stopped at the ticket check, which had a wrong word in it: the ticket says "the owner", not "owner"), a draft that Haiku gets wrong, a card made through the SQLite skill and then opened in the sheet, and the pins at other display scales.

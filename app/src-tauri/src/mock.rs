@@ -181,12 +181,7 @@ impl Reply {
 /// What every page gets, put in by `inject_helper`: the way the sheet talks to a page that runs in an opaque frame it cannot reach into. It sets the theme
 /// (`data-theme` and `color-scheme` on the page's root, from `?kona-theme=dark|light` at once and from the sheet's message later, so the next page of the card follows too),
 /// passes Ctrl and the wheel and Esc up to the sheet (a frame keeps those to itself), and says it is ready. Messages from the sheet are taken only when `e.source` is the parent.
-const HELPER: &str = "<script>(function(){var r=document.documentElement;function t(v){if(v==='dark'||v==='light'){r.setAttribute('data-theme',v);r.style.colorScheme=v;}}\
-try{var m=/[?&]kona-theme=(dark|light)/.exec(location.search);if(m)t(m[1]);}catch(e){}\
-addEventListener('message',function(e){var d=e.data;if(e.source===parent&&d&&d.kona==='theme')t(d.value);});\
-addEventListener('wheel',function(e){if(!e.ctrlKey)return;e.preventDefault();parent.postMessage({kona:'wheel',dy:e.deltaY,x:e.clientX,y:e.clientY},'*');},{passive:false});\
-addEventListener('keydown',function(e){if(e.key==='Escape')parent.postMessage({kona:'escape'},'*');});\
-parent.postMessage({kona:'ready'},'*');})();</script>";
+const HELPER: &str = concat!("<script>", include_str!("mock_helper.js"), "</script>");
 
 /// The page with the helper after its `<head>` tag (or `<html>`, or the doctype, or at the very start). Never before the doctype, which would put the page in quirks mode.
 fn inject_helper(html: &[u8]) -> Vec<u8> {
@@ -448,7 +443,7 @@ mod tests {
         assert!(page("").contains("<script>"), "an empty file still works");
         // the helper has no closing script tag inside itself, and sets the theme and talks to the parent only
         assert_eq!(HELPER.matches("</script>").count(), 1);
-        for must in ["kona-theme", "e.source===parent", "kona:'wheel'", "kona:'escape'", "kona:'ready'"] {
+        for must in ["kona-theme", "e.source===parent", "kona:'wheel'", "kona:'escape'", "kona:'ready'", "kona==='pick'", "kona:'hover'", "kona:'rect'", "[data-part]", "attachShadow"] {
             assert!(HELPER.contains(must), "the helper lacks {must}");
         }
         assert!(!HELPER.contains("fetch") && !HELPER.contains("XMLHttpRequest") && !HELPER.contains("http"), "the helper reaches nowhere");

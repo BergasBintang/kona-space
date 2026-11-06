@@ -190,6 +190,9 @@ pub struct Answer {
     pub hits: Vec<Hit>,
 }
 
+/// How many words wide the window is in which a section's words must stand together to count as answering (the same number as `SEARCH.window` in the screen's engine.ts).
+const WINDOW: usize = 40;
+
 pub fn search(notes: &[Note], question: &str) -> Answer {
     let q: Vec<String> = { let mut seen = HashSet::new(); terms(question).into_iter().filter(|t| seen.insert(t.clone())).collect() };
     if q.is_empty() { return Answer { state: "none", hits: vec![] }; }
@@ -197,6 +200,8 @@ pub fn search(notes: &[Note], question: &str) -> Answer {
     let secs: Vec<(&Note, &Section)> = notes.iter().filter(|n| !n.secret).flat_map(|n| n.sections.iter().filter(|s| !contains_secret(&s.text)).map(move |s| (n, s))).collect();
     let n_sections = secs.len() as f64;
     let mut tfs: Vec<HashMap<String, f64>> = vec![];
+    let mut seqs: Vec<Vec<String>> = vec![]; // each section's words in reading order
+    let mut heads: Vec<HashSet<String>> = vec![]; // the words of its heading and its note's title
     let mut df: HashMap<String, f64> = HashMap::new();
     let mut total_len = 0.0;
     let mut lens: Vec<f64> = vec![];
@@ -204,7 +209,10 @@ pub fn search(notes: &[Note], question: &str) -> Answer {
         let mut tf: HashMap<String, f64> = HashMap::new();
         for t in terms(&s.heading) { *tf.entry(t).or_default() += 3.0; }
         for t in terms(&note.title) { *tf.entry(t).or_default() += if s.first { 3.0 } else { 1.0 }; }
-        for t in terms(&s.text) { *tf.entry(t).or_default() += 1.0; }
+        let ordered = terms(&s.text);
+        for t in &ordered { *tf.entry(t.clone()).or_default() += 1.0; }
+        seqs.push(ordered);
+        heads.push(terms(&s.heading).into_iter().chain(terms(&note.title)).collect());
         let len: f64 = tf.values().sum();
         total_len += len; lens.push(len);
         for t in tf.keys() { *df.entry(t.clone()).or_default() += 1.0; }
@@ -224,7 +232,22 @@ pub fn search(notes: &[Note], question: &str) -> Answer {
                 score += w * ((f * (k1 + 1.0)) / (f + k1 * (1.0 - b + b * (lens[i] / avg))));
             }
         }
-        if matched > 0.0 { scored.push((if total_w > 0.0 { matched / total_w } else { 0.0 }, score, i)); }
+        if matched > 0.0 {
+            // how much of the question the section answers in its best window: the heading's and the title's words count for the whole section, the others only when
+            // they stand within WINDOW words of each other
+            let (mut fixed, mut rest): (f64, HashSet<&String>) = (0.0, HashSet::new());
+            for t in &q { if heads[i].contains(t) { fixed += idf(t); } else { rest.insert(t); } }
+            let mut best = 0.0;
+            if !rest.is_empty() {
+                let (mut counts, mut have): (HashMap<&str, i32>, f64) = (HashMap::new(), 0.0);
+                for (k, t) in seqs[i].iter().enumerate() {
+                    if rest.contains(t) { let c = counts.entry(t.as_str()).or_insert(0); *c += 1; if *c == 1 { have += idf(t); } }
+                    if k >= WINDOW { let o = &seqs[i][k - WINDOW]; if rest.contains(o) { let c = counts.entry(o.as_str()).or_insert(1); *c -= 1; if *c == 0 { have -= idf(o); } } }
+                    if have > best { best = have; }
+                }
+            }
+            scored.push((if total_w > 0.0 { (fixed + best) / total_w } else { 0.0 }, score, i));
+        }
     }
     scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap().then(b.1.partial_cmp(&a.1).unwrap()).then(secs[a.2].1.note_id.cmp(&secs[b.2].1.note_id)));
     let Some(top) = scored.first().copied() else { return Answer { state: "none", hits: vec![] } };
@@ -341,5 +364,25 @@ mod tests {
         notes.push(parse("deploy-notes", "project", "# Deploy notes\n\nThe server login is password: hunter2hunter2 and we deploy with the script every Friday afternoon.\n"));
         assert!(search(&notes, "deploy script friday").hits.iter().all(|h| h.note_id != "deploy-notes"));
         assert!(read(&notes, "deploy-notes", None, None).is_err());
+    }
+
+    #[test]
+    fn words_that_stand_far_apart_in_a_long_section_do_not_count_as_an_answer() {
+        // the same two notes and questions as in the screen's tests (brain.test.ts): both searches must answer the same
+        let filler = |n: usize, seed: &str| (0..n).map(|i| format!("{seed}{} plain filler words about nothing in particular", i % 17)).collect::<Vec<_>>().join(" ");
+        let text = format!("# A long report
+
+{} The refund policy for the premium plan is thirty days. {}
+
+{} Servers in Frankfurt hold the backups. {}
+", filler(30, "alpha"), filler(30, "beta"), filler(30, "gamma"), filler(30, "delta"));
+        let notes = vec![parse("long-report", "project", &text)];
+        assert_eq!(search(&notes, "refund policy premium plan thirty days").state, "found", "the words stand in one sentence");
+        assert_ne!(search(&notes, "refund policy Frankfurt backups").state, "found", "one half of the question is in one paragraph and the other half far away");
+        let short = vec![parse("short-note", "project", "# Short note
+
+Refunds take thirty days. Backups sit in Frankfurt.
+")];
+        assert_eq!(search(&short, "refunds thirty days backups Frankfurt").state, "found");
     }
 }

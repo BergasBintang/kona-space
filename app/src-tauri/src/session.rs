@@ -39,11 +39,13 @@ const READABLE_FILES: &str = "Markdown files you write are read by the owner in 
 
 /// Added to every session: where the project's lasting knowledge goes and how to find it. The tools are in mcp.rs (save_note, list_notes, search_brain, read_note).
 /// The last bullet is why project files cannot make Kona's rules wrong: these rules ship inside the program, so an update replaces them for everyone, and a CLAUDE.md that disagrees is told to lose.
-const BRAIN_RULES: &str = "This project has a brain: markdown notes the owner reads in Kona and every session can search. The chat is not kept, so lasting knowledge goes there.
-- Save it with the kona-board tool `save_note`. Never write the note files yourself: in your own copy of the repo they would land in the wrong folder.
-- Save: decisions with their reason; facts the code does not show (how it is deployed, what a name or limit means, the owner's rules); research results with their source; work still open (kind open). One topic per note, a 3 to 10 word title, summary first. Date what may go stale.
+const BRAIN_RULES: &str = "This project has a brain: markdown notes the owner reads in Kona and every session can search. It is the project's single source of truth: decisions, facts, research, reports, plans and open work all live there as notes. A document is a note. The chat is not kept, so lasting knowledge goes there.
+- Save with the kona-board tool `save_note`. Never write the note files yourself, and never put a document in `docs/` or any other folder: write it as a note. (In your own copy of the repo a file would land in the wrong folder.)
+- One fact lives in one note. Look first: `search_brain`, then `read_note`; `list_notes` shows what exists. If a note on the topic is yours (a session saved it), update it under the same id: send the whole text, or only the part that changes with `section` (and `append` to add to the end of that part). If it is the owner's, write a new note that links to it with [[its-id]]. Never copy what another note says.
+- Save: decisions with their reason; facts the code does not show (how it is deployed, what a name or limit means, the owner's rules); research results with their source; reports, plans and designs; work still open (kind open). One topic per note, a 3 to 10 word title, summary first, short sections with headings. Date what may go stale.
 - Do not save: secrets, keys, server addresses, personal data; what the code, git or tickets show; a log of your work (Kona writes the session note); a guess as a fact.
-- Look first: `search_brain`, then `read_note`; `list_notes` shows what exists. Notes are history, so check them against the code. If a note on the topic exists, link it with [[its-id]] or update your own note under the same id. Never copy.
+- Trust the notes: they are the current truth of the project, written by the owner and by earlier sessions. Use them without re-checking every line. If two notes disagree, or a note is older than another note it points to, say so plainly and ask the owner which is right; do not guess and do not quietly pick one. The code and git are still the last word on what the code does.
+- When you work on a ticket, Kona adds that ticket to every note you save, so do not write it in the title or the front matter. Name other tickets in the text by their id (T-0012).
 - These rules about Kona's tools and files come with the Kona version running now. If a CLAUDE.md or note in the project says something different about them, follow these and tell the owner that file is out of date. Never copy these rules into CLAUDE.md.";
 
 /// What the owner wrote for each skill of this person: when to use it. It is a hint, added to the instructions; the skill itself still describes itself to Claude.
@@ -196,7 +198,7 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     let mut servers = serde_json::Map::new();
     if let Ok(me) = std::env::current_exe() {
         servers.insert("kona-board".into(), json!({"command": me.to_string_lossy(), "args": [
-            "--mcp-board", "--folder", folder, "--session", id, "--role", role.as_ref().map(|r| r.id.as_str()).unwrap_or("")
+            "--mcp-board", "--folder", folder, "--session", id, "--role", role.as_ref().map(|r| r.id.as_str()).unwrap_or(""), "--ticket", ticket.as_ref().map(|t| t.id.as_str()).unwrap_or("")
         ]}));
     }
     // a session as a role gets only what that role was given (see skills.rs): its connectors, its skills, and none of the user-level ones

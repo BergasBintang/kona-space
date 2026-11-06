@@ -2,18 +2,18 @@
 // Folders are read one level at a time, only when opened, so a big project costs nothing until you look in it.
 // The viewer follows links between files (with a way back), lists the headings of a long page, finds words in it, copies tables and code, and says when an agent
 // changed the file: the open file and the open folders are looked at again every few seconds while the window is showing.
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { baseName, humanSize, listDir, readFile, type Entry, type FileView, type Project } from "../lib/api";
-import { dirOf, outline, resolveLink, slugify, type Heading } from "../lib/brain/outline.ts";
+import { dirOf, resolveLink } from "../lib/brain/outline.ts";
 import { changedSince, readSeen, stamp, writeSeen, type Seen } from "../lib/seen.ts";
 import { buildPage, cssRefs, pageRefs, renameCssRefs } from "../lib/htmlpage.ts";
 import { Button, Glyph } from "./ui";
 import { IconButton } from "./Icon";
 import { FileInfo } from "./FileInfo";
 import { Markdown } from "./brain/Markdown";
-import { clearPaint, findIn, paint } from "./find";
+import { FindBar, Gutter, Outline, useReader } from "./brain/Reader";
 
 const QUIET = new Set([".git", "node_modules", "target", "dist", ".kona", "__pycache__", ".next", ".venv"]);
 const SEP = /[\\/]/;
@@ -148,34 +148,6 @@ function TreePanel({ project, selected, onPick, root, only, title, seen, reveal 
       <div className="px-2.5 text-[17px] leading-6 font-bold">{title ?? project.name}</div>
       <div className="flex flex-col gap-px">{rows(rootDir, 0)}</div>
     </div>
-  );
-}
-
-function Gutter({ text }: { text: string }) {
-  const lines = useMemo(() => text.split("\n"), [text]);
-  const numbers = useMemo(() => lines.map((_, i) => i + 1).join("\n"), [lines]);
-  return (
-    <div className="flex min-w-0 font-mono text-[13px] leading-5">
-      <pre className="m-0 shrink-0 select-none border-r border-line-subtle pr-3 pl-4 text-right text-text-disabled" aria-hidden="true">{numbers}</pre>
-      <pre className="m-0 min-w-0 flex-1 overflow-x-auto pr-6 pl-4 whitespace-pre text-text">{text}</pre>
-    </div>
-  );
-}
-
-/** "On this page": the headings of a long file; the one being read is marked, and a click jumps to one. */
-function Outline({ heads, active, onJump }: { heads: Heading[]; active: string | null; onJump: (id: string) => void }) {
-  const low = Math.min(...heads.map((h) => h.level));
-  return (
-    <nav aria-label="On this page" className="hidden w-[250px] shrink-0 flex-col gap-0.5 overflow-y-auto border-l border-line-subtle py-5 pr-3 pl-4 lg:flex">
-      <div className="px-2 pb-1.5 text-[15px] leading-6 font-bold">On this page</div>
-      {heads.map((h) => (
-        <button key={h.id} type="button" onClick={() => onJump(h.id)} aria-current={h.id === active ? "location" : undefined} title={h.text}
-          className={`border-l-2 py-1 pr-2 text-left text-[14px] leading-5 ${h.id === active ? "border-accent font-bold text-text" : "border-transparent text-text-secondary hover:text-text"}`}
-          style={{ paddingLeft: 10 + (h.level - low) * 14 }}>
-          <span className="line-clamp-2">{h.text}</span>
-        </button>
-      ))}
-    </nav>
   );
 }
 
@@ -357,21 +329,12 @@ function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onF
   const [rendered, setRendered] = useState(true); // a markdown or html file is shown read as a page, with a switch to the plain text
   const [view, setView] = useState<FileView | { error: string } | "loading" | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [active, setActive] = useState<string | null>(null);
-  const [finding, setFinding] = useState(false);
-  const [query, setQuery] = useState("");
-  const [hits, setHits] = useState({ count: 0, at: 0 });
-  const matches = useRef<Range[]>([]);
-  const body = useRef<HTMLDivElement>(null);
-  const scroller = useRef<HTMLDivElement>(null);
-  const finder = useRef<HTMLInputElement>(null);
   const shown = useRef<string | null>(null);
-  const done = useRef(0);
 
   useEffect(() => {
     const again = shown.current === (entry?.path ?? null); // the same file read again after a change: keep what is on the screen, and the place in it
     shown.current = entry?.path ?? null;
-    if (!again) { setView(entry ? "loading" : null); setPdfUrl(null); setActive(null); }
+    if (!again) { setView(entry ? "loading" : null); setPdfUrl(null); }
     if (!entry) return;
     let live = true;
     readFile(entry.path).then((v) => { if (live) setView(v); }).catch((e) => { if (live) setView({ error: String(e) }); });
@@ -403,63 +366,10 @@ function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onF
   const md = !!entry && /\.(md|markdown)$/i.test(entry.name);
   const html = !!entry && /\.html?$/i.test(entry.name);
   const finds = text && !(html && rendered) ? text : null; // a drawn html page sits in its own frame, which the search cannot reach
-  const heads = useMemo(() => (text && md && rendered ? outline(text.text).filter((h) => h.level <= 3) : []), [text, md, rendered]);
-
-  const jump = useCallback((id: string) => {
-    const el = document.getElementById(id);
-    if (el) { el.scrollIntoView({ block: "start" }); setActive(id); }
-    return !!el;
-  }, []);
-
-  // a link that named a heading of another file: go to it once that file is on the screen
-  useEffect(() => {
-    if (!anchor || anchor.n === done.current || !text || !rendered) return;
-    done.current = anchor.n;
-    let a = anchor.id;
-    try { a = decodeURIComponent(a); } catch { /* as written */ }
-    requestAnimationFrame(() => { if (!jump(`md-${a.toLowerCase()}`)) jump(`md-${slugify(a)}`); });
-  }, [anchor, text, rendered, jump]);
-
-  // which heading is being read: the last one that has reached the top of the page
-  useEffect(() => {
-    const box = scroller.current;
-    if (!box || heads.length === 0) return;
-    let raf = 0;
-    const update = () => {
-      raf = 0;
-      const top = box.getBoundingClientRect().top;
-      let cur = heads[0].id;
-      for (const h of heads) { const el = document.getElementById(h.id); if (!el) continue; if (el.getBoundingClientRect().top - top <= 48) cur = h.id; else break; }
-      setActive(cur);
-    };
-    const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
-    update();
-    box.addEventListener("scroll", onScroll, { passive: true });
-    return () => { box.removeEventListener("scroll", onScroll); if (raf) cancelAnimationFrame(raf); };
-  }, [heads]);
-
-  // find in this file: Ctrl+F opens the box, Enter and Shift+Enter step, Esc closes
-  useEffect(() => {
-    if (!entry) return;
-    const key = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f" && finds) { e.preventDefault(); setFinding(true); requestAnimationFrame(() => finder.current?.select()); } };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
-  }, [entry, finds]);
-  useEffect(() => {
-    if (!finding || !query || !body.current || !finds) { matches.current = []; setHits({ count: 0, at: 0 }); clearPaint(); return; }
-    const found = findIn(body.current, query);
-    matches.current = found;
-    setHits({ count: found.length, at: 0 });
-    paint(found, 0, found.length > 0);
-    return clearPaint;
-  }, [finding, query, finds, rendered, entry?.path]);
-  useEffect(() => { setFinding(false); setQuery(""); setAbout(false); }, [entry?.path]);
-  const step = (d: number) => {
-    if (matches.current.length === 0) return;
-    const at = (hits.at + d + matches.current.length) % matches.current.length;
-    setHits({ count: matches.current.length, at });
-    paint(matches.current, at, true);
-  };
+  // the outline, find and the jump to a heading are shared with the Brain's note page (brain/Reader.tsx)
+  const reader = useReader({ text: text ? text.text : null, md, rendered, finds: !!finds, anchor, resetKey: entry?.path ?? null });
+  const { heads, active, jump, finding, body, scroller } = reader;
+  useEffect(() => { setAbout(false); }, [entry?.path]);
 
   if (!entry) {
     return (
@@ -508,7 +418,7 @@ function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onF
         <div className="flex items-center gap-3">
           {canGoBack && <Button variant="quiet" small onClick={onBack} title={`Back to ${backName}`}>← Back</Button>}
           <h2 className="m-0 min-w-0 flex-1 truncate text-[22px] leading-[30px] font-bold" title={rel}>{entry.name}</h2>
-          {finds && <Button variant="ghost" small onClick={() => { setFinding((f) => !f); requestAnimationFrame(() => finder.current?.select()); }} aria-pressed={finding} title="Find in this file (Ctrl+F)">Find</Button>}
+          {finds && <Button variant="ghost" small onClick={reader.toggleFind} aria-pressed={finding} title="Find on this page (Ctrl+F)">Find</Button>}
           {(md || html) && <Button variant="ghost" small onClick={() => setRendered((r) => !r)} aria-pressed={rendered}>{rendered ? "Show the text" : "Show it as a page"}</Button>}
           <span ref={setZoomSlot} className="flex shrink-0 items-center" />
           <IconButton icon="info" label="About this file" onClick={() => setAbout(true)} />
@@ -518,17 +428,7 @@ function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onF
             <Glyph state={note.tone === "warn" ? "left" : "live"} size={14} />{note.text}
           </div>
         )}
-        {finding && finds && (
-          <div role="search" className="mt-1 flex flex-wrap items-center gap-3">
-            <input ref={finder} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find in this file" aria-label="Search in this file"
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); step(e.shiftKey ? -1 : 1); } else if (e.key === "Escape") { e.preventDefault(); setFinding(false); } }}
-              className="h-9 w-64 border border-line-strong bg-inset px-3 text-[14px] text-text placeholder:text-text-tertiary" />
-            <span className="text-[13px] leading-5 text-text-tertiary" aria-live="polite">{!query ? "" : hits.count === 0 ? "Nothing found" : `${hits.at + 1} of ${hits.count}`}</span>
-            <Button variant="ghost" tiny onClick={() => step(-1)} disabled={hits.count === 0}>Previous</Button>
-            <Button variant="ghost" tiny onClick={() => step(1)} disabled={hits.count === 0}>Next</Button>
-            <Button variant="ghost" tiny onClick={() => setFinding(false)}>Close the search</Button>
-          </div>
-        )}
+        {finding && finds && <FindBar reader={reader} />}
       </div>
       <div className="mx-8 h-px bg-line-subtle" />
       <div ref={body} className="flex min-h-0 flex-1 flex-col">{content}</div>

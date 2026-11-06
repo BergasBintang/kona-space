@@ -2,6 +2,15 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.36.0, 2026-11-06
+
+The Brain map, and one source of truth for a project's notes and documents.
+
+- **The Brain map fills the window** down to the bottom, with the same space at the bottom as at the sides. Its dots are laid out like the Miralis canon's skill graph: groups packed apart, dots held inside their group, no two dots touching. A dot has no name until the pointer is on it; a click shows its name and the names of everything it links to and dims the rest; a click on empty map puts it back. The "Start here" note sits in the exact middle with a ring.
+- **A document is a note.** One page view for Files and the Brain (find, the outline of headings, the text as written). Sessions are told to write documents as notes, one fact in one note, linked and never copied; the notes are the current truth, and when two disagree a session says so and asks. A session can change one section of a note it saved. A note a session saves on a ticket always carries that ticket, written by Kona.
+- **A better and safer search.** A long document no longer answers a question because the words are somewhere in it (the words must stand together). `node tests/search-eval.mjs` measures the search with labelled questions (true and false positives and negatives); a test keeps the numbers from getting worse.
+- **Checks in the Brain report:** a note that links to a note that changed after it, and two decisions under one ticket on different days. A button "Check for conflicts" on a note asks one cheap Haiku call whether it disagrees with the notes it links to (it asks first and uses a little of the plan).
+
 ## 0.35.1, 2026-11-04
 
 Reading a server's fingerprint works again, and a GitHub repo now has a card of its own on the Servers screen.

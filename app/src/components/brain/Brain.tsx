@@ -71,16 +71,17 @@ export function BrainPlace({ project, tab, onTab, onAsk }: { project: Project; t
   const openNoteObj = open ? brain.notes.get(open) ?? null : null;
 
   let body: React.ReactNode;
+  let fill = false; // the map fills the page down to the bottom edge; the other pages are lists that scroll
   if (error) body = <div className="flex items-start gap-2.5 text-[14px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>;
   else if (data === null) body = <p className="m-0 text-text-tertiary">Reading the notes…</p>;
   else if (open !== null && (open === "" || openNoteObj)) {
-    body = <NoteView key={open} projectId={project.id} brain={brain} note={open === "" ? null : openNoteObj} draftTitle={draftTitle} onOpen={openNote} onClose={() => setOpen(null)} onChanged={changed} />;
+    body = <NoteView key={open} projectId={project.id} accountId={project.account ?? null} brain={brain} note={open === "" ? null : openNoteObj} draftTitle={draftTitle} onOpen={openNote} onClose={() => setOpen(null)} onChanged={changed} />; fill = true;
   } else if (asked) {
     body = (
       <Ask question={asked.question} result={asked.result} onOpen={(id) => openNote(id)} onClose={() => setAsked(null)} onWrite={() => writeNote(asked.question)} onWeb={() => setWeb(asked.question)}
         onAskClaude={async () => { setBusy(true); try { await onAsk(asked.question); } catch (e) { setError(String(e)); } finally { setBusy(false); } }} />
     );
-  } else if (tab === "map") body = <MapView brain={brain} onOpen={openNote} />;
+  } else if (tab === "map") { body = <MapView brain={brain} onOpen={openNote} />; fill = true; }
   else if (tab === "notes") {
     body = (
       <div className="flex flex-col gap-4">
@@ -96,7 +97,7 @@ export function BrainPlace({ project, tab, onTab, onAsk }: { project: Project; t
               <span className="truncate text-[15px] leading-6 font-bold">{n.title}</span>
               <span className="line-clamp-2 text-[13px] leading-5 text-text-secondary">{n.sections[0]?.text.split("\n").map((l) => l.trim()).find((l) => l && !/^#/.test(l))?.replace(/[*`]/g, "")}</span>
             </span>
-            <span className="flex shrink-0 flex-col items-end gap-1.5"><Chip>{LAYER_WORD[n.layer]}</Chip><span className="text-[12px] text-text-tertiary">{brain.outgoing(n.id).length} out · {brain.incoming(n.id).length} in</span></span>
+            <span className="flex shrink-0 flex-col items-end gap-1.5"><Chip>{LAYER_WORD[n.layer]}</Chip>{n.tickets.map((t) => <Chip key={t}>{t}</Chip>)}<span className="text-[12px] text-text-tertiary">{brain.outgoing(n.id).length} out · {brain.incoming(n.id).length} in</span></span>
           </button>
         ))}
       </div>
@@ -124,7 +125,7 @@ export function BrainPlace({ project, tab, onTab, onAsk }: { project: Project; t
         {notice && <div role="status" className="flex items-start gap-2.5 border border-line-subtle bg-surface-2 px-4 py-3 text-[14px] leading-5"><Glyph state="done" size={16} /> {notice}</div>}
         {busy && <p className="m-0 text-[13px] text-text-tertiary">Starting a session…</p>}
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-8 pt-6 pb-10">{body}</div>
+      <div className={`flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-8 pt-6 ${fill ? "pb-8" : "pb-10"}`}>{body}</div>
 
       {web && (
         <Confirm title="Search the web for this?" confirmLabel="Open my browser" onConfirm={() => { void openUrl(`https://duckduckgo.com/?q=${encodeURIComponent(web)}`); setWeb(null); }} onCancel={() => setWeb(null)}>

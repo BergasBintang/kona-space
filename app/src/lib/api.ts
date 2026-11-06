@@ -74,6 +74,8 @@ export const deleteTool = (id: string) => invoke<void>("delete_tool", { id });
 export const checkTools = (ids: string[]) => invoke<ToolStatus[]>("check_tools", { ids });
 export const projectHints = (folder: string) => invoke<Hint[]>("project_hints", { folder });
 export const listTickets = (projectId: string) => invoke<TicketView[]>("list_tickets", { projectId });
+/** Whether a note disagrees with the notes it links to: one cheap Haiku call on request (the prompt is built and cleaned in lib/brain/notecheck.ts). */
+export const noteCheck = (projectId: string, accountId: string | null, prompt: string) => invoke<string>("note_check", { projectId, accountId, prompt });
 export const createTicket = (projectId: string, n: { title: string; description?: string; acceptance?: string; role?: string | null; status?: string; next?: string; own_copy?: string }) => invoke<Ticket>("create_ticket", { projectId, new: n });
 export const updateTicket = (projectId: string, id: string, patch: TicketPatch) => invoke<Ticket>("update_ticket", { projectId, id, patch });
 export const removeTicket = (projectId: string, id: string) => invoke<void>("remove_ticket", { projectId, id });

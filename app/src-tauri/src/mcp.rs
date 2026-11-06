@@ -15,6 +15,7 @@ struct Ctx {
     who: String,
     session: String,
     role: String, // the role id, or empty
+    ticket: String, // the ticket this session works on (T-0012), or empty
     roles: Vec<(String, String, String)>, // id, job, person
 }
 
@@ -27,22 +28,73 @@ fn slug(s: &str) -> String {
     out.trim_matches('-').chars().take(60).collect::<String>().trim_matches('-').to_string()
 }
 
+/// The front matter keys Kona writes itself on a note a session saves. Any other key a note has (where a document was moved from, its status) is kept when the note is saved again.
+const MANAGED: [&str; 10] = ["title", "kind", "date", "updated", "status", "source", "session", "role", "ticket", "tickets"];
+
+/// A note's front matter as ordered pairs (keys in lower case), and its body (the text after the closing `---`).
+fn split_note(text: &str) -> (Vec<(String, String)>, String) {
+    let t = text.replace('\r', "");
+    let all: Vec<&str> = t.split('\n').collect();
+    if all.first() != Some(&"---") { return (vec![], t); }
+    let Some(close) = all.iter().skip(1).position(|l| *l == "---").map(|p| p + 1) else { return (vec![], t) };
+    let meta = all[1..close].iter().filter_map(|l| l.split_once(':').map(|(k, v)| (k.trim().to_lowercase(), v.trim().to_string()))).collect();
+    (meta, all[close + 1..].join("\n"))
+}
+
+/// Change one section of a note's body: the heading named (without its #) and everything under it up to the next heading of the same or a higher level. `append` adds the
+/// text at the end of the section; otherwise the text replaces what the section held. The heading line stays. A heading inside a code block is not a heading.
+fn replace_section(body: &str, heading: &str, text: &str, append: bool) -> Result<String, String> {
+    let want = heading.trim().trim_start_matches('#').trim().to_lowercase();
+    let lines: Vec<&str> = body.split('\n').collect();
+    let mut fence = false;
+    let mut heads: Vec<(usize, usize, String)> = Vec::new(); // line, level, text
+    for (i, l) in lines.iter().enumerate() {
+        if l.trim_start().starts_with("```") { fence = !fence; continue; }
+        if fence { continue; }
+        let level = l.chars().take_while(|c| *c == '#').count();
+        if (1..=6).contains(&level) && l[level..].starts_with(' ') { heads.push((i, level, l[level..].trim().to_string())); }
+    }
+    let hits: Vec<(usize, usize)> = heads.iter().filter(|h| h.2.to_lowercase() == want).map(|h| (h.0, h.1)).collect();
+    if hits.is_empty() { return Err(format!("That note has no heading called \"{heading}\". Its headings are: {}", heads.iter().map(|h| h.2.clone()).collect::<Vec<_>>().join("; "))); }
+    if hits.len() > 1 { return Err(format!("The heading \"{heading}\" is there more than once, so Kona cannot tell which section you mean")); }
+    let (at, level) = hits[0];
+    let end = heads.iter().find(|h| h.0 > at && h.1 <= level).map(|h| h.0).unwrap_or(lines.len());
+    let mut out: Vec<String> = lines[..=at].iter().map(|l| l.to_string()).collect();
+    if append {
+        let mut kept: Vec<String> = lines[at + 1..end].iter().map(|l| l.to_string()).collect();
+        while kept.last().is_some_and(|l| l.trim().is_empty()) { kept.pop(); }
+        if kept.is_empty() { out.push(String::new()); }
+        out.extend(kept);
+    } else {
+        out.push(String::new());
+    }
+    out.extend(text.trim().split('\n').map(str::to_string));
+    out.push(String::new());
+    out.extend(lines[end..].iter().map(|l| l.to_string()));
+    Ok(out.join("\n"))
+}
+
 /// Write a note into the project's brain on behalf of a session. A note of the owner's, or one Kona wrote, is never changed here; a note this tool wrote before can be rewritten.
 fn save_note(ctx: &Ctx, a: &Value) -> Result<String, String> {
-    let title = text_of(a, "title").unwrap_or_default().split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut title = text_of(a, "title").unwrap_or_default().split_whitespace().collect::<Vec<_>>().join(" ");
     let body = text_of(a, "body").unwrap_or_default();
-    if title.is_empty() { return Err("Give the note a title".into()); }
+    let section = text_of(a, "section").map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    let append = a.get("append").and_then(Value::as_bool).unwrap_or(false);
+    if title.is_empty() && section.is_none() { return Err("Give the note a title".into()); }
     if body.trim().is_empty() { return Err("The note has no text".into()); }
     if body.trim_start().starts_with("---") { return Err("Do not write front matter (the lines between ---). Kona adds it. Send only the text of the note.".into()); }
     if body.len() > 60 * 1024 { return Err("That note is longer than 60 KB. Split it into notes that link to each other with [[their-id]].".into()); }
     if brain_search::contains_secret(&body) || brain_search::contains_secret(&title) {
         return Err("That text looks like it holds a secret (a key, a token or a password). Leave it out and say where it is kept instead.".into());
     }
-    let kind = text_of(a, "kind").unwrap_or_else(|| "note".into());
-    if !["decision", "topic", "open", "note"].contains(&kind.as_str()) { return Err("kind is one of: decision, topic, open, note".into()); }
-    let id = text_of(a, "id").map(|s| slug(&s)).filter(|s| !s.is_empty()).unwrap_or_else(|| slug(&title));
+    let kind_arg = text_of(a, "kind");
+    if let Some(k) = &kind_arg { if !["decision", "topic", "open", "note"].contains(&k.as_str()) { return Err("kind is one of: decision, topic, open, note".into()); } }
+    let given_id = text_of(a, "id").map(|s| slug(&s)).filter(|s| !s.is_empty());
+    if section.is_some() && given_id.is_none() { return Err("To change one section, say which note with its id".into()); }
+    let id = given_id.unwrap_or_else(|| slug(&title));
     if !brain::valid_id(&id) { return Err("Give a title or an id with letters or digits in it".into()); }
     let old = std::fs::read_to_string(brain::dir(&ctx.project).join(format!("{id}.md"))).ok();
+    if section.is_some() && old.is_none() { return Err(format!("There is no note called {id}, so there is no section to change. Save the note first.")); }
     let today: String = tickets::now().chars().take(10).collect();
     let mut date = today.clone();
     if let Some(old) = &old {
@@ -52,15 +104,37 @@ fn save_note(ctx: &Ctx, a: &Value) -> Result<String, String> {
         }
         if let Some(d) = meta.get("date") { date = d.clone(); }
     }
+    let (old_meta, old_body) = old.as_deref().map(split_note).unwrap_or_default();
+    let old_get = |k: &str| old_meta.iter().find(|(a, _)| a == k).map(|(_, v)| v.clone());
+    if title.is_empty() { title = old_get("title").unwrap_or_else(|| id.clone()); }
+    // saving a whole note again starts from the kind given (note when none); changing one section keeps the note's own kind
+    let kind = kind_arg.or_else(|| if section.is_some() { old_get("kind") } else { None }).unwrap_or_else(|| "note".into());
     let mut text = format!("---\ntitle: {title}\nkind: {kind}\ndate: {date}\n");
     if date != today { text.push_str(&format!("updated: {today}\n")); }
-    if kind == "open" { text.push_str("status: open\n"); }
+    if kind == "open" { let st = if section.is_some() { old_get("status").unwrap_or_else(|| "open".into()) } else { "open".into() }; text.push_str(&format!("status: {st}\n")); }
     text.push_str("source: agent\n");
     text.push_str(&format!("session: {}\n", ctx.session));
     if !ctx.role.is_empty() { text.push_str(&format!("role: {}\n", ctx.role)); }
+    // The ticket is written by Kona, not left to the session (a rule in a prompt is followed only some of the time). A note saved again from another ticket keeps
+    // the first one in `ticket` and lists all of them in `tickets`.
+    let mut of_tickets: Vec<String> = Vec::new();
+    if let Some(old) = &old {
+        let (meta, _) = brain_search::front_matter(old);
+        for v in [meta.get("ticket"), meta.get("tickets")].into_iter().flatten() {
+            for t in v.split(',').map(|x| x.trim().to_string()) { if tickets::valid_id(&t) && !of_tickets.contains(&t) { of_tickets.push(t); } }
+        }
+    }
+    if !ctx.ticket.is_empty() && !of_tickets.contains(&ctx.ticket) { of_tickets.push(ctx.ticket.clone()); }
+    if let Some(first) = of_tickets.first() { text.push_str(&format!("ticket: {first}\n")); }
+    if of_tickets.len() > 1 { text.push_str(&format!("tickets: {}\n", of_tickets.join(", "))); }
+    for (k, v) in &old_meta { if !MANAGED.contains(&k.as_str()) && k != "edited_by" { text.push_str(&format!("{k}: {v}\n")); } }
     text.push_str("---\n");
-    if !body.trim_start().starts_with("# ") { text.push_str(&format!("# {title}\n\n")); }
-    text.push_str(body.trim());
+    if let Some(sec) = &section {
+        text.push_str(replace_section(&old_body, sec, body.trim(), append)?.trim_end());
+    } else {
+        if !body.trim_start().starts_with("# ") { text.push_str(&format!("# {title}\n\n")); }
+        text.push_str(body.trim());
+    }
     text.push('\n');
     let n = brain::save(&ctx.project, &id, &text)?;
     Ok(format!("{} note {id} in the project's brain ({}). The owner sees it in the Brain place, and any session finds it with search_brain.", if old.is_some() { "Updated" } else { "Saved" }, n.path))
@@ -122,12 +196,14 @@ fn tools() -> Value {
          "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}, "from_line": {"type": "integer"}, "to_line": {"type": "integer"}}, "required": ["id"]}},
         {"name": "list_notes", "description": "List the notes of this project's brain that belong to the project (not Claude's memory or Kona's starter notes), newest first, one line each: id, kind, date, title. Use it to see what is already written before you add a note.",
          "inputSchema": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["decision", "topic", "open", "note", "session"], "description": "Only notes of this kind. Optional."}}}},
-        {"name": "save_note", "description": "Save something worth keeping into this project's brain, so the owner and every later session can find it with search_brain. Use it for decisions with their reason, facts about the project that the code does not show (how it is deployed, what a name means, a limit, a rule of the owner's), the result of a piece of research, and work still open. Do not save secrets, passwords or keys, what the code or git history already shows, or the chat itself. Search first: if a note on the topic exists, write a new note that links to it with [[its-id]] rather than a copy. Write the body in markdown: a one or two sentence summary first, then short sections. A note you saved before can be saved again under the same id to update it; the owner's notes are never changed.",
+        {"name": "save_note", "description": "Save something worth keeping into this project's brain, so the owner and every later session can find it with search_brain. Use it for decisions with their reason, facts about the project that the code does not show (how it is deployed, what a name means, a limit, a rule of the owner's), the result of a piece of research, and work still open. Do not save secrets, passwords or keys, what the code or git history already shows, or the chat itself. Search first: if a note on the topic exists, write a new note that links to it with [[its-id]] rather than a copy. Write the body in markdown: a one or two sentence summary first, then short sections. Documents (reports, plans, designs) are notes too: write them here, never as files in docs/. A note you saved before can be updated under the same id: send the whole text again, or only the part that changes with `section` (and `append` to add to the end of that part). The owner's notes are never changed. If you are working on a ticket, Kona adds that ticket to the note itself: do not write it into the title or the front matter.",
          "inputSchema": {"type": "object", "properties": {
             "title": {"type": "string", "description": "What the note is about, in 3 to 10 words."},
             "body": {"type": "string", "description": "The text of the note in markdown, without front matter."},
             "kind": {"type": "string", "enum": ["decision", "topic", "open", "note"], "description": "decision: something decided, with the reason. topic: how something works or what was found. open: work still to do. note: anything else. Default note."},
-            "id": {"type": "string", "description": "Lower-case letters, digits and dashes. Optional: made from the title when left out."}}, "required": ["title", "body"]}}
+            "id": {"type": "string", "description": "Lower-case letters, digits and dashes. Optional: made from the title when left out."},
+            "section": {"type": "string", "description": "To change one part of a note you saved before: its id in id and the heading of that part here (without the #). body then replaces that section only; the rest of the note stays as it is."},
+            "append": {"type": "boolean", "description": "With section: add body at the end of that section instead of replacing it."}}, "required": ["body"]}}
     ])
 }
 
@@ -245,10 +321,11 @@ pub fn run(args: &[String]) {
     let folder = arg(args, "--folder");
     let session = arg(args, "--session");
     let role = arg(args, "--role");
+    let ticket = Some(arg(args, "--ticket")).filter(|t| tickets::valid_id(t)).unwrap_or_default();
     let roles = read_roles();
     let role_name = roles.iter().find(|r| r.0 == role).map(the);
     let who = format!("session {}{}", &session[..session.len().min(8)], role_name.map(|n| format!(" (role: {n})")).unwrap_or_default());
-    let ctx = Ctx { dir: tickets::dir(Path::new(&folder)), project: PathBuf::from(&folder), who, session: session.clone(), role: role.clone(), roles };
+    let ctx = Ctx { dir: tickets::dir(Path::new(&folder)), project: PathBuf::from(&folder), who, session: session.clone(), role: role.clone(), ticket, roles };
     let stdin = std::io::stdin();
     let mut out = std::io::stdout();
     for line in stdin.lock().lines() {
@@ -272,7 +349,7 @@ mod tests {
         let d = std::env::temp_dir().join(format!("kona-mcp-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
-        Ctx { dir: tickets::dir(&d), project: d, who: "session test".into(), session: "abc12345-0000".into(), role: "backend".into(), roles: vec![] }
+        Ctx { dir: tickets::dir(&d), project: d, who: "session test".into(), session: "abc12345-0000".into(), role: "backend".into(), ticket: String::new(), roles: vec![] }
     }
     fn note(c: &Ctx, id: &str) -> String {
         std::fs::read_to_string(brain::dir(&c.project).join(format!("{id}.md"))).unwrap_or_default()
@@ -292,6 +369,66 @@ mod tests {
         assert!(text.contains("Changed.") && !text.contains("# How deploys work\n\n# How deploys work"), "the title heading is not written twice");
         assert!(list_notes(&c, &json!({})).contains("how-deploys-work [note]"));
         assert!(list_notes(&c, &json!({"kind": "decision"})).starts_with("The project's brain has no notes"));
+    }
+
+    #[test]
+    fn a_note_saved_in_a_ticket_session_carries_the_ticket_and_one_saved_without_does_not() {
+        let mut c = ctx("ticket");
+        c.ticket = "T-0005".into();
+        save_note(&c, &json!({"title": "Credit table approved", "kind": "decision", "body": "Approved."})).unwrap();
+        let text = note(&c, "credit-table-approved");
+        assert!(text.contains("\nrole: backend\nticket: T-0005\n---\n"), "{text}");
+        assert!(!text.contains("tickets:"));
+        // saved again in the same ticket: nothing is added
+        save_note(&c, &json!({"title": "Credit table approved", "id": "credit-table-approved", "body": "Approved, again."})).unwrap();
+        assert!(!note(&c, "credit-table-approved").contains("tickets:"));
+        // saved again from another ticket: the first stays in `ticket`, both are listed
+        c.ticket = "T-0009".into();
+        save_note(&c, &json!({"title": "Credit table approved", "id": "credit-table-approved", "body": "Approved, later."})).unwrap();
+        let later = note(&c, "credit-table-approved");
+        assert!(later.contains("\nticket: T-0005\ntickets: T-0005, T-0009\n---\n"), "{later}");
+        // a session with no ticket stamps nothing
+        let mut none = ctx("noticket");
+        none.ticket = String::new();
+        save_note(&none, &json!({"title": "A free note", "body": "Text."})).unwrap();
+        assert!(!note(&none, "a-free-note").contains("ticket"));
+        // a ticket that is not a ticket id is never written
+        assert!(!tickets::valid_id("../x") && tickets::valid_id("T-0005"));
+    }
+
+    #[test]
+    fn one_section_of_a_note_can_be_replaced_or_added_to_and_the_rest_stays() {
+        let mut c = ctx("section");
+        c.ticket = "T-0005".into();
+        save_note(&c, &json!({"title": "Deploys", "kind": "topic", "body": "Deploys run from main.\n\n## Steps\n- push\n- run the script\n\n## Open\n- who owns the script?\n\n## Notes\n```\n## not a heading\n```\n"})).unwrap();
+        // a key Kona does not manage (a document's origin) survives every save
+        let path = brain::dir(&c.project).join("deploys.md");
+        let t = std::fs::read_to_string(&path).unwrap().replace("\n---\n#", "\nmerged_from: docs/deploys.md\n---\n#");
+        std::fs::write(&path, t).unwrap();
+        let said = save_note(&c, &json!({"id": "deploys", "section": "Steps", "body": "- push\n- run the script\n- check the page"})).unwrap();
+        assert!(said.starts_with("Updated note deploys"));
+        let text = note(&c, "deploys");
+        assert!(text.contains("## Steps\n\n- push\n- run the script\n- check the page\n\n## Open\n- who owns the script?"), "{text}");
+        assert!(text.contains("Deploys run from main.") && text.contains("kind: topic") && text.contains("merged_from: docs/deploys.md") && text.contains("ticket: T-0005"), "{text}");
+        assert!(text.contains("updated: ") || text.contains("date: "), "{text}");
+        // append adds to the end of the section
+        save_note(&c, &json!({"id": "deploys", "section": "open", "append": true, "body": "- is the script tested?"})).unwrap();
+        assert!(note(&c, "deploys").contains("## Open\n- who owns the script?\n- is the script tested?\n\n"), "{}", note(&c, "deploys"));
+        // the rest was not touched
+        assert!(note(&c, "deploys").contains("## Steps\n\n- push\n- run the script\n- check the page\n"));
+        // errors say what is wrong
+        let no_head = save_note(&c, &json!({"id": "deploys", "section": "Nothing here", "body": "x"})).unwrap_err();
+        assert!(no_head.contains("no heading called") && no_head.contains("Steps") && no_head.contains("Open"), "{no_head}");
+        assert!(save_note(&c, &json!({"section": "Steps", "body": "x"})).unwrap_err().contains("say which note"));
+        assert!(save_note(&c, &json!({"id": "missing-note", "section": "Steps", "body": "x"})).unwrap_err().contains("There is no note called"));
+        assert!(save_note(&c, &json!({"id": "deploys", "section": "not a heading", "body": "x"})).unwrap_err().contains("no heading called"), "a heading inside a code block is not a heading");
+        // a whole note saved again keeps the keys Kona does not manage
+        save_note(&c, &json!({"title": "Deploys", "id": "deploys", "body": "# Deploys\n\nRewritten."})).unwrap();
+        assert!(note(&c, "deploys").contains("merged_from: docs/deploys.md"));
+        // the owner's note is not changed by a section either
+        let owner = brain::dir(&c.project).join("mine.md");
+        std::fs::write(&owner, "---\ntitle: Mine\nsource: owner\n---\n# Mine\n\n## A\ntext\n").unwrap();
+        assert!(save_note(&c, &json!({"id": "mine", "section": "A", "body": "x"})).unwrap_err().contains("owner's or Kona's"));
     }
 
     #[test]

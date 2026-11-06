@@ -3,11 +3,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
-import { Brain } from "./engine.ts";
+import { Brain, groupCircle } from "./engine.ts";
 import { redact, terms } from "./text.ts";
 import { frontMatter, sectionsOf } from "./parse.ts";
 import { cleanBody } from "./clean.ts";
-import type { RawNote } from "./parse.ts";
+import { ticketsOf, type RawNote } from "./parse.ts";
 
 const dir = new URL("../../brain/starter/", import.meta.url);
 const starter: RawNote[] = readdirSync(dir).filter((f) => f.endsWith(".md")).map((f) => ({ id: f.replace(/\.md$/, ""), layer: "starter" as const, text: readFileSync(new URL(f, dir), "utf8"), readonly: true }));
@@ -152,4 +152,122 @@ test("a note written by the model: invented links become plain words, real ones 
   assert.ok(!body.includes("[[Made Up Note]]") && body.includes("Made Up Note"));
   assert.ok(!body.includes("[[ghost") && body.includes("shown words"));
   assert.ok(!body.includes("foo: bar") && !body.includes("A repeated title"));
+});
+
+// The map: no two dots touch and no two group circles overlap, as in the canon's skill graph (see the comment on Brain.layout).
+function mapProblems(b: Brain, width = 880, height = 560): string[] {
+  const pos = b.layout(width, height), problems: string[] = [];
+  const ids = [...pos.keys()];
+  assert.equal(ids.length, b.notes.size, "every note has a place");
+  for (const p of pos.values()) if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) problems.push("a position is not a number");
+  for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+    const a = pos.get(ids[i])!, c = pos.get(ids[j])!, need = b.radiusOf(ids[i]) + b.radiusOf(ids[j]);
+    if (Math.hypot(a.x - c.x, a.y - c.y) < need) problems.push(`dots ${ids[i]} and ${ids[j]} touch`);
+  }
+  const circles = b.clusters.filter((c) => c.members.length >= 2).map((c) => ({ id: c.id, ...groupCircle(c.members.map((m) => pos.get(m)!)) }));
+  for (let i = 0; i < circles.length; i++) for (let j = i + 1; j < circles.length; j++) {
+    if (Math.hypot(circles[i].cx - circles[j].cx, circles[i].cy - circles[j].cy) < circles[i].r + circles[j].r) problems.push(`group circles ${circles[i].id} and ${circles[j].id} overlap`);
+  }
+  return problems;
+}
+
+test("on the starter notes, no two dots touch and no two group circles overlap", () => {
+  assert.deepEqual(mapProblems(new Brain(starter)), []);
+});
+
+test("on a crowd of notes with hubs, loose notes and links between groups, the same holds, at any shape of picture", () => {
+  const raw: RawNote[] = [];
+  let seed = 7;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+  const mk = (id: string, links: string[]) => raw.push({ id, layer: "project", readonly: false, text: `# ${id}\n\n${links.map((l) => `[[${l}]]`).join(" ")}\n` });
+  for (let g = 0; g < 7; g++) for (let i = 0; i < 10; i++) {
+    const links = [`g${g}-${(i + 1) % 10}`];
+    if (i === 0) links.push("hub");
+    if (rnd() < 0.15) links.push(`g${Math.floor(rnd() * 7)}-${Math.floor(rnd() * 10)}`);
+    mk(`g${g}-${i}`, links.filter((l) => l !== `g${g}-${i}`));
+  }
+  mk("hub", ["g0-0", "g3-0"]);
+  mk("alone-one", []); mk("alone-two", []); mk("alone-three", []);
+  const b = new Brain(raw);
+  for (const [w, h] of [[880, 560], [1400, 500], [600, 600]]) assert.deepEqual(mapProblems(b, w, h), [], `${w} x ${h}`);
+});
+
+test("the Start here note is in the exact middle of the map, and nothing else is pushed on top of it", () => {
+  const b = new Brain(starter);
+  assert.equal(b.centreNote(), "start-here");
+  for (const [w, h] of [[880, 560], [1400, 560], [560, 560]]) {
+    const pos = b.layout(w, h);
+    assert.deepEqual(pos.get("start-here"), { x: w / 2, y: h / 2 }, `${w} x ${h}`);
+    assert.deepEqual(mapProblems(b, w, h), []);
+  }
+  // a brain without that note has no centre note and still lays out
+  const plain = new Brain(starter.filter((n) => n.id !== "start-here"));
+  assert.equal(plain.centreNote(), null);
+  assert.deepEqual(mapProblems(plain), []);
+});
+
+test("with the centre note and a project's own notes (some with no links), the middle holds and nothing touches", () => {
+  const raw: RawNote[] = [...starter, { id: "own-a", layer: "project", readonly: false, text: "# Own A\n\nSee [[start-here]] and [[own-b]].\n" }, { id: "own-b", layer: "project", readonly: false, text: "# Own B\n\n[[own-a]]\n" }, { id: "own-loose", layer: "project", readonly: false, text: "# Own loose\n\nNothing links here.\n" }];
+  const b = new Brain(raw);
+  const pos = b.layout(880, 560);
+  assert.deepEqual(pos.get("start-here"), { x: 440, y: (560 - 52) / 2 });
+  assert.deepEqual(mapProblems(b), []);
+});
+
+test("a note's tickets come from the stamp Kona writes, and a title that names another ticket is reported", () => {
+  const mk = (id: string, head: string, title: string): RawNote => ({ id, layer: "project", readonly: false, text: `---\ntitle: ${title}\nkind: decision\ndate: 2026-11-05\nsource: agent\nsession: s1\n${head}---\n# ${title}\n\nText.\n` });
+  const a = mk("credit-table", "ticket: T-0005\ntickets: T-0005, T-0009\n", "Credit table approved");
+  const b = mk("other-note", "ticket: T-0003\n", "Report for T-0007");
+  const c = mk("no-ticket", "", "A note with no ticket");
+  const brain = new Brain([a, b, c]);
+  assert.deepEqual(brain.notes.get("credit-table")!.tickets, ["T-0005", "T-0009"]);
+  assert.deepEqual(brain.notes.get("no-ticket")!.tickets, []);
+  assert.deepEqual(ticketsOf({ ticket: "T-0005", tickets: "T-0005, T-0009, junk, T-12" }), ["T-0005", "T-0009"], "junk and short ids are dropped, no repeats");
+  const warns = brain.report(NOW).warnings.filter((w) => w.code === "ticket-mismatch");
+  assert.equal(warns.length, 1);
+  assert.ok(warns[0].text.includes("T-0007") && warns[0].text.includes("T-0003") && warns[0].noteId === "other-note");
+  // a decision with a ticket is not "without a source" even with no session
+  const d: RawNote = { id: "d", layer: "project", readonly: false, text: "---\ntitle: D\nkind: decision\nticket: T-0001\n---\n# D\n\nText.\n" };
+  assert.equal(new Brain([d]).report(NOW).warnings.filter((w) => w.code === "decision-no-source").length, 0);
+});
+
+test("a ticket named in a note's text reaches every note written under that ticket", () => {
+  const first: RawNote = { id: "written-under-both", layer: "project", readonly: false, text: "---\ntitle: Written under both\nticket: T-0005\ntickets: T-0005, T-0009\n---\n# Written under both\n\nText.\n" };
+  const reader: RawNote = { id: "reader", layer: "project", readonly: false, text: "# Reader\n\nSee ticket T-0009 for the reasons.\n" };
+  const brain = new Brain([first, reader]);
+  assert.ok(brain.edges.some((e) => e.s === "reader" && e.t === "written-under-both"), "the second ticket also links");
+});
+
+// A long document must not answer a question just because the words are somewhere in it (ticket T-0033). The same two notes and questions are in the Rust twin's tests
+// (brain_search.rs), which must give the same answers.
+const longDoc = (): RawNote[] => {
+  const filler = (n: number, seed: string) => Array.from({ length: n }, (_, i) => `${seed}${i % 17} plain filler words about nothing in particular`).join(" ");
+  const text = `# A long report\n\n${filler(30, "alpha")} The refund policy for the premium plan is thirty days. ${filler(30, "beta")}\n\n${filler(30, "gamma")} Servers in Frankfurt hold the backups. ${filler(30, "delta")}\n`;
+  return [{ id: "long-report", layer: "project", readonly: false, text }];
+};
+
+test("words that stand far apart in a long section do not count as an answer, words that stand together do", () => {
+  const b = new Brain(longDoc());
+  const together = b.search("refund policy premium plan thirty days");
+  assert.equal(together.state, "found", "the words stand in one sentence");
+  const apart = b.search("refund policy Frankfurt backups");
+  assert.equal(apart.state === "found", false, "one half of the question is in one paragraph and the other half far away");
+  // a short section is read whole, as before
+  const short = new Brain([{ id: "short-note", layer: "project", readonly: false, text: "# Short note\n\nRefunds take thirty days. Backups sit in Frankfurt.\n" }]);
+  assert.equal(short.search("refunds thirty days backups Frankfurt").state, "found");
+});
+
+test("the report says when a note links to a note that changed after it, and when two decisions under one ticket are on different days", () => {
+  const mk = (id: string, kind: string, date: string, extra = "", body = ""): RawNote => ({ id, layer: "project", readonly: false, text: `---\ntitle: ${id}\nkind: ${kind}\ndate: ${date}\n${extra}---\n# ${id}\n\n${body}\n` });
+  const old = mk("old-note", "decision", "2026-11-01", "", "See [[changed-note]] for the numbers.");
+  const changed = mk("changed-note", "topic", "2026-10-20", "updated: 2026-11-05\n", "The numbers.");
+  const same = mk("same-day", "decision", "2026-11-05", "", "See [[changed-note]].");
+  const session = mk("a-session", "session", "2026-11-01", "", "See [[changed-note]].");
+  const w = new Brain([old, changed, same, session]).report(NOW).warnings.filter((x) => x.code === "link-newer");
+  assert.equal(w.length, 1, "only the older note that states something is named");
+  assert.ok(w[0].noteId === "old-note" && w[0].text.includes("2026-11-05") && w[0].severity === "info");
+  const d1 = mk("decision-one", "decision", "2026-11-01", "ticket: T-0005\n"), d2 = mk("decision-two", "decision", "2026-11-04", "ticket: T-0005\n"), d3 = mk("decision-three", "decision", "2026-11-04", "ticket: T-0006\n"), d4 = mk("decision-four", "decision", "2026-11-04", "ticket: T-0006\n");
+  const two = new Brain([d1, d2, d3, d4]).report(NOW).warnings.filter((x) => x.code === "two-decisions");
+  assert.equal(two.length, 1, "T-0005 has two days, T-0006 has one");
+  assert.ok(two[0].text.includes("T-0005"));
 });

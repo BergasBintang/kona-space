@@ -16,7 +16,7 @@ Claude also writes its own notes from your corrections and preferences. They liv
 Kona reads Claude's memory folder into the brain as a separate, read-only layer. Each note shows its date, because a memory records what was true when it was written. Kona never writes there. See [[how-the-brain-works]].
 
 ## What Kona tells every session, and what stays out of CLAUDE.md
-Kona gives each session its own rules at the start: where to keep lasting knowledge (the brain's `save_note`), how to write files so Kona's reader draws them, and how to use the board. They live inside the program, so every Kona update replaces them for everyone. Do not copy them into a CLAUDE.md: that copy would go out of date, and sessions are told to follow Kona's current rules over an older one. Keep CLAUDE.md for what is true about your project and must be followed in every session.
+Kona gives each session its own rules at the start: where to keep lasting knowledge (the brain's `save_note`), how to write files so Kona's reader draws them, and how to use the board. They live inside the program, so every Kona update replaces them for everyone. Do not copy them into a CLAUDE.md: that copy would go out of date, and sessions are told to follow Kona's current rules over an older one. Where documents go is one of them: a document is a note, so a CLAUDE.md should not say where documents go. Keep CLAUDE.md for what is true about your project and must be followed in every session.
 
 ## Instructions are context, not a lock
 Claude treats CLAUDE.md as guidance. To force something, use a permission rule or a hook. See [[skills-mcp-and-hooks]] and [[roles-and-permission-modes]].

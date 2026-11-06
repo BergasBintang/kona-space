@@ -20,6 +20,7 @@ Settings, Updates also has **Check now**.
 
 ## Publishing a version
 
+0. Before the commit, keep the notes true (they went stale for a week once, see `docs/LESSONS.md` section 19): add a row to the progress table and update "Where things stand now" and section 14 in `kona-space-app.md`, and set the `next` line of every ticket of the version to its real state.
 1. Make the change, bump the version in the usual way (`docs/VERSIONING.md`: `VERSION`, `app/package.json`, `Cargo.toml`, `tauri.conf.json`, `CHANGELOG.md`), commit and push, and tag `vX.Y.Z`.
 2. `cd app` then `npm run release`. It builds the installer and signs it. It writes three files into `app/src-tauri/target/release/bundle/nsis/`:
    `Kona_X.Y.Z_x64-setup.exe`, `Kona_X.Y.Z_x64-setup.exe.sig` and `latest.json`. The first lines of the version's `CHANGELOG.md` entry become the notes on the update card.

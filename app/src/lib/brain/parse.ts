@@ -17,6 +17,13 @@ export type Section = {
   text: string; // the text with secrets hidden: this is what is indexed and shown in results
 };
 
+/** The tickets a note was written under: `ticket` is the first, `tickets` lists all of them when the note was saved again from another ticket. Kona writes both itself. */
+export function ticketsOf(meta: Record<string, string>): string[] {
+  const out: string[] = [];
+  for (const v of [meta.ticket, meta.tickets]) for (const t of (v ?? "").split(",").map((x) => x.trim())) if (/^T-\d{4,}$/.test(t) && !out.includes(t)) out.push(t);
+  return out;
+}
+
 export type Link = { raw: string; target: string | null; kind: "wiki" | "ref"; trust: "written" | "guessed"; line: number; heading?: string };
 
 export type Note = {
@@ -25,6 +32,8 @@ export type Note = {
   title: string;
   kind: string; // session, decision, open, topic, starter, memory, note
   meta: Record<string, string>;
+  /** the tickets it was written under, first one first (see ticketsOf) */
+  tickets: string[];
   readonly: boolean;
   mtime?: number;
   path?: string;
@@ -108,7 +117,7 @@ export function parseNote(r: RawNote): Note {
   const title = meta.title || meta.name || (firstHeading ? firstHeading.replace(/^#\s+/, "").trim() : r.id === "memory-index" ? "Memory index" : r.id);
   const kind = meta.kind || (r.layer === "starter" ? "starter" : r.layer === "memory" ? "memory" : "note");
   return {
-    id: r.id, layer: r.layer, title, kind, meta, readonly: r.readonly, mtime: r.mtime, path: r.path, raw: r.text, words: words(r.text),
+    id: r.id, layer: r.layer, title, kind, meta, tickets: ticketsOf(meta), readonly: r.readonly, mtime: r.mtime, path: r.path, raw: r.text, words: words(r.text),
     sections: sectionsOf(r.id, r.text, bodyStart, title), links: linksOf(r.text, bodyStart), secrets: redact(r.text).found,
   };
 }

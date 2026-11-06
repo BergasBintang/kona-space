@@ -1,6 +1,6 @@
 // Where the names go on the Brain map, so that no two names and no name and another dot sit on top of each other (decision: names never overlap).
-// Each name tries under its dot, above it, to the right and to the left, then a little further under and over; a name that fits nowhere is left off
-// (it still shows on hover and in the side panel). The chosen dot is placed first, then the most connected ones, so the names that matter win a crowded spot.
+// Each name tries under its dot, above it, to the right and to the left, then a little further under, over and to the sides, so the many names of a picked dot find room; a name that fits nowhere is left off
+// (it still shows in the side panel). The chosen dot is placed first, then the others in the order given (the most connected first), so the names that matter win a crowded spot.
 
 export type Box = [number, number, number, number]; // x0, y0, x1, y1 in map units
 export type Placed = { x: number; y: number; anchor: "start" | "middle" | "end" };
@@ -35,6 +35,8 @@ export function placeNames(opts: {
       { x: p.x, y: p.y + r + 14, anchor: "middle" }, { x: p.x, y: p.y - r - 7, anchor: "middle" },
       { x: p.x + r + 6, y: p.y + 4, anchor: "start" }, { x: p.x - r - 6, y: p.y + 4, anchor: "end" },
       { x: p.x, y: p.y + r + 29, anchor: "middle" }, { x: p.x, y: p.y - r - 22, anchor: "middle" },
+      { x: p.x + r + 6, y: p.y + 20, anchor: "start" }, { x: p.x - r - 6, y: p.y + 20, anchor: "end" }, { x: p.x + r + 6, y: p.y - 12, anchor: "start" }, { x: p.x - r - 6, y: p.y - 12, anchor: "end" },
+      { x: p.x, y: p.y + r + 44, anchor: "middle" }, { x: p.x, y: p.y - r - 37, anchor: "middle" },
     ];
     const boxOf = (t: Placed): Box => { const x0 = t.anchor === "middle" ? t.x - w / 2 : t.anchor === "start" ? t.x : t.x - w; return [x0, t.y - 11, x0 + w, t.y + 3]; };
     const free = tries.find((t) => { const b = boxOf(t); return !taken.some((o) => hit(b, o)) && !dots.some((d) => d.id !== id && hit(b, d.box)); });

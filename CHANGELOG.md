@@ -2,6 +2,12 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.38.2, 2026-11-08
+
+The dashed edge of every rug in the office lies the same distance inside its rim on all four sides.
+
+- **Rugs have an even edge.** The fill of a rug and its dashed edge were drawn by two different pixel rules, so the gap between the edge and the rim was 4, 4, 3 and 1 pixels on the four sides, and the bottom-right side nearly touched the rim (the gap moved round when the building was turned, and all ten rugs of the standard office were like this). Both are now drawn the same way and the gap is 4 pixels on every side, in all four views. A test measures the gap of every rug in all four views.
+
 ## 0.38.1, 2026-11-07
 
 A server with a Deploy and a Root login is told apart, long words wrap in the chat, and the file tree shows what changed in Git.

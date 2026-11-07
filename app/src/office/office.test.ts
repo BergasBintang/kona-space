@@ -475,3 +475,28 @@ test("a doorway is drawn as a gap with a post at each end, whatever its width", 
     assert.ok(posts.length >= gaps.length, `side ${view}: every gap has its posts drawn (${posts.length} pieces for ${gaps.length} gaps)`);
   }
 });
+
+test("a rug's dashed edge lies the same distance inside its rim on all four sides, in all four views", () => {
+  const hex = (g: { w: number; d: Uint8ClampedArray | Uint8Array }, x: number, y: number) => { const o = (y * g.w + x) * 4; return [g.d[o], g.d[o + 1], g.d[o + 2]].map((v) => v.toString(16).padStart(2, "0")).join(""); };
+  for (const o of STANDARD.objects.filter((r) => r.kind === "rug")) {
+    const rug = o as unknown as { i: number; j: number; w: number; d: number; c: string; c2: string };
+    for (let view = 0; view < 4; view++) {
+      const iso = new Iso(STANDARD.cols, STANDARD.rows, view), g = buildScene(STANDARD, view).ground;
+      const mid = iso.P(rug.i + rug.w / 2, rug.j + rug.d / 2);
+      const corners = [[rug.i, rug.j], [rug.i + rug.w, rug.j], [rug.i + rug.w, rug.j + rug.d], [rug.i, rug.j + rug.d]].map(([a, b]) => iso.P(a, b));
+      const gaps: number[] = [];
+      for (let k = 0; k < 4; k++) {
+        const a = corners[k], b = corners[(k + 1) % 4], y = Math.round((a[1] + b[1]) / 2), dir = (a[0] + b[0]) / 2 < mid[0] ? -1 : 1;
+        let state = 0, n = 0;
+        for (let x = Math.round(mid[0]); x > 0 && x < g.w; x += dir) {
+          const h = hex(g, x, y);
+          if (state === 0 && h === rug.c2.slice(1)) state = 1; else if (state === 1 && h !== rug.c2.slice(1)) state = 2;
+          if (state === 2) { if (h === rug.c.slice(1)) n++; else break; }
+        }
+        if (state === 2 && n <= 8) gaps.push(n); // a rug of the colour of the floor round it cannot be measured on every side
+      }
+      assert.ok(gaps.length >= 2, `rug at ${rug.i},${rug.j}, view ${view}: the gap could be measured`);
+      assert.ok(gaps.every((n) => n === 4), `rug at ${rug.i},${rug.j}, view ${view}: the gaps are ${gaps.join(", ")} pixels, they should all be 4`);
+    }
+  }
+});

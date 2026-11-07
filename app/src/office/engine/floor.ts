@@ -3,11 +3,12 @@
 import { Img } from "./img.ts";
 import { mix } from "./palette.ts";
 import { OUT } from "./palette.ts";
-import type { Iso } from "./iso.ts";
+import { OY, type Iso } from "./iso.ts";
 import type { Rug } from "./furniture.ts";
 import type { FloorStyle, OfficeMap } from "./types.ts";
 
 const TILE_PIC_X = 16;
+const EDGE_INSET = 0.125, EDGE_BAND = 0.0625; // a rug's dashed edge: how far inside the rim it lies, and how thick it is, in tiles
 const tiles = new Map<string, Img>();
 
 /** One tile: a diamond of `colour`, with `grout` on its rim when there is any. */
@@ -57,10 +58,15 @@ export function drawGround(map: OfficeMap, iso: Iso, rugs: Rug[], styleOf: Map<s
     if (r.pattern === "carpet") for (let k = 0; k < 4; k++) { const h = hash(i, j, k), p = iso.P(i + 0.15 + (h % 70) / 100, j + 0.15 + ((h >>> 8) % 70) / 100); img.set(Math.round(p[0]), Math.round(p[1]), r.floor[1]); }
   }
   // rugs
+  // The fill and its dashed edge are both drawn as filled shapes, so one rule of rounding applies to all four sides: the gap between the edge and the rim of the rug is the same
+  // on every side, in every view. (The edge used to be a drawn line, which rounds the other way: the gap was 4, 4, 3 and 1 pixels, and one side nearly touched the rim.)
+  // The edge is a band 1/16 tile thick, which is a run of two pixels on every row, and lies 1/8 tile inside the rim.
+  const px = (i: number, j: number): number[] => { const [u, v] = iso.rot(i, j); return [iso.OX + (u - v) * 16, OY + (u + v) * 8]; };
+  const shape = (g: Rug, inset: number) => [px(g.i + inset, g.j + inset), px(g.i + g.w - inset, g.j + inset), px(g.i + g.w - inset, g.j + g.d - inset), px(g.i + inset, g.j + g.d - inset)];
   for (const g of rugs) {
-    const P = iso.P;
-    img.poly([P(g.i, g.j), P(g.i + g.w, g.j), P(g.i + g.w, g.j + g.d), P(g.i, g.j + g.d)], g.c);
-    img.polyLine([P(g.i + 0.125, g.j + 0.125), P(g.i + g.w - 0.125, g.j + 0.125), P(g.i + g.w - 0.125, g.j + g.d - 0.125), P(g.i + 0.125, g.j + g.d - 0.125)], g.c2);
+    img.poly(shape(g, 0), g.c);
+    img.poly(shape(g, EDGE_INSET), g.c2);
+    img.poly(shape(g, EDGE_INSET + EDGE_BAND), g.c);
   }
   return img;
 }

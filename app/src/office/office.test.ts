@@ -8,10 +8,27 @@ import { WALL_PAGES } from "./engine/decor.ts";
 import { OUT, WALL_SHADES } from "./engine/palette.ts";
 import { Iso } from "./engine/iso.ts";
 import { ensurePages, missingPieces } from "./map.ts";
-import { addAttach, artHung, faceAt, growMap, isPlaced, moveObject, newObject, objectAt, paintFloor, placeObject, removeAttach, setParam, setWall, trimMap, turnObject, deleteObject } from "./edit.ts";
+import { addAttach, artHung, blankMap, isBlank, faceAt, growMap, isPlaced, moveObject, newObject, objectAt, paintFloor, placeObject, removeAttach, setParam, setWall, trimMap, turnObject, deleteObject } from "./edit.ts";
 import type { OfficeMap } from "./engine/types.ts";
+import { STYLES } from "./engine/styles.ts";
 
 const text = (m: OfficeMap) => JSON.stringify(m);
+
+test("a cleaned map is the same size with nothing on it, and every person and screen is missing again", () => {
+  const b = blankMap(STANDARD);
+  assert.equal(isBlank(STANDARD), false);
+  assert.equal(isBlank(b), true);
+  assert.deepEqual([b.cols, b.rows, b.floor.length, b.floor[0].length, b.walls.length, b.walls[0].length], [STANDARD.cols, STANDARD.rows, STANDARD.rows, STANDARD.cols, STANDARD.rows, STANDARD.cols]);
+  assert.equal(STANDARD.objects.length > 0, true, "the standard office itself is not changed");
+  assert.equal(missingPieces(b).length >= CAT_ROLES.length, true, "every person has to be placed again");
+  assert.doesNotThrow(() => checkMap(b));
+  assert.doesNotThrow(() => buildScene(b, 0), "an empty office can still be drawn");
+  // building up again works: a floor tile brings its style back
+  const p = paintFloor(b, 2, 2, STYLES[0].id);
+  assert.equal(p.floor[2][2], STYLES[0].id);
+  assert.equal(p.styles.length, 1);
+  assert.equal(isBlank(p), false);
+});
 
 test("the standard office is a good map and says nothing is wrong with it", () => {
   const r = parseMap(text(STANDARD));

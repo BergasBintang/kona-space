@@ -83,6 +83,7 @@ function Drawer({ project, roles, ticket, state, guardDone, onClose, onSaved, on
   }, [stamp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
+  useEffect(() => { document.querySelector<HTMLElement>('[role="dialog"][aria-modal] input[aria-label="Title"]')?.focus(); }, []);
 
   const save = async () => {
     setBusy(true); setError(null);
@@ -110,19 +111,17 @@ function Drawer({ project, roles, ticket, state, guardDone, onClose, onSaved, on
   const why = fresh ? "" : dirty ? "Save your changes first." : draft.role === "" ? "Choose a role first." : ticket!.status === "done" ? "This ticket is done." : "";
 
   return (
-    <aside aria-label={fresh ? "New ticket" : `Ticket ${ticket!.id}`} className="absolute inset-y-0 right-0 z-20 flex w-[500px] max-w-full flex-col border-l-2 border-line-strong bg-surface-1 px-shadow">
-      <div className="flex items-center justify-between gap-3 px-6 pt-6 pb-3">
+    // a dialog over the board, so the columns keep their whole width. It closes with Close or Esc, never with a click outside (a stray click must not throw away what was typed)
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-6" onKeyDown={(e) => { if (e.key === "Escape" && !e.defaultPrevented) { e.stopPropagation(); onClose(); } }}>
+    <div role="dialog" aria-modal="true" aria-label={fresh ? "New ticket" : `Ticket ${ticket!.id}`} className="px-card px-shadow flex max-h-full w-full max-w-[680px] flex-col">
+      <div className="flex items-center justify-between gap-3 px-3 pt-3 pb-3">
         <div className="flex min-w-0 flex-col gap-1">
           <span className="font-mono text-[13px] text-text-tertiary">{fresh ? "New ticket" : ticket!.id}</span>
           {!fresh && <span className="text-[13px] leading-5 text-text-tertiary">Raised by {ticket!.raised_by} · {ticket!.created}</span>}
         </div>
-        {/* a framed button with words and an arrow toward the edge it slides to, so it is never taken for the sheet's X above it */}
-        <Button variant="quiet" small onClick={onClose}>
-          {fresh ? "Cancel" : "Close ticket"}
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="shrink-0"><path d="M2 8 H10 M7 4.5 L10.5 8 L7 11.5 M13.5 3 V13" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="square" /></svg>
-        </Button>
+        <Button variant="quiet" small onClick={onClose}>{fresh ? "Cancel" : "Close"}</Button>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 pb-6">
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-3 pb-4">
         <label className="flex flex-col gap-2">
           <span className="text-[13px] leading-5 font-bold text-text-secondary">Title</span>
           <input value={draft.title} onChange={(e) => set({ title: e.target.value })} placeholder="Login page" aria-label="Title" className={`h-11 ${field}`} />
@@ -188,7 +187,7 @@ function Drawer({ project, roles, ticket, state, guardDone, onClose, onSaved, on
         )}
         {error && <div className="flex items-start gap-2.5 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
       </div>
-      <div className="flex flex-col gap-3 border-t border-line-subtle px-6 py-4">
+      <div className="flex flex-col gap-3 border-t border-line-subtle px-3 pt-4 pb-1">
         {!fresh && (
           <div className="flex items-center justify-between gap-3">
             <Button onClick={start} disabled={!canStart || busy}>{role ? `Start session as ${roleLabel(role)}` : "Start session"}</Button>
@@ -200,7 +199,8 @@ function Drawer({ project, roles, ticket, state, guardDone, onClose, onSaved, on
           <Button variant={fresh ? "primary" : "quiet"} onClick={save} disabled={!dirty || busy || draft.title.trim() === ""}>{fresh ? "Create ticket" : "Save"}</Button>
         </div>
       </div>
-    </aside>
+    </div>
+    </div>
   );
 }
 

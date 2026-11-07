@@ -12,7 +12,7 @@ import type { Guard } from "./Sheet";
 import { canvasOf, loadSheets, sceneOf, type Sheets } from "./Office";
 import { fitScale, pinchBoost } from "../lib/mapview";
 import { CAT_ROLES, checkMap, missingPieces, parseMap, STANDARD } from "../office/map";
-import { addAttach, artHung, attachCells, attachProblem, doorwayAxis, doorwayProblem, freeSideAt, deleteObject, faceAt, growMap, isPlaced, moveObject, newObject, objectAt, paintFloor, placeObject, removeAttach, setParam, setRugColours, setWall, trimMap, turnObject } from "../office/edit";
+import { addAttach, artHung, blankMap, isBlank, attachCells, attachProblem, doorwayAxis, doorwayProblem, freeSideAt, deleteObject, faceAt, growMap, isPlaced, moveObject, newObject, objectAt, paintFloor, placeObject, removeAttach, setParam, setRugColours, setWall, trimMap, turnObject } from "../office/edit";
 import { Pic, Thumb } from "./Thumb";
 import { Icon, IconButton } from "./Icon";
 import { thumbOfAttach, thumbOfDoorway, thumbOfWall } from "../office/engine/thumb";
@@ -26,7 +26,7 @@ import { PLACES } from "../lib/places";
 
 type Tool = "select" | "floor" | "wall" | "decor" | "doorway" | "furniture" | "erase";
 const TOOLS: { id: Tool; label: string; hint: string }[] = [
-  { id: "select", label: "Select and move", hint: "Click a thing to pick it up. Drag to move it. R turns it, Delete removes it." },
+  { id: "select", label: "Select and move", hint: "Click a thing to pick it up. Drag to move it. R turns it, Delete removes it. The arrow on a piece is its front: the side it faces." },
   { id: "floor", label: "Floor", hint: "Pick a floor, then click or drag on the plan to paint it. Paint over a tile to change its floor." },
   { id: "wall", label: "Walls", hint: "Click or drag to build walls. Start on a wall to take walls away." },
   { id: "decor", label: "On a wall", hint: "Pick what to hang, then click the wall tile, on the side it should face." },
@@ -144,8 +144,10 @@ export function OfficeEditor({ names, map, hasOwn, broken, guard, onSave, onRese
         ctx.fillStyle = GROUP_COLOUR[kd.group] ?? "#a8a89a"; ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
         ctx.strokeStyle = "#33241a"; ctx.lineWidth = 1; ctx.strokeRect(x + 2.5, y + 2.5, w - 5, h - 5);
         if (o.kind === "workstation") { ctx.fillStyle = "#2d2218"; ctx.font = `bold ${Math.max(9, cs * 0.45)}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(o.role ?? "?").slice(0, 3).toUpperCase(), x + w / 2, y + h / 2); }
-        const n = FACE_N[["j+", "i-", "j-", "i+"][(o.facing ?? 0)] as keyof typeof FACE_N]; // a small mark on the side its front looks towards
-        ctx.fillStyle = "#33241a"; ctx.fillRect(x + w / 2 - 3 + n[0] * (w / 2 - 4), y + h / 2 - 3 + n[1] * (h / 2 - 4), 6, 6);
+        // an arrow on the side its front looks towards: the tip at that edge, pointing out of the piece
+        const n = FACE_N[["j+", "i-", "j-", "i+"][(o.facing ?? 0)] as keyof typeof FACE_N], s = Math.min(6, Math.max(3, cs * 0.22));
+        const tipX = x + w / 2 + n[0] * (w / 2 - 3), tipY = y + h / 2 + n[1] * (h / 2 - 3), bx = tipX - n[0] * 2 * s, by = tipY - n[1] * 2 * s, px = -n[1] * s * 0.95, py = n[0] * s * 0.95;
+        ctx.fillStyle = "#33241a"; ctx.beginPath(); ctx.moveTo(tipX, tipY); ctx.lineTo(bx + px, by + py); ctx.lineTo(bx - px, by - py); ctx.closePath(); ctx.fill();
       }
       if (k === sel) { ctx.strokeStyle = "#1a6558"; ctx.lineWidth = 3; ctx.strokeRect(x + 1, y + 1, w - 2, h - 2); ctx.lineWidth = 1; }
     });
@@ -314,6 +316,7 @@ export function OfficeEditor({ names, map, hasOwn, broken, guard, onSave, onRese
           <Button variant="quiet" small onClick={() => { setMode((m) => (m === "plan" ? "3d" : "plan")); setSel(-1); setHover(null); }} aria-pressed={mode === "3d"}>{mode === "plan" ? "See in 3D" : "Back to the plan"}</Button>
           <IconButton icon="undo" label="Undo (Ctrl+Z)" onClick={doUndo} disabled={undo.current.length === 0 || mode === "3d"} />
           <IconButton icon="redo" label="Redo (Ctrl+Y)" onClick={doRedo} disabled={redo.current.length === 0 || mode === "3d"} />
+          <Button variant="quiet" small onClick={() => { commit(blankMap(draft)); setSel(-1); setTool("floor"); }} disabled={mode === "3d" || isBlank(draft)} title="Take everything off the plan and build the office from nothing. Undo (Ctrl+Z) brings it back.">Clean the map</Button>
           {hasOwn && <Button variant="quiet" small onClick={() => setAsks("reset")} disabled={busy}>Default map</Button>}
           <IconButton variant="primary" icon="save" label={busy ? "Saving…" : "Save"} onClick={() => void save()} disabled={busy || !dirty || blockers.length > 0} title={blockers.length > 0 ? "Fix what is listed under the plan first" : busy ? "Saving…" : "Save"} />
           <IconButton icon="close" label="Close (Esc)" onClick={() => leave(onClose)} />
@@ -488,7 +491,7 @@ function Grow({ side, onGrow }: { side: "left" | "right" | "top" | "bottom"; onG
   const word = side === "left" || side === "right" ? "column" : "row";
   return (
     <button type="button" onClick={onGrow} aria-label={`Add a ${word} on the ${side}`} title={`Add a ${word} on the ${side}`}
-      className="flex items-center justify-center border border-dashed border-line-strong bg-transparent p-0 text-text-tertiary opacity-70 hover:bg-surface-3 hover:text-text hover:opacity-100"><Icon name="plus" /></button>
+      className="px-btn px-btn-paper flex items-center justify-center p-0 opacity-80 hover:opacity-100"><Icon name="plus" /></button>
   );
 }
 

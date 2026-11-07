@@ -80,7 +80,7 @@ export function Needs({ project, role, kit, onKit, editable = false, refresh = 0
               <span className="font-bold">{roleLabel(r)}</span>
               <span className={r.installed ? "truncate font-mono text-[13px] text-text-secondary" : "text-state-left"}>{r.installed ? r.version : "Missing"}</span>
               <span className="ml-auto truncate text-[13px] text-text-tertiary">{why.get(r.id)?.join(" · ")}</span>
-              {canEdit && <button type="button" onClick={() => void hide(r.id)} aria-label={`${r.name} is not needed in ${project.name}`} title={`Not needed in ${project.name}: take it off this list`} className="shrink-0 border border-line-subtle px-1.5 text-[12px] leading-5 text-text-tertiary hover:bg-surface-3 hover:text-text">Not needed</button>}
+              {canEdit && <Button variant="quiet" tiny onClick={() => void hide(r.id)} aria-label={`${r.name} is not needed in ${project.name}`} title={`Not needed in ${project.name}: take it off this list`}>Not needed</Button>}
             </div>
             {!r.installed && (
               <div className="ml-[26px] flex items-center gap-3">
@@ -99,7 +99,7 @@ export function Needs({ project, role, kit, onKit, editable = false, refresh = 0
                 options={addable.map((c) => ({ value: c.id, label: c.name, hint: c.builtin ? c.program : `yours: ${c.program}` }))} onChange={(o) => { if (o) void add(o.value); }} />
             </div>
           )}
-          {hidden.length > 0 && <span className="flex flex-wrap items-center gap-2">Hidden for this project: {hidden.map((id) => <button key={id} type="button" onClick={() => void unhide(id)} title="Show it again" className="border border-line-subtle px-1.5 hover:bg-surface-3">{catalog.find((c) => c.id === id)?.name} ↺</button>)}</span>}
+          {hidden.length > 0 && <span className="flex flex-wrap items-center gap-2">Hidden for this project: {hidden.map((id) => <Button key={id} variant="quiet" tiny onClick={() => void unhide(id)} title="Show it again">Show {catalog.find((c) => c.id === id)?.name}</Button>)}</span>}
           {error && <span role="alert" className="font-bold text-state-left">{error}</span>}
         </div>
       )}

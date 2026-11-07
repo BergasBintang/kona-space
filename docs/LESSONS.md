@@ -16,7 +16,7 @@ Every line was paid for with a correction or a wasted hour. Before showing the o
 2. When a redesign replaces a screen, list what the old one had first. Nothing agreed may disappear without saying so.
 3. If a word could mean two things (they said "b-tree"), show a small picture of what you understood before building it. A wrong guess costs more than one question. Before saying a new idea overlaps something that exists, say what you think it is for and ask.
 4. When the owner says "I don't understand", take things away. More explaining text makes it worse.
-5. A question gets answered first, in plain words ("WHAT IS THIS?" means explain it). While the owner says "we are discussing", change nothing.
+5. A question gets answered first, in plain words ("WHAT IS THIS?" means explain it). While the owner says "we are discussing", change nothing. "Would that be a disaster, right?" is a question, not a request (it got a rebuild that was then undone).
 
 **Screens**
 
@@ -56,6 +56,8 @@ Every line was paid for with a correction or a wasted hour. Before showing the o
 24. Open choices go to the owner through the question tool, the recommended answer first. Ask only what has not been said.
 25. A piece placed in the office is looked at in the picture of the real office, from all four sides, and nothing stands beside a doorway (a test checks it).
 26. A page, a mockup or a button that people click is proven by clicking it in the real window. A test of its logic in Node proves only the logic: a form button that could not be sent passed every such test.
+27. A form or the details of a card open in a dialog (a button or Esc closes it), never below a list or in a panel that squeezes the page. Everything pressed is Kona's `Button` or `IconButton` in the pixel frame; a chosen choice uses `on`. No flat box with an onClick, no `×` or `↺` character as an icon. A card shows only what is true now; the rest is in Edit.
+28. The owner watches the dev window live, and every save reloads it. Save in an order that never leaves a reference to something not written yet (a missing component crashed the open page for a few seconds).
 
 ---
 
@@ -674,3 +676,30 @@ The owner closed the last ten tickets (T-0018 to T-0027), so all 27 are Done, an
 | I wrote the real project's name into the plan note | It was in my head from the work | Real project names stay out of files Git tracks (the tickets are local). Replaced with "a real project" before anything was committed |
 
 **Left behind:** a full backup of the first moved project's documents and notes in a folder outside the project and outside the repo, with a checksum list, until the owner says it can go; the throwaway projects of the proof runs and their transcripts were removed by the scripts; the dev window is still open.
+
+## 21. What was found in the session of 2026-11-06 to 2026-11-07 (Connections, Costs, the Brain notes list, real buttons, the Mockups note for agents)
+
+| Seen | Cause | Keep |
+|---|---|---|
+| "Why do I need to scroll down to edit or create a connection?" | The form was drawn after the last card of the list | A form that a button opens appears where the owner is looking: a dialog (lesson 27 of the benchmark) |
+| After the first dialog the owner listed five faults: a flat edge, a text box and its Choose button of different heights, no line between GitHub and servers, "the copy here and there is too much", cards with too much information | A thin border where Kona's pixel frame is the rule; `h-11` boxes beside `h-12` buttons; one list for two kinds; a button for every copy; every fact on the card | The frame is `px-card` / `px-btn`; every box and button in a row is 48 px; one group per kind with a heading, a count, a rule and its own Add; one Copy… menu; a card shows only what is true now |
+| Asked whether "All time" would be a disaster as a dot chart, I rebuilt the chart (weeks, months). The owner had only asked, then asked for the old one back | I treated a question as a request (benchmark 5) | Answer the question, say what I would change, and wait |
+| A bar scaled to the biggest row next to "42%" looked wrong (the first bar was full) | The bar and the percent had different denominators | A bar is the share of the same total the percent is |
+| The owner asked for read and written in two colours on the cost bars | The ledger keeps one dollar figure per turn (Claude Code's own), not one per kind of token. The usual price ratios did not fit 400 recorded turns (the implied price of Sonnet ran from 2.0 to 3.1) | Do not draw a number that cannot be measured. The split is shown in tokens, and the page says why (decision 84) |
+| A line that is 99.96% of the total shows "100%" next to a "<1%" line | Whole-number rounding | Left as it is on the owner's word. Kona's own helper calls (the Bako and Kibby chats) are filed as a "session" with 0 turns: also left |
+| The Report said "Nothing links to" about the project's own index ("where to start") | Every project note with nothing pointing at it counted as lost | A rule that flags a hub is tried on the real index note before it ships. A note with 5 links out and none in is an entry point (`ENTRY_LINKS`) |
+| "What is the small dot in every furniture?" | The front of a piece was a 6 px square that nothing explained | A mark has a shape that says what it is (an arrow) and a line in the "?" |
+| "You forgot to disable the chevron here" (the back arrow of the top bar, live inside the office editor) | The editor is not a sheet, so `sheetOpen` was false | Every screen that takes over the page counts as an open page for the top bar |
+| "Is there any button that is not a real button?" A sweep found 7 flat boxes that act as buttons, 6 kinds of choice control with a thin line, 49 plain "ghost" buttons and one round "?" | Each screen styled its own `<button>` | The fix is the benchmark line 27. Choice controls are a `Button` with `on`. The ghost buttons and the "?" were left on purpose |
+| A half-finished edit of the Servers page crashed the owner's open window for a few seconds (`KeyChip is not defined`) | The card used the new component before the component was written; every save reloads the dev window | Benchmark line 28: write the new piece first, then use it |
+| A Rust test string `"C:\p1"` written from a JavaScript template lost its backslash and would have stopped the build (lesson 23 again) | Backslashes in a JS template string are eaten before the Rust file is written | Paths in Rust test strings use slashes (`/p/one`). It was caught before the dev window rebuilt |
+| I dropped a closing `</div>` while replacing a block | A replace by text, with no check of the tags | Run `npx tsc --noEmit` straight after a block replace |
+| A session wrote in the brain that "the widths are not filled in yet, the owner will read them from the viewer" | Nothing in the starter notes, the skills or the prompts said how big the Mockups devices are, or that the viewer is built in | What a built-in tool of Kona does is written for agents: a starter note ("kona-mockups"), the skills that use it, and a test that checks the words against the file the viewer draws from (`devices.json`) |
+| Adding that starter note made an old question answer from it: "drag a card to In progress" found the Mockups note first, and the first-answer rate fell from 85.0% to 83.7% | The note used "card" and "drag" in everyday senses | After any starter note, run `node tests/search-eval.mjs`; reword the common words ("card" became "folder", "drag" became "move by hand"); add questions about the new note. The baseline is now TP 40, top-1 88.4% |
+| The owner asked about vector search for the Brain | At 27 notes the keyword search misses 2 of 10 "same idea, other words" questions; a model costs a 235 MB download, a second engine and the honest "Not in the brain" | Scrapped for now (decision 85). Revisit with hundreds of notes or repeated real misses; first try `aliases:` and one cheap Haiku rewrite |
+| "Deploy" was meant as a Kona release | The same word means a server in the Miralis repos | In the Miralis repos "deploy" means a server. In Kona, "deploy" and "release" mean the signed installer on GitHub (docs/RELEASING.md) |
+| "Wait, not like that, the usual way" after I started `npx tauri dev` | The README says `npm run tauri dev` (the same program). What the owner meant was never said | Open: ask once for the exact way, and write it in the README |
+
+**Checked by the owner, not by Claude:** the owner saw the Connections form and cards, the Costs lists and charts, the Brain notes list, the Board dialog and the notes list through pictures, and said the arrow on a piece "is better". Claude did not open these new screens in the window itself: they are proven by `tsc`, the unit tests and the owner's pictures only.
+
+**Not seen at all:** the sheet tabs and the Costs period as pressed-in chips (the header may sit 4 px taller), an answered question card in Chat with its disabled options, the + strips at the plan's edges, the Skill editor's new buttons, the Needs page, the per-hour chart on a busy day, the ticket dialog's pickers over the dialog, and the signed installer of this version on a machine with an older Kona.

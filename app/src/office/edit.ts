@@ -17,6 +17,14 @@ export function paintFloor(m: OfficeMap, i: number, j: number, id: string | null
   n.floor[j][i] = id; return n;
 }
 
+/** The same plan with nothing on it: no floor, no walls, nothing on a wall, no furniture. The size stays. The owner builds the office from the ground up. */
+export function blankMap(m: OfficeMap): OfficeMap {
+  return { ...m, styles: [], floor: m.floor.map((row) => row.map(() => null)), walls: m.walls.map((row) => row.map(() => false)), attach: [], objects: [] };
+}
+
+/** Is there nothing on the plan at all? */
+export const isBlank = (m: OfficeMap): boolean => m.objects.length === 0 && m.attach.length === 0 && !m.walls.some((r) => r.some(Boolean)) && !m.floor.some((r) => r.some((f) => f != null));
+
 /** Give a rug one of Kona's colour pairs. */
 export function setRugColours(m: OfficeMap, k: number, c: string, c2: string): OfficeMap {
   const o = m.objects[k];

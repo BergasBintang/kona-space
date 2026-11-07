@@ -12,7 +12,8 @@ import { Button, Glyph } from "../ui";
 import { Confirm } from "../Confirm";
 import { Ask } from "./Ask";
 import { MapView } from "./MapView";
-import { Chip, LAYER_WORD, NoteView } from "./NoteView";
+import { LAYER_WORD, NoteView } from "./NoteView";
+import { Select } from "../pick";
 import { Report } from "./Report";
 import { Help } from "../Help";
 
@@ -33,6 +34,8 @@ export function BrainPlace({ project, tab, onTab, onAsk }: { project: Project; t
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [auto, setAuto] = useState(autoNoteOn());
+  const [dirty, setDirty] = useState(false); // the open note has text typed that is not saved
+  const [leave, setLeave] = useState<(() => void) | null>(null); // what the owner asked for while a note had unsaved text: done only after they agree
   // a tab pressed in the title bar leaves an open note or answer; a tab this page picks itself (after saving a note) keeps it
   const own = useRef(tab);
   const goTab = (t: BrainTab) => { own.current = t; onTab(t); };
@@ -54,11 +57,14 @@ export function BrainPlace({ project, tab, onTab, onAsk }: { project: Project; t
     const question = redact(q.trim()).text;
     if (!q.trim()) return;
     const result = brain.search(question);
-    setAsked({ question, result }); setOpen(null);
     if (result.state === "none") wantedAdd(project.id, question).then(setWanted).catch(() => {});
+    leaving(() => { setAsked({ question, result }); setOpen(null); });
   };
-  const openNote = (id: string) => { setOpen(id); setAsked(null); };
-  const writeNote = (title: string) => { setDraftTitle(title); setOpen(""); setAsked(null); };
+  /** do this, but first ask when the open note has text that is not saved */
+  const leaving = (go: () => void) => { if (dirty) setLeave(() => go); else go(); };
+  // opening a note, or starting one, always shows it on the Notes page: the list stays on the left and the note is on the right
+  const openNote = (id: string) => leaving(() => { setOpen(id); setAsked(null); goTab("notes"); });
+  const writeNote = (title: string) => leaving(() => { setDraftTitle(title); setOpen(""); setAsked(null); goTab("notes"); });
   const changed = (id: string | null) => {
     // a note written for a wanted question answers it: the question comes off the list
     const answered = id && draftTitle ? wanted.find((w) => w.question === draftTitle) : undefined;
@@ -74,34 +80,44 @@ export function BrainPlace({ project, tab, onTab, onAsk }: { project: Project; t
   let fill = false; // the map fills the page down to the bottom edge; the other pages are lists that scroll
   if (error) body = <div className="flex items-start gap-2.5 text-[14px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>;
   else if (data === null) body = <p className="m-0 text-text-tertiary">Reading the notes…</p>;
-  else if (open !== null && (open === "" || openNoteObj)) {
-    body = <NoteView key={open} projectId={project.id} accountId={project.account ?? null} brain={brain} note={open === "" ? null : openNoteObj} draftTitle={draftTitle} onOpen={openNote} onClose={() => setOpen(null)} onChanged={changed} />; fill = true;
-  } else if (asked) {
+  else if (tab !== "notes" && asked) {
     body = (
       <Ask question={asked.question} result={asked.result} onOpen={(id) => openNote(id)} onClose={() => setAsked(null)} onWrite={() => writeNote(asked.question)} onWeb={() => setWeb(asked.question)}
         onAskClaude={async () => { setBusy(true); try { await onAsk(asked.question); } catch (e) { setError(String(e)); } finally { setBusy(false); } }} />
     );
   } else if (tab === "map") { body = <MapView brain={brain} onOpen={openNote} />; fill = true; }
   else if (tab === "notes") {
+    // like the Files place: the list stays on the left, what is picked is read on the right, and nothing has to be closed to read the next one
+    const right = open !== null && (open === "" || openNoteObj)
+      ? <NoteView key={open} projectId={project.id} accountId={project.account ?? null} brain={brain} note={open === "" ? null : openNoteObj} draftTitle={draftTitle} onOpen={openNote} onClose={() => setOpen(null)} onChanged={changed} onDirty={setDirty} />
+      : asked
+        ? (
+          <Ask question={asked.question} result={asked.result} onOpen={(id) => openNote(id)} onClose={() => setAsked(null)} onWrite={() => writeNote(asked.question)} onWeb={() => setWeb(asked.question)}
+            onAskClaude={async () => { setBusy(true); try { await onAsk(asked.question); } catch (e) { setError(String(e)); } finally { setBusy(false); } }} />
+        )
+        : <p className="m-0 p-2 text-text-tertiary">Pick a note on the left to read it.</p>;
+    const row = "flex flex-col gap-0.5 px-2.5 py-1.5 text-left";
     body = (
-      <div className="flex flex-col gap-4">
-        <div role="group" aria-label="Layer" className="flex self-start border border-line-strong p-0.5">
-          {([["all", "All"], ["project", "Project"], ["starter", "Starter"], ["memory", "Claude's memory"]] as const).map(([id, word]) => (
-            <button key={id} type="button" aria-pressed={layer === id} onClick={() => setLayer(id)} className={`h-9 px-3.5 text-[14px] ${layer === id ? "bg-surface-3 font-bold text-text" : "text-text-secondary hover:text-text"}`}>{word}{id !== "all" ? ` (${counts[id]})` : ""}</button>
-          ))}
+      <div className="flex min-h-0 flex-1 gap-6">
+        <div className="flex min-h-0 w-[250px] shrink-0 flex-col gap-3">
+          <Select ariaLabel="Layer" value={layer} onChange={(v) => setLayer(v as Layer | "all")} search={false}
+            options={([["all", "All notes"], ["project", "Project"], ["starter", "Starter"], ["memory", "Claude's memory"]] as const).map(([id, word]) => ({ value: id, label: `${word} (${id === "all" ? brain.notes.size : counts[id]})` }))} />
+          <div role="list" aria-label="Notes" className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+            {open === "" && <span className={`${row} bg-surface-3`}><span className="text-[14px] leading-5 font-bold">New note</span><span className="text-[12px] leading-4 text-text-tertiary">Not saved yet</span></span>}
+            {data?.memory_dir === null && layer === "memory" && <p className="m-0 p-2 text-[14px] leading-5 text-text-tertiary">Claude has no memory folder for this project yet.</p>}
+            {noteList.map((n) => (
+              <button key={n.id} type="button" role="listitem" title={n.title} aria-current={open === n.id ? "true" : undefined} onClick={() => openNote(n.id)}
+                className={`${row} ${open === n.id ? "bg-surface-3" : "hover:bg-surface-2"}`}>
+                <span className={`line-clamp-2 text-[13px] leading-[18px] ${open === n.id ? "font-bold text-text" : "text-text"}`}>{n.title}</span>
+                <span className="truncate text-[12px] leading-4 text-text-tertiary">{LAYER_WORD[n.layer]}{n.tickets.length ? ` · ${n.tickets.join(", ")}` : ""}</span>
+              </button>
+            ))}
+          </div>
         </div>
-        {data?.memory_dir === null && layer === "memory" && <p className="m-0 text-[14px] leading-5 text-text-tertiary">Claude has no memory folder for this project yet.</p>}
-        {noteList.map((n) => (
-          <button key={n.id} type="button" onClick={() => openNote(n.id)} className="flex items-start justify-between gap-4 border border-line-subtle bg-surface-1 p-4 text-left hover:bg-surface-2">
-            <span className="flex min-w-0 flex-col gap-1.5">
-              <span className="truncate text-[15px] leading-6 font-bold">{n.title}</span>
-              <span className="line-clamp-2 text-[13px] leading-5 text-text-secondary">{n.sections[0]?.text.split("\n").map((l) => l.trim()).find((l) => l && !/^#/.test(l))?.replace(/[*`]/g, "")}</span>
-            </span>
-            <span className="flex shrink-0 flex-col items-end gap-1.5"><Chip>{LAYER_WORD[n.layer]}</Chip>{n.tickets.map((t) => <Chip key={t}>{t}</Chip>)}<span className="text-[12px] text-text-tertiary">{brain.outgoing(n.id).length} out · {brain.incoming(n.id).length} in</span></span>
-          </button>
-        ))}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">{right}</div>
       </div>
     );
+    fill = true;
   } else body = <Report brain={brain} wanted={wanted} onOpen={openNote} onWrite={writeNote} onDrop={(question) => { void wantedRemove(project.id, question).then(setWanted); }} />;
 
   return (
@@ -127,6 +143,11 @@ export function BrainPlace({ project, tab, onTab, onAsk }: { project: Project; t
       </div>
       <div className={`flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-8 pt-6 ${fill ? "pb-8" : "pb-10"}`}>{body}</div>
 
+      {leave && (
+        <Confirm title="Leave this note?" confirmLabel="Leave without saving" danger onConfirm={() => { const go = leave; setLeave(null); setDirty(false); go(); }} onCancel={() => setLeave(null)}>
+          <p className="m-0">What you typed in this note is not saved yet. If you leave, it is lost.</p>
+        </Confirm>
+      )}
       {web && (
         <Confirm title="Search the web for this?" confirmLabel="Open my browser" onConfirm={() => { void openUrl(`https://duckduckgo.com/?q=${encodeURIComponent(web)}`); setWeb(null); }} onCancel={() => setWeb(null)}>
           <p className="m-0">Your browser opens a search with exactly these words. They are sent to the search site, so leave out anything private.</p>

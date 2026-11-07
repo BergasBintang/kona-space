@@ -2,6 +2,18 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.37.0, 2026-11-07
+
+Servers is now Connections, the Costs page shows every cut at once, and the Brain's notes read like files.
+
+- **Connections.** The Servers screen holds two kinds of entry, a server and a GitHub repo, so it has a new name and two groups, each with a heading, a count and its own Add button. A card shows only what is true now: the address, who may use it, whether the key and the fingerprint are there. One **Copy…** button hands out the ssh config entry, the git address or the entry for a server that pulls the repo, and the copied text reads like a hand-written file (`~/.ssh/…`). Adding and editing open a dialog, not a form below the list. A GitHub repo has a **Port**: a network that blocks github.com on port 22 can use ssh.github.com and 443. Kona still never writes your ssh config.
+- **A role is told which servers it may reach.** The session starts with the list, with what to type after ssh, and a refusal ends with the list that role may use.
+- **Costs shows every cut at once.** A chart of dots with a smooth line (one dot per hour today, per day for 7 days, 30 days and all time up to the last 60 days), then lists by role, ticket, model and the most expensive sessions, with dollars in cents and a bar that is the share of the whole. A click on a line shows the tokens Claude read (new and from the cache) against what it wrote.
+- **The Brain's Notes: a list on the left, the note on the right,** like Files, so nothing has to be closed to read the next note. A note's outline is on the left of it and closes to a thin strip with an icon that opens it again. The Report no longer says that nothing links to the page a project starts from. The ticket details open as a dialog.
+- **Real buttons.** The tabs of a page, the period of Costs, the choices on a question card, the small tags and the strips that grow the office plan are buttons in the pixel frame, and the chosen one sits pressed in. The close button of a page is a button.
+- **The office editor** has a **Clean the map** button (undo brings it back), an arrow for the front of every piece, and the top bar's back arrow is off while you edit.
+- **Agents know the Mockups sizes.** A new starter note, and the skills that draw a mockup, say how big each of the five devices is (320 x 568, 390 x 844, 768 x 1024, 1024 x 640 and 1440 x 900), that the viewer is built into Kona, and where a mockup is saved.
+
 ## 0.36.0, 2026-11-06
 
 The Brain map, and one source of truth for a project's notes and documents.

@@ -74,7 +74,7 @@ try {
   await c.ev(`(() => { const b = document.querySelector('section button[aria-label^="Close"]'); if (b) b.click(); return true; })()`);
   await wait(500);
 
-  ok("the Servers screen opens", await c.ev(`(() => { const e = document.querySelector('[aria-label="Open Servers"]'); if (!e) return false; e.click(); return true; })()`) && await c.waitFor(`!!document.querySelector('section[aria-label="Web"]')`, 8000, 100));
+  ok("the Servers screen opens", await c.ev(`(() => { const e = document.querySelector('[aria-label="Open Connections"]'); if (!e) return false; e.click(); return true; })()`) && await c.waitFor(`!!document.querySelector('section[aria-label="Web"]')`, 8000, 100));
   ok("both Add buttons are there", await c.ev(`['Add a server', 'Add a GitHub repo'].every((l) => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === l))`));
 
   // the repo form: a bad repo is refused with a plain message
@@ -101,11 +101,11 @@ try {
   const card = await sectionText("Demo repo");
   console.log("     card: " + card);
   ok("the card shows the git address with the nickname", card.includes("git@github-demo:Owner/demo.git"));
-  ok("the read and write key is found", /Read and write key, this PC\s*·\s*Key file found/.test(card));
-  ok("the read-only key on this PC is reported missing", /Read-only key, this PC\s*·\s*Key file not found/.test(card));
-  ok("it says which server pulls it and where the key is there", card.includes("Pulled by Web") && card.includes("~/.ssh/demo_ro"));
-  ok("it has the copy buttons", await c.ev(`['Copy git address', 'Copy ssh config entry', 'Copy server entry', 'Read the fingerprint…'].every((l) => [...document.querySelector('section[aria-label="Demo repo"]').querySelectorAll('button')].some((b) => b.textContent.trim() === l))`));
-  ok("Copy server entry answers Copied", await press("Copy server entry", `document.querySelector('section[aria-label="Demo repo"]')`) && await c.waitFor(`[...document.querySelector('section[aria-label="Demo repo"]').querySelectorAll('button')].some((b) => b.textContent.trim() === 'Copied')`, 3000, 100));
+  ok("the read and write key is found", /Read and write key found/.test(card));
+  ok("the read-only key on this PC is reported missing", /Read-only key: file not found/.test(card));
+  ok("it says which server pulls it and where the key is there", card.includes("Pulled by Web"));
+  ok("it has the copy buttons", await c.ev(`['Copy…', 'Read the fingerprint…'].every((l) => [...document.querySelector('section[aria-label="Demo repo"]').querySelectorAll('button')].some((b) => b.textContent.trim() === l))`));
+  ok("Copy… offers the git address, the ssh config entry and the entry for Web, and a choice answers Copied", await press("Copy…", `document.querySelector('section[aria-label="Demo repo"]')`) && await c.ev(`['Git address', 'ssh config entry', 'Entry for Web'].every((l) => [...document.querySelectorAll('[role="menuitem"]')].some((b) => b.textContent.trim() === l))`) && await press("Entry for Web", `document.querySelector('section[aria-label="Demo repo"]')`) && await c.waitFor(`[...document.querySelector('section[aria-label="Demo repo"]').querySelectorAll('button')].some((b) => b.textContent.trim() === 'Copied')`, 3000, 100));
   await shot("repo-card");
   const saved = (await invoke("ssh_list", { projectId: id })).find((h) => h.label === "Demo repo");
   ok("it was saved as a repo with the clean name, user git and port 22", saved?.kind === "github" && saved.repo === "Owner/demo" && saved.user === "git" && saved.port === 22 && saved.real_host === HOST, JSON.stringify(saved && { kind: saved.kind, repo: saved.repo, user: saved.user, port: saved.port }));

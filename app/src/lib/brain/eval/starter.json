@@ -58,5 +58,8 @@
   { "q": "what is the colour of the Kona logo", "kind": "near-miss" },
   { "q": "how do I rotate my API key", "kind": "near-miss" },
   { "q": "what does the meeting room in Kona do", "kind": "near-miss" },
-  { "q": "how do I change the font of the file reader", "kind": "near-miss" }
+  { "q": "how do I change the font of the file reader", "kind": "near-miss" },
+  { "q": "what size is the phone in the mockup viewer", "kind": "exact", "needles": ["390 × 844"] },
+  { "q": "which devices does the mockup viewer draw", "kind": "exact", "needles": ["The viewer draws five devices"] },
+  { "q": "where is a mockup saved in the project", "kind": "exact", "needles": [".kona/mockups/<card>/"] }
 ]

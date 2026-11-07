@@ -273,7 +273,8 @@ export class Brain {
     for (const n of this.notes.values()) {
       for (const l of n.links) if (!l.target && mine(n)) warn("broken-link", `“${n.title}” links to [[${l.raw}]], which does not exist`, n.id, l.line);
       if (mine(n) && n.layer === "project" && this.incoming(n.id).length === 0 && this.outgoing(n.id).length === 0) warn("orphan", `“${n.title}” has no links in or out`, n.id);
-      else if (mine(n) && n.layer === "project" && this.incoming(n.id).length === 0) warn("orphan", `Nothing links to “${n.title}”`, n.id);
+      // a note that links out to many notes and that nothing links to is the way in (an index, a "where to start" page), not a lost note: nothing needs to point at the door
+      else if (mine(n) && n.layer === "project" && this.incoming(n.id).length === 0 && this.outgoing(n.id).length < ENTRY_LINKS) warn("orphan", `Nothing links to “${n.title}”`, n.id);
       // a title that names a ticket other than the ones the note was written under (Kona stamped those itself) may be about the wrong ticket
       if (n.layer === "project" && n.tickets.length > 0) {
         const named = (n.title.match(/\bT-\d{4,}\b/g) ?? []).filter((t) => !n.tickets.includes(t));
@@ -522,6 +523,8 @@ export class Brain {
 
 /** The note every session starts from; the map keeps it in the middle. */
 export const CENTRE_NOTE = "start-here";
+/** A project note with at least this many links out and none in is an entry point (an index), so the report does not say "nothing links to it". */
+const ENTRY_LINKS = 5;
 
 /** The margin the circle round a group keeps past its farthest dot. */
 export const GROUP_PAD = 34;

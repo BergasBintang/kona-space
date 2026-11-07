@@ -108,6 +108,15 @@ impl Ledger {
     }
 }
 
+/// What one project's folder spent in one (local) hour: the points of the Costs page's chart for today.
+#[derive(serde::Serialize)]
+pub struct HourRow {
+    pub folder: Option<String>,
+    /// local time, `YYYY-MM-DD HH`
+    pub hour: String,
+    pub cost: f64,
+}
+
 /// One line of the cost views: what one session spent on one model on one (local) day.
 #[derive(serde::Serialize)]
 pub struct CostRow {
@@ -167,6 +176,17 @@ impl Ledger {
         ids.iter().map(|id| conn.query_row("SELECT IFNULL(SUM(cost_usd), 0) FROM usage_turn WHERE session_id = ?1", params![id], |r| r.get::<_, f64>(0)).unwrap_or(0.0)).sum()
     }
 
+    /// The ledger, summed per folder and local hour, from `since_day` (YYYY-MM-DD, local) on.
+    pub fn cost_hours(&self, since_day: &str) -> Vec<HourRow> {
+        let conn = self.conn.lock().unwrap();
+        let Ok(mut st) = conn.prepare(
+            "SELECT folder, strftime('%Y-%m-%d %H', at, 'localtime') AS hour, SUM(cost_usd)
+             FROM usage_turn WHERE date(at, 'localtime') >= ?1 GROUP BY folder, hour ORDER BY hour",
+        ) else { return vec![] };
+        let rows = st.query_map(params![since_day], |r| Ok(HourRow { folder: r.get(0)?, hour: r.get(1)?, cost: r.get(2)? }));
+        match rows { Ok(it) => it.filter_map(Result::ok).collect(), Err(_) => vec![] }
+    }
+
     /// The ledger, summed per session, model and local day, from `since_day` (YYYY-MM-DD, local) on. The screen groups it any way it likes.
     pub fn cost_rows(&self, since_day: Option<&str>) -> Vec<CostRow> {
         let conn = self.conn.lock().unwrap();
@@ -183,5 +203,31 @@ impl Ledger {
             })
         });
         match rows { Ok(it) => it.filter_map(Result::ok).collect(), Err(_) => vec![] }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cost_hours_sums_per_folder_and_hour() {
+        let path = std::env::temp_dir().join(format!("kona-ledger-hours-{}", std::process::id())).join("kona.db");
+        let _ = std::fs::remove_file(&path);
+        let ledger = Ledger::open(&path).unwrap();
+        {
+            let conn = ledger.conn.lock().unwrap();
+            // two turns in one hour, one two hours later, and one for another folder; minutes 20 and 25 stay in one hour in any time zone
+            for (folder, at, cost) in [("/p/one", "2030-05-04T10:20:00.000Z", 0.25), ("/p/one", "2030-05-04T10:25:00.000Z", 0.50), ("/p/one", "2030-05-04T12:20:00.000Z", 1.0), ("/p/two", "2030-05-04T10:20:00.000Z", 4.0)] {
+                conn.execute("INSERT INTO usage_turn (session_id, folder, turn, at, model, input_tokens, output_tokens, cache_read, cache_write, cost_usd) VALUES ('s', ?1, 1, ?2, 'm', 1, 1, 0, 0, ?3)", params![folder, at, cost]).unwrap();
+            }
+        }
+        let rows = ledger.cost_hours("2000-01-01");
+        let p1: Vec<f64> = rows.iter().filter(|r| r.folder.as_deref() == Some("/p/one")).map(|r| r.cost).collect();
+        assert_eq!(p1.len(), 2, "two hours for the first folder: {:?}", rows.iter().map(|r| (&r.hour, r.cost)).collect::<Vec<_>>());
+        assert!((p1[0] - 0.75).abs() < 1e-9 && (p1[1] - 1.0).abs() < 1e-9, "{p1:?}");
+        assert_eq!(rows.iter().filter(|r| r.folder.as_deref() == Some("/p/two")).count(), 1);
+        assert!(rows.iter().all(|r| r.hour.len() == 13), "the hour reads YYYY-MM-DD HH");
+        assert!(ledger.cost_hours("2031-01-01").is_empty(), "nothing before the day asked for is counted");
     }
 }

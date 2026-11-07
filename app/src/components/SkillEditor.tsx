@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { readSkill, readSkillFiles, saveSkillFolder, type SkillInfo } from "../lib/api";
 import { KINDS, addLine, composeSkill, newPath, pathProblem, renameIn, unmentioned, type FileKind } from "../lib/skillfiles";
 import { Button } from "./ui";
+import { IconButton } from "./Icon";
 import { Help } from "./Help";
 
 const field = "bare border border-line-strong bg-inset px-3 text-[15px] text-text placeholder:text-text-tertiary";
@@ -108,14 +109,14 @@ export function SkillEditor({ folder, name, onSaved, onClose }: { folder: string
               {items.map((it, n) => (
                 <div key={it.key} className="flex items-stretch">
                   {fileButton(it.key, it.path, it.text === null ? `Cannot be changed here, ${Math.ceil(it.bytes / 1024)} KB` : KINDS.find((k) => it.path.startsWith(`${k.id}/`))?.label ?? "A file", !!problems[n])}
-                  <button type="button" aria-label={`Remove ${it.path}`} title="Remove this file" onClick={() => remove(it)} className="w-8 shrink-0 text-[15px] text-text-tertiary hover:bg-surface-3 hover:text-text">×</button>
+                  <IconButton icon="trash" label={`Remove ${it.path}`} title="Remove this file" onClick={() => remove(it)} className="self-center" />
                 </div>
               ))}
             </div>
             <div className="flex flex-col gap-1.5 border-t border-line-subtle pt-3">
               <span className="font-sans text-[13px] leading-5 font-bold text-text-secondary">Add to the folder</span>
               {KINDS.map((k) => (
-                <button key={k.id} type="button" onClick={() => add(k.id)} title={k.hint} className="flex flex-col border border-line-subtle bg-surface-2 px-2 py-1.5 text-left hover:bg-surface-3">
+                <button key={k.id} type="button" onClick={() => add(k.id)} title={k.hint} className="px-btn px-btn-paper flex flex-col px-2 py-1 text-left">
                   <span className="text-[14px] leading-5">+ {k.label}</span>
                   <span className="font-sans text-[12px] leading-4 tracking-normal text-text-tertiary">{k.hint}</span>
                 </button>

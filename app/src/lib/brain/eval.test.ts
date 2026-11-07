@@ -28,11 +28,12 @@ test("holds() ignores case, accents, spacing and markdown marks", () => {
 test("the search on the starter notes is no worse than the baseline", () => {
   const { summary: s, rows } = evaluate(new Brain(starter), questions);
   const wrong = rows.filter((r) => r.outcome === "FN" || r.outcome === "FP" || r.confidentWrong).map((r) => `${r.outcome} ${r.q}`).join("; ");
-  // baseline 2026-11-06 (after the starter notes learned that a document is a note): TP 37, FN 3, FP 4, TN 11, one confident wrong answer, top-1 85.0%
-  assert.ok(s.TP >= 37, `true positives fell to ${s.TP}: ${wrong}`);
+  // baseline 2026-11-07 (after the starter note about the Mockups viewer and three questions about it): TP 40, FN 3, FP 4, TN 11, one confident wrong answer, top-1 88.4%
+  // (2026-11-06: TP 37, top-1 85.0%, before that note)
+  assert.ok(s.TP >= 40, `true positives fell to ${s.TP}: ${wrong}`);
   assert.ok(s.FN <= 3, `false negatives rose to ${s.FN}: ${wrong}`);
   assert.ok(s.FP <= 4, `false positives rose to ${s.FP}: ${wrong}`);
   assert.ok(s.TN >= 11, `true negatives fell to ${s.TN}: ${wrong}`);
   assert.ok(s.confidentWrong <= 1, `confident wrong answers rose to ${s.confidentWrong}: ${wrong}`);
-  assert.ok(s.top1 >= 0.85, `the first shown section is right less often: ${(s.top1 * 100).toFixed(1)}%`);
+  assert.ok(s.top1 >= 0.88, `the first shown section is right less often: ${(s.top1 * 100).toFixed(1)}%`);
 });

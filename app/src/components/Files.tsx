@@ -13,7 +13,7 @@ import { Button, Glyph } from "./ui";
 import { IconButton } from "./Icon";
 import { FileInfo } from "./FileInfo";
 import { Markdown } from "./brain/Markdown";
-import { FindBar, Gutter, Outline, useReader } from "./brain/Reader";
+import { FindBar, Gutter, Outline, OutlineRail, useOutlineOpen, useReader } from "./brain/Reader";
 
 const QUIET = new Set([".git", "node_modules", "target", "dist", ".kona", "__pycache__", ".next", ".venv"]);
 const SEP = /[\\/]/;
@@ -369,6 +369,8 @@ function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onF
   // the outline, find and the jump to a heading are shared with the Brain's note page (brain/Reader.tsx)
   const reader = useReader({ text: text ? text.text : null, md, rendered, finds: !!finds, anchor, resetKey: entry?.path ?? null });
   const { heads, active, jump, finding, body, scroller } = reader;
+  const [outlineOpen, setOutlineOpen] = useOutlineOpen();
+  const hasOutline = md && rendered && heads.length >= 3;
   useEffect(() => { setAbout(false); }, [entry?.path]);
 
   if (!entry) {
@@ -391,11 +393,11 @@ function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onF
       <HtmlFrame key={entry.path} html={view.text} path={entry.path} bound={project.folder} name={entry.name} slot={zoomSlot} />
     ) : md && rendered ? (
       <div className="flex min-h-0 flex-1">
+        {hasOutline && (outlineOpen ? <Outline heads={heads} active={active} onJump={jump} onClose={() => setOutlineOpen(false)} /> : <OutlineRail onOpen={() => setOutlineOpen(true)} />)}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           {view.truncated && <div className="px-8 pb-2 text-[13px] leading-5 text-text-tertiary">Only the first 2 MB are shown.</div>}
           <div ref={scroller} className="min-h-0 flex-1 overflow-auto px-8 py-5"><div className="max-w-[calc(1180px*var(--k))]"><Markdown text={view.text} resolve={() => null} open={() => {}} wiki={false} front go={onFollow} /></div></div>
         </div>
-        {heads.length >= 3 && <Outline heads={heads} active={active} onJump={jump} />}
       </div>
     ) : (
       <div className="flex min-h-0 flex-1 flex-col">

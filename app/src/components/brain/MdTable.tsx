@@ -28,8 +28,7 @@ function Choice({ label, value, options, onChange }: { label: string; value: str
     <div role="group" aria-label={label} className="flex items-center gap-2">
       <span className="text-[13px] leading-5 font-bold text-text-secondary">{label}</span>
       {options.map(([v, text]) => (
-        <button key={v} type="button" aria-pressed={v === value} onClick={() => onChange(v)}
-          className={`h-8 border-2 px-2.5 text-[14px] ${v === value ? "border-accent bg-surface-3 text-text" : "border-line-subtle bg-surface-2 text-text-secondary hover:bg-surface-3"}`}>{text}</button>
+        <Button key={v} variant="quiet" tiny aria-pressed={v === value} on={v === value} onClick={() => onChange(v)}>{text}</Button>
       ))}
     </div>
   );

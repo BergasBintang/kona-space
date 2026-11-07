@@ -5,7 +5,7 @@ description: Use when asked to draw or mock up a page, a flow or a few options a
 
 # Make a mockup
 
-A mockup is a small web page that runs by itself, with made-up data, so the owner can click through it in the Mockups sheet (the big screen in the Lounge) at phone, tablet and desktop widths. It is not the real code. Say what you will draw before you draw it.
+A mockup is a small web page that runs by itself, with made-up data, so the owner can click through it in the Mockups sheet (the big screen in the Lounge), which is built into Kona. The sheet draws five devices and runs the page at the true size of each, so its media queries answer to the device, not to the window: Small phone 320 x 568, Phone 390 x 844, Tablet 768 x 1024, Laptop 1024 x 640 and Desktop 1440 x 900 (the two phones and the tablet also turn on their side). Search the Brain for "kona-mockups" for more. It is not the real code. Say what you will draw before you draw it.
 
 ## Where it goes
 
@@ -53,5 +53,5 @@ It runs in a sandbox, so some things that work in a browser do not here.
 ## Before you say it is done
 
 1. Run the check, or read the four points by hand.
-2. Open each page and say which widths you looked at. If you did not open it in the Mockups sheet, say so; do not say it looks right.
+2. Open each page and say which widths you looked at (320, 390, 768, 1024 and 1440). If you did not open it in the Mockups sheet, say so; do not say it looks right.
 3. Tell the owner: the card name and where it is, how to open it (the big screen in the Lounge), the accounts and what each shows, every `[TBD]`, and what you did not check.

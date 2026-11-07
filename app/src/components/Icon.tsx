@@ -213,6 +213,7 @@ const ICONS = {
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const d = Math.hypot(x + 0.5 - 8, y + 0.5 - 8); if (d >= 5.6 && d <= 7.5) p(x, y); }
     rect(p, 7, 4, 8, 5); rect(p, 7, 7, 8, 11);
   },
+  outline: (p) => { for (const y of [2, 7, 12]) { rect(p, 1, y, 2, y + 1); rect(p, 5, y, 14, y + 1); } }, // three dots, each with a strip: the outline of a page
   send: (p) => { rect(p, 1, 7, 12, 8); for (let k = 0; k < 6; k++) { p(8 + k, 2 + k); p(9 + k, 2 + k); p(8 + k, 13 - k); p(9 + k, 13 - k); } }, // an arrow that goes on: send the notes
   play: (p) => { for (let y = 0; y < 12; y++) rect(p, 4, 2 + y, 4 + Math.ceil(Math.min(y + 1, 12 - y) * 1.4) - 1, 2 + y); }, // a triangle that points on: pick it up again
 } satisfies Record<string, Draw>;

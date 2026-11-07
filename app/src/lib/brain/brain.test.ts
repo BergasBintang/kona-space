@@ -128,6 +128,22 @@ test("the report finds what needs a look", () => {
   assert.ok(rep.hubs.length >= 1);
 });
 
+test("an index that nothing links to is an entry point, not a lost note", () => {
+  const note = (id: string, body: string): RawNote => ({ id, layer: "project", readonly: false, text: `# ${id}
+
+${body}
+` });
+  const names = ["one-a", "two-b", "three-c", "four-d", "five-e"];
+  const raw: RawNote[] = [
+    note("where-to-start", names.map((n) => `[[${n}]]`).join(" ")),
+    ...names.map((n) => note(n, "[[where-to-start]]".replace("where-to-start", names[0] === n ? "two-b" : "one-a"))),
+    note("small-hub", "[[one-a]] and [[two-b]]"),
+  ];
+  const says = new Brain(raw).report(NOW).warnings.filter((w) => w.code === "orphan").map((w) => w.text);
+  assert.ok(!says.some((t) => t.includes("where-to-start")), `the index is flagged: ${says.join(" | ")}`);
+  assert.ok(says.some((t) => t.includes("small-hub")), "a note with only two links out and none in is still flagged");
+});
+
 test("front matter, sections and a heading inside a code fence", () => {
   const text = "---\ntitle: T\nkind: topic\n---\n# T\n\nintro words\n\n```\n# not a heading\n```\n\n## One\nsome text here that is long enough to stand on its own as a section of the note for sure yes.\n\n## Two\nmore text here that is long enough to stand on its own as a section of the note for sure yes.\n";
   const { meta, bodyStart } = frontMatter(text);

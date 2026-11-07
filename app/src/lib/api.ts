@@ -113,6 +113,9 @@ export const listBackups = () => invoke<BackupInfo[]>("list_backups");
 export const deleteBackup = (name: string) => invoke<void>("delete_backup", { name });
 export const earlierSessions = (projectId: string) => invoke<Earlier[]>("earlier_sessions", { projectId });
 export const costRows = (sinceDay: string | null) => invoke<CostRow[]>("cost_rows", { sinceDay });
+/** what a folder spent in one local hour (`hour` reads YYYY-MM-DD HH): the points of today's chart */
+export type HourRow = { folder: string | null; hour: string; cost: number };
+export const costHours = (sinceDay: string) => invoke<HourRow[]>("cost_hours", { sinceDay });
 export const listRoles = () => invoke<Role[]>("list_roles");
 export const saveRole = (id: string, profile: RoleProfile) => invoke<Role>("save_role", { id, profile });
 export const resetRole = (id: string) => invoke<Role>("reset_role", { id });

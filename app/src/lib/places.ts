@@ -10,7 +10,7 @@ export const PLACES: { id: Place; label: string }[] = [
   { id: "files", label: "Files" },
   { id: "mockups", label: "Mockups" },
   { id: "leftovers", label: "Leftovers" },
-  { id: "servers", label: "Servers" },
+  { id: "servers", label: "Connections" }, // holds both kinds of entry: a server and a GitHub repo (decision 83)
   { id: "costs", label: "Costs" },
   { id: "accounts", label: "Accounts" },
   { id: "settings", label: "Settings" },

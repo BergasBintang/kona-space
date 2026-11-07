@@ -443,7 +443,7 @@ export default function App() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <TopBar project={project} onHome={() => leave(() => { setAdding(false); setGreeted(false); })} sheetOpen={sheet !== null} place={place}
+      <TopBar project={project} onHome={() => leave(() => { setAdding(false); setGreeted(false); })} sheetOpen={sheet !== null || editing} place={place}
         onPlace={(p) => leave(() => { setAdding(false); setPerson(null); setPlace(p); })} onAttention={() => leave(() => { const w = state.order.map((id) => state.sessions[id]).find((s) => s.run === "waiting" && project && samePlace(s.folder, project.folder)); if (w) openPerson(w.roleId ?? "secretary"); })} attention={attention} leftBehind={leftTotal} plan={state.plans[current?.accountId ?? accountOf(project) ?? lastAccount]}
         limitLine={PLAIN_LINES.limit} accountLabel={project ? accounts.find((a) => a.id === (current?.accountId ?? accountOf(project)))?.label ?? null : null} version={version} />
       <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">

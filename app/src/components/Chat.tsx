@@ -135,7 +135,7 @@ export function QuestionCard({ it, who, onAnswer }: { it: Extract<Item, { kind: 
               const on = (picked[q.question] ?? []).includes(o.label) || (!open && it.answers?.[q.question]?.split(", ").includes(o.label));
               return (
                 <button key={o.label} type="button" aria-pressed={on} onClick={() => toggle(q, o.label)}
-                  className={`flex flex-col items-start border-2 px-3 py-2 text-left ${on ? "border-accent bg-surface-3" : "border-line-subtle bg-surface-1 hover:bg-surface-3"} disabled:cursor-default`} disabled={!open}>
+                  className={`px-btn px-btn-paper flex flex-col items-start px-2 py-1 text-left ${on ? "px-on" : ""} disabled:cursor-default`} disabled={!open}>
                   <span className="text-[15px] leading-6 font-bold">{o.label}</span>
                   {o.description && <span className="text-[13px] leading-5 text-text-secondary">{o.description}</span>}
                 </button>
@@ -263,9 +263,9 @@ export function Composer({ run, who, onSend, busyHint }: { run: RunState | null;
         {images.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {images.map((im, i) => (
-              <div key={i} className="relative">
+              <div key={i} className="flex flex-col items-start gap-1.5">
                 <img src={im.url} alt="A picture waiting to be sent" className="h-16" />
-                <button className="absolute -top-2 -right-2 h-6 w-6 border border-line-strong bg-surface-3 text-[13px] leading-none" aria-label="Remove this picture" onClick={() => setImages((cur) => cur.filter((_, j) => j !== i))}>×</button>
+                <Button variant="quiet" tiny aria-label="Remove this picture" onClick={() => setImages((cur) => cur.filter((_, j) => j !== i))}>Remove</Button>
               </div>
             ))}
           </div>

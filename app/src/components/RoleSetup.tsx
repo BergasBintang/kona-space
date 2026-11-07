@@ -18,8 +18,7 @@ function Choice({ label, value, options, onChange, help }: { label: string; valu
       <span className="flex items-center gap-2 text-[13px] leading-5 font-bold text-text-secondary">{label}<Help title={label}>{help}</Help></span>
       <div className="flex flex-wrap gap-2">
         {options.map((o) => (
-          <button key={o.value} type="button" role="radio" aria-checked={value === o.value} onClick={() => onChange(o.value)} title={o.hint || undefined}
-            className={`h-10 border-2 px-3 text-[14px] font-bold ${value === o.value ? "border-accent bg-surface-3 text-text" : "border-line-subtle bg-surface-2 text-text-secondary hover:bg-surface-3"}`}>{o.label}</button>
+          <Button key={o.value} variant="quiet" small role="radio" aria-checked={value === o.value} on={value === o.value} onClick={() => onChange(o.value)} title={o.hint || undefined}>{o.label}</Button>
         ))}
       </div>
       {options.find((o) => o.value === value)?.hint && <span className="text-[13px] leading-5 text-text-tertiary">{options.find((o) => o.value === value)?.hint}</span>}
@@ -67,7 +66,7 @@ export function RoleSetup({ role, onSaved }: { role: Role; onSaved: (r: Role) =>
               <span className="flex items-center gap-2 text-[15px] leading-6 font-bold">Tone<Help title="Tone"><p className="m-0">How {who} sounds, in your own words, for example careful and blunt, or warm and patient. Keep it short: it is sent at the start of every conversation.</p><p className="m-0">It changes the wording of chat replies only, never the work, the files, the tickets or the warnings.</p></Help></span>
               <textarea value={persona} onChange={(e) => setPersona(e.target.value)} rows={3} className={area} placeholder="For example: careful and blunt" />
               <span className="flex flex-wrap items-center gap-2">
-                {STARTERS.map((s) => <button key={s} type="button" onClick={() => setPersona(s)} className="border border-line-subtle bg-surface-2 px-2 py-0.5 text-[13px] leading-5 text-text-secondary hover:bg-surface-3">{s.split(":")[0]}</button>)}
+                {STARTERS.map((s) => <Button key={s} variant="quiet" tiny onClick={() => setPersona(s)}>{s.split(":")[0]}</Button>)}
                 <span className={`ml-auto text-[13px] leading-5 ${words > 150 ? "text-state-left" : "text-text-tertiary"}`}>{words} words</span>
               </span>
             </label>

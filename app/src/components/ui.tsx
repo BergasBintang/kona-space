@@ -62,7 +62,8 @@ export function Badge({ state, label }: { state: GlyphState; label?: string }) {
 }
 
 type Variant = "primary" | "quiet" | "ghost" | "danger";
-export function Button({ variant = "primary", small = false, tiny = false, className = "", ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; small?: boolean; tiny?: boolean; ref?: Ref<HTMLButtonElement> }) {
+/** `on` is for a button that is one of a group of choices (a tab, a period): the chosen one sits pressed in. The caller still sets aria-pressed, aria-selected or aria-checked. */
+export function Button({ variant = "primary", small = false, tiny = false, on = false, className = "", ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; small?: boolean; tiny?: boolean; on?: boolean; ref?: Ref<HTMLButtonElement> }) {
   // `tiny` is for the plain actions (ghost) that sit in a line of small text: Open, Copy, Check again
   const size = tiny ? "h-8 px-1.5 text-[13px]" : small ? "h-10 px-2 text-[14px]" : "h-12 px-3 text-[16px]";
   const look: Record<Variant, string> = {
@@ -74,7 +75,7 @@ export function Button({ variant = "primary", small = false, tiny = false, class
   return (
     <button
       {...rest}
-      className={`inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap font-bold disabled:cursor-not-allowed ${size} ${look[variant]} ${className}`}
+      className={`inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap font-bold disabled:cursor-not-allowed ${size} ${look[variant]} ${on ? "px-on" : ""} ${className}`}
     />
   );
 }

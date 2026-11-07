@@ -47,7 +47,7 @@ try {
   ok("it is the throwaway project that is open", await c.waitFor(`document.querySelector('header')?.innerText.includes(${JSON.stringify(NAME)})`, 10000, 200), (await text()).slice(0, 300));
   await shot("after-open");
   ok("the office is drawn", await c.waitFor(`document.querySelectorAll('[aria-label^="Open "]').length >= 10`, 20000, 200));
-  ok("the Servers screen opens", await c.ev(`(() => { const e = document.querySelector('[aria-label="Open Servers"]'); if (!e) return false; e.click(); return true; })()`) && await c.waitFor(`!!document.querySelector('section[aria-label="Real server"]')`, 8000, 100));
+  ok("the Servers screen opens", await c.ev(`(() => { const e = document.querySelector('[aria-label="Open Connections"]'); if (!e) return false; e.click(); return true; })()`) && await c.waitFor(`!!document.querySelector('section[aria-label="Real server"]')`, 8000, 100));
 
   // the real server: the three fingerprints, and a button that can be pressed
   const realCard = `document.querySelector('section[aria-label="Real server"]')`;

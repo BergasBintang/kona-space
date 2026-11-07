@@ -172,6 +172,12 @@ fn cost_rows(sessions: State<'_, Sessions>, since_day: Option<String>) -> Vec<le
     sessions.ledger.cost_rows(since_day.as_deref())
 }
 
+/// What the sessions cost per folder and hour, from a day on (the chart of today).
+#[tauri::command]
+fn cost_hours(sessions: State<'_, Sessions>, since_day: String) -> Vec<ledger::HourRow> {
+    sessions.ledger.cost_hours(&since_day)
+}
+
 /// The tools Kona knows how to look for.
 #[tauri::command]
 fn list_tools(app: AppHandle) -> Result<Vec<needs::ToolInfo>, String> {
@@ -880,7 +886,7 @@ pub fn run() {
             app.manage(backup::SettingsStore::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![read_skill_files, save_skill_folder, default_role_kit, apply_default_tree, check_claude, save_tool, delete_tool, read_skill, write_skill, delete_skill, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, cost_rows, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, office_say, mockup_ticket_draft, note_check, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, workflow_list, workflow_save, workflow_delete, run_list, run_save, run_delete, office_map_load, office_map_save, office_map_reset, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file, mock_base, mock_cards, mock_files])
+        .invoke_handler(tauri::generate_handler![cost_hours, read_skill_files, save_skill_folder, default_role_kit, apply_default_tree, check_claude, save_tool, delete_tool, read_skill, write_skill, delete_skill, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, cost_rows, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, office_say, mockup_ticket_draft, note_check, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, workflow_list, workflow_save, workflow_delete, run_list, run_save, run_delete, office_map_load, office_map_save, office_map_reset, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file, mock_base, mock_cards, mock_files])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

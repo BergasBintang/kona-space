@@ -1,7 +1,7 @@
 // One note: read it (links open), see what it links to and what links to it, and, for the owner's own notes, edit or delete it.
 // Starter notes and Claude's memory are read-only: Kona never writes them. It reads like a file in the Files place: the same reader (Markdown.tsx), and the same
 // find, outline of headings and plain view of the text (Reader.tsx), so a note and a document are one kind of page (decision 81).
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { deleteNote, noteCheck, saveNote } from "../../lib/api";
 import { linkedWith, noteCheckPrompt, readNoteCheck } from "../../lib/brain/notecheck.ts";
 import type { Brain } from "../../lib/brain/engine.ts";
@@ -9,7 +9,7 @@ import { frontMatter, type Note } from "../../lib/brain/parse.ts";
 import { Button, Glyph } from "../ui";
 import { Confirm } from "../Confirm";
 import { Markdown } from "./Markdown";
-import { FindBar, Gutter, Outline, useReader } from "./Reader";
+import { FindBar, Gutter, Outline, OutlineRail, useOutlineOpen, useReader } from "./Reader";
 import { localDate } from "../../lib/brain/text.ts";
 
 export const LAYER_WORD: Record<string, string> = { project: "Project", starter: "Starter", memory: "Claude's memory" };
@@ -29,8 +29,10 @@ function ownerMark(text: string): string {
   return lines.join("\n");
 }
 
-export function NoteView({ projectId, accountId, brain, note, draftTitle, onOpen, onClose, onChanged }: {
+export function NoteView({ projectId, accountId, brain, note, draftTitle, onOpen, onClose, onChanged, onDirty }: {
   projectId: string; accountId: string | null; brain: Brain; note: Note | null; draftTitle?: string; onOpen: (id: string) => void; onClose: () => void; onChanged: (id: string | null) => void;
+  /** tells the page whether there is text typed here that is not saved, so it can ask before another note replaces this one */
+  onDirty?: (dirty: boolean) => void;
 }) {
   const fresh = note === null;
   const [editing, setEditing] = useState(fresh);
@@ -38,10 +40,16 @@ export function NoteView({ projectId, accountId, brain, note, draftTitle, onOpen
   const [text, setText] = useState(fresh ? `---\ntitle: ${draftTitle ?? ""}\nkind: note\ndate: ${today()}\n---\n# ${draftTitle ?? ""}\n\n` : note!.raw);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const startText = useRef(text);
+  const dirty = editing && (text !== startText.current || (fresh && name !== ""));
+  useEffect(() => { onDirty?.(dirty); }, [dirty, onDirty]);
+  useEffect(() => () => onDirty?.(false), [onDirty]);
   const [confirm, setConfirm] = useState(false);
   const [rendered, setRendered] = useState(true); // a page, or the text as written
   const [check, setCheck] = useState<null | { stage: "ask" | "running" | "done"; answer?: string; error?: string }>(null); // the on-request comparison with the linked notes
   const reader = useReader({ text: note ? note.raw : null, md: true, rendered, finds: !!note && !editing, anchor: null, resetKey: note?.id ?? null });
+  const [outlineOpen, setOutlineOpen] = useOutlineOpen();
+  const hasOutline = rendered && reader.heads.length >= 3;
 
   const save = async () => {
     setBusy(true); setError(null);
@@ -91,7 +99,6 @@ export function NoteView({ projectId, accountId, brain, note, draftTitle, onOpen
     <div className={`flex flex-col gap-5 ${note && !editing ? "min-h-0 flex-1" : ""}`}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-2">
-          <Button variant="ghost" small className="self-start" onClick={onClose}>← Back</Button>
           <h2 className="m-0 text-[26px] leading-[34px] font-bold">{fresh ? "New note" : note!.title}</h2>
           {note && (
             <div className="flex flex-wrap items-center gap-2">
@@ -136,11 +143,11 @@ export function NoteView({ projectId, accountId, brain, note, draftTitle, onOpen
         </div>
       ) : (
         <div ref={reader.body} className="flex min-h-0 flex-1 border-t border-line-subtle">
-          <div ref={reader.scroller} className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-auto py-5 pr-5">
+          {hasOutline && (outlineOpen ? <Outline heads={reader.heads} active={reader.active} onJump={reader.jump} onClose={() => setOutlineOpen(false)} /> : <OutlineRail onOpen={() => setOutlineOpen(true)} />)}
+          <div ref={reader.scroller} className={`flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-auto py-5 pr-5 ${hasOutline ? "pl-5" : ""}`}>
             {rendered ? <Markdown text={note!.raw} resolve={(r) => brain.resolve(r)} open={onOpen} /> : <Gutter text={note!.raw} />}
             {linksPanel}
           </div>
-          {rendered && reader.heads.length >= 3 && <Outline heads={reader.heads} active={reader.active} onJump={reader.jump} />}
         </div>
       )}
 

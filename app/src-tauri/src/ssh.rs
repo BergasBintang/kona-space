@@ -257,6 +257,30 @@ pub fn read_command(cmd: &str) -> (Vec<Target>, bool) {
     (targets, insecure)
 }
 
+/// The entries a role may use, as the name it types after `ssh` (`user@host`), for a refusal to end with: "none" when there are none.
+fn allowed_names(hosts: &[Host], role_id: Option<&str>) -> String {
+    let names: Vec<String> = hosts.iter().filter(|h| role_id.is_some_and(|r| h.roles.iter().any(|x| x == r))).map(|h| format!("{}@{}", h.user, h.host)).collect();
+    if names.is_empty() { "none".into() } else { names.join(", ") }
+}
+
+/// Told to a role at the start of a session: the servers and repos it may reach and what to type, so it does not guess. None when it may use none
+/// (ssh is then blocked outright). The list is the one at the start of the session; a refusal always carries the current one (`allowed_names`).
+pub fn allowed_prompt(hosts: &[Host], role_id: Option<&str>) -> Option<String> {
+    let mine: Vec<&Host> = hosts.iter().filter(|h| role_id.is_some_and(|r| h.roles.iter().any(|x| x == r))).collect();
+    if mine.is_empty() { return None; }
+    let mut out = vec!["You may reach only these servers and repos with ssh, scp or sftp (the owner keeps this list in Kona, under Connections). Type the name exactly as shown; any other name is refused and every command still asks the owner first. Never write these addresses into notes or documents.".to_string()];
+    for h in mine {
+        out.push(if h.kind == "github" {
+            format!("- {} (GitHub repo {}): ssh {}@{}; git address git@{}:{}.git", h.label, h.repo, h.user, h.host, h.host, h.repo)
+        } else if h.port != 22 {
+            format!("- {}: ssh -p {} {}@{}", h.label, h.port, h.user, h.host)
+        } else {
+            format!("- {}: ssh {}@{}", h.label, h.user, h.host)
+        });
+    }
+    Some(out.join("\n"))
+}
+
 pub enum Decision {
     /// not an ssh, scp or sftp command
     NotSsh,
@@ -273,10 +297,10 @@ pub fn decide(hosts: &[Host], role_id: Option<&str>, cmd: &str) -> Decision {
     let mut found: Vec<Host> = vec![];
     for t in &targets {
         let Some(h) = hosts.iter().find(|h| h.host.eq_ignore_ascii_case(&t.host)) else {
-            return Decision::Deny(format!("Refused: {} is not in this project's server list. Ask the owner to add it in Kona under Servers; do not try another way to reach it.", t.host));
+            return Decision::Deny(format!("Refused: {} is not in this project's server list. Allowed for this role: {}. Ask the owner to add it in Kona under Connections; do not try another way to reach it.", t.host, allowed_names(hosts, role_id)));
         };
         if !role_id.is_some_and(|r| h.roles.iter().any(|x| x == r)) {
-            return Decision::Deny(format!("Refused: this role may not use the server \"{}\". Ask the owner to allow it in Kona under Servers.", h.label));
+            return Decision::Deny(format!("Refused: this role may not use the server \"{}\". Allowed for this role: {}. Ask the owner to allow it in Kona under Connections.", h.label, allowed_names(hosts, role_id)));
         }
         if let Some(u) = &t.user && !u.eq_ignore_ascii_case(&h.user) { return Decision::Deny(format!("Refused: the server \"{}\" is registered for the user {}, not {}.", h.label, h.user, u)); }
         if !found.iter().any(|f| f.id == h.id) { found.push(h.clone()); }
@@ -726,6 +750,40 @@ mod tests {
         assert!(matches!(decide(&hosts, Some("devops"), "ssh deploy@elsewhere.example.test ls"), Decision::Deny(m) if m.contains("not in this project's server list")));
         assert!(matches!(decide(&hosts, Some("devops"), "ssh root@web.example.test ls"), Decision::Deny(m) if m.contains("registered for the user deploy")));
         assert!(matches!(decide(&hosts, Some("devops"), "ssh deploy@web.example.test ls && scp x deploy@elsewhere.example.test:/"), Decision::Deny(_)));
+    }
+
+    #[test]
+    fn a_refusal_names_what_the_role_may_use() {
+        let mut card = repo_card("Kona", "github-kona", "o/n");
+        card.roles = vec!["devops".into()];
+        card.user = "git".into();
+        let hosts = vec![card, host("Web", "web.example.test", "deploy", &["devops", "qa"]), host("Admin", "admin.example.test", "root", &["security"])];
+        let Decision::Deny(m) = decide(&hosts, Some("devops"), "ssh -T git@github.com") else { panic!("should refuse") };
+        assert!(m.contains("not in this project's server list") && m.contains("Allowed for this role: git@github-kona, deploy@web.example.test."), "{m}");
+        assert!(!m.contains("admin.example.test"), "another role's server is not listed: {m}");
+        let Decision::Deny(m) = decide(&hosts, Some("qa"), "ssh root@admin.example.test") else { panic!("should refuse") };
+        assert!(m.contains("may not use the server") && m.contains("Allowed for this role: deploy@web.example.test."), "{m}");
+        let Decision::Deny(m) = decide(&hosts, Some("marketing"), "ssh x@elsewhere.example.test") else { panic!("should refuse") };
+        assert!(m.contains("Allowed for this role: none."), "{m}");
+    }
+
+    #[test]
+    fn a_session_is_told_which_entries_its_role_may_reach() {
+        let mut card = repo_card("Kona", "github-kona", "Owner/kona-space");
+        card.roles = vec!["devops".into()];
+        card.user = "git".into();
+        card.real_host = "ssh.github.com".into();
+        card.port = 443;
+        let mut odd = host("Odd", "odd.example.test", "deploy", &["devops"]);
+        odd.port = 2222;
+        let hosts = vec![card, host("Web", "web.example.test", "deploy", &["devops"]), odd, host("Admin", "admin.example.test", "root", &["security"])];
+        let p = allowed_prompt(&hosts, Some("devops")).unwrap();
+        assert!(p.contains("- Kona (GitHub repo Owner/kona-space): ssh git@github-kona; git address git@github-kona:Owner/kona-space.git"), "{p}");
+        assert!(p.contains("- Web: ssh deploy@web.example.test"), "{p}");
+        assert!(p.contains("- Odd: ssh -p 2222 deploy@odd.example.test"), "{p}");
+        assert!(!p.contains("admin.example.test") && !p.contains("ssh.github.com"), "only what the role needs to type: {p}");
+        assert!(p.contains("any other name is refused"), "{p}");
+        assert!(allowed_prompt(&hosts, Some("marketing")).is_none() && allowed_prompt(&hosts, None).is_none(), "a role with none gets no block: ssh is blocked for it already");
     }
 
     #[test]

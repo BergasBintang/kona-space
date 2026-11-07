@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { outline, slugify, type Heading } from "../../lib/brain/outline.ts";
 import { clearPaint, findIn, paint } from "../find";
 import { Button } from "../ui";
+import { IconButton } from "../Icon";
 
 export type Anchor = { id: string; n: number };
 
@@ -117,12 +118,31 @@ export function Gutter({ text }: { text: string }) {
   );
 }
 
-/** "On this page": the headings of a long page; the one being read is marked, and a click jumps to one. */
-export function Outline({ heads, active, onJump }: { heads: Heading[]; active: string | null; onJump: (id: string) => void }) {
+/** Whether the outline is open. It is one choice for every page, and it is remembered (a closed outline stays closed on the next page and the next day). */
+export function useOutlineOpen(): [boolean, (open: boolean) => void] {
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem("kona-outline") !== "closed"; } catch { return true; } });
+  const set = useCallback((v: boolean) => { setOpen(v); try { localStorage.setItem("kona-outline", v ? "open" : "closed"); } catch { /* not remembered this time */ } }, []);
+  return [open, set];
+}
+
+/** What is left of a closed outline: a slim strip down the left of the page with the icon of three dots, each with a strip. The icon opens the outline again. */
+export function OutlineRail({ onOpen }: { onOpen: () => void }) {
+  return (
+    <div className="hidden w-14 shrink-0 flex-col items-center border-r border-line-subtle py-3 lg:flex">
+      <IconButton icon="outline" variant="ghost" label="Show the outline" onClick={onOpen} />
+    </div>
+  );
+}
+
+/** "On this page": the headings of a long page, on the left of it; the one being read is marked, and a click jumps to one. The X closes it. */
+export function Outline({ heads, active, onJump, onClose }: { heads: Heading[]; active: string | null; onJump: (id: string) => void; onClose: () => void }) {
   const low = Math.min(...heads.map((h) => h.level));
   return (
-    <nav aria-label="On this page" className="hidden w-[250px] shrink-0 flex-col gap-0.5 overflow-y-auto border-l border-line-subtle py-5 pr-3 pl-4 lg:flex">
-      <div className="px-2 pb-1.5 text-[15px] leading-6 font-bold">On this page</div>
+    <nav aria-label="On this page" className="hidden w-[250px] shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-line-subtle py-3 pr-3 pl-3 lg:flex">
+      <div className="flex items-center justify-between gap-2 pb-1.5 pl-2">
+        <span className="text-[15px] leading-6 font-bold">On this page</span>
+        <IconButton icon="close" variant="ghost" label="Close the outline" onClick={onClose} />
+      </div>
       {heads.map((h) => (
         <button key={h.id} type="button" onClick={() => onJump(h.id)} aria-current={h.id === active ? "location" : undefined} title={h.text}
           className={`border-l-2 py-1 pr-2 text-left text-[14px] leading-5 ${h.id === active ? "border-accent font-bold text-text" : "border-transparent text-text-secondary hover:text-text"}`}

@@ -12,7 +12,7 @@ import { STANDARD, ensurePages, parseMap } from "./office/map";
 import type { OfficeMap } from "./office/engine/types";
 import { Sheet, type Guard } from "./components/Sheet";
 import { officeLooks, looksSignature } from "./lib/office";
-import { Hello } from "./components/Hello";
+import { Hello, WelcomeBar } from "./components/Hello";
 import { AddProject } from "./components/AddProject";
 import { PERSON_TABS, PersonSheet, type PersonTab } from "./components/PersonSheet";
 import type { Attached } from "./components/Chat";
@@ -30,7 +30,9 @@ import { Worktrees } from "./components/Worktrees";
 import { Leftovers } from "./components/Leftovers";
 import { BRAIN_TABS, BrainPlace, type BrainTab } from "./components/brain/Brain";
 import { Servers } from "./components/Servers";
-import { Settings } from "./components/Settings";
+import { GeneralSettings } from "./components/Settings";
+import { ProjectSettings } from "./components/ProjectSettings";
+import { groupNames } from "./lib/groups";
 import { Button, Glyph } from "./components/ui";
 import { autoNoteOn, buildDigest, writeSessionNote } from "./lib/brain/summary.ts";
 import { localDate, redact } from "./lib/brain/text.ts";
@@ -55,10 +57,11 @@ export default function App() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountsReady, setAccountsReady] = useState(false); // the welcome page needs the accounts, or every project looks accountless
   const [helloNote, setHelloNote] = useState<string | null>(null); // why the welcome page came back
-  const [lastAccount, setLastAccount] = useState(remembered("kona.account") ?? "main"); // the account used last
+  const [lastAccount, setLastAccount] = useState(remembered("kona.account") ?? ""); // the account used last
   const [place, setPlace] = useState<Place>("office"); // the page open in the sheet over the office; "office" means no page
   const sheetGuard = useRef<Guard | null>(null); // the open sheet, which asks before anything that would throw away unsaved text
   const [greeted, setGreeted] = useState(false); // the welcome page comes first on every launch
+  const [welcomeView, setWelcomeView] = useState<"home" | "add" | "settings">("home"); // what the welcome page shows: the projects, Add a project, or the settings of Kona
   // the account of a project, or null when it has none (or its account was removed): then nothing starts until the owner picks one on the welcome page
   const accountOf = (p: Project | null | undefined) => (p?.account && accounts.some((a) => a.id === p.account) ? p.account : null);
   const NO_ACCOUNT = "This project has no account yet. Click the Kona mark and choose one.";
@@ -68,7 +71,6 @@ export default function App() {
   const [personError, setPersonError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<Record<string, true>>({}); // sessions the owner put away with New conversation: they stay in the list of what ran, but are not shown with the person
   const [kits, setKits] = useState<Record<string, RoleKit>>({}); // what each role may use in the open project (its skills and connectors)
-  const [adding, setAdding] = useState(false); // the Add a project screen
   const [notice, setNotice] = useState<string | null>(null);
   const [officeMap, setOfficeMap] = useState<OfficeMap>(STANDARD); // the office of the open project: its own map, or the standard one
   const [ownMap, setOwnMap] = useState(false); // the project has a map of its own
@@ -207,7 +209,7 @@ export default function App() {
     setProjects((cur) => [...(cur ?? []), r.project]);
     pickProject(r.project.id);
     setGreeted(true);
-    setAdding(false);
+    setWelcomeView("home");
     setNotice(r.hidden_folder ? `Added ${r.project.name}. A hidden folder for Kona's notes is inside it${r.git_ignored ? ", and Git ignores it" : ""}.` : `Added ${r.project.name}.`);
   };
 
@@ -380,15 +382,20 @@ export default function App() {
 
   if (projects === null || persona === null || !accountsReady) return <div className="flex h-full items-center justify-center text-text-tertiary">Opening Kona…</div>;
 
-  if (!greeted && projects.length > 0) {
+  // the welcome page: the projects, Add a project and the settings of Kona are three views of it, so nothing here shows a project in the top bar, and Cancel or the back button return to the projects
+  if (!greeted) {
     return (
-      <div className="relative flex h-full overflow-hidden">
-        <Hello projects={projects} accounts={accounts} version={version}
-          note={helloNote}
-          onOpen={(id) => { pickProject(id); setHelloNote(null); setGreeted(true); setAdding(false); setPlace("office"); }}
-          onAdd={() => { setGreeted(true); setAdding(true); setPlace("office"); }}
-          onOpenAccounts={() => { setGreeted(true); setAdding(false); setPlace("accounts"); }}
-          onProjects={setProjects} />
+      <div className="relative flex h-full flex-col overflow-hidden">
+        {welcomeView !== "home" && <WelcomeBar onBack={() => setWelcomeView("home")} />}
+        <div className="relative flex min-h-0 flex-1 overflow-hidden">
+          {welcomeView === "add"
+            ? <AddProject first={projects.length === 0} accounts={accounts} groups={groupNames(projects)} onDone={added} onCancel={() => setWelcomeView("home")} onOpenAccounts={() => setWelcomeView("settings")} />
+            : welcomeView === "settings"
+              ? <GeneralSettings accounts={accounts} onAccounts={setAccounts} version={version} />
+              : <Hello projects={projects} accounts={accounts} version={version} note={helloNote}
+                  onOpen={(id) => { pickProject(id); setHelloNote(null); setGreeted(true); setPlace("office"); }}
+                  onAdd={() => setWelcomeView("add")} onOpenSettings={() => setWelcomeView("settings")} onProjects={setProjects} />}
+        </div>
         <UpdateCard running={state.order.filter((id) => state.sessions[id].run !== "ended").length} />
       </div>
     );
@@ -401,7 +408,9 @@ export default function App() {
       case "accounts": return <Accounts accounts={accounts} onChanged={setAccounts} />;
       case "files": return <Files project={project} />;
       case "mockups": return <Mockups project={project} send={{ designer: roles.find((r) => r.id === "design")?.person || "the designer", draft: draftMockupTicket, start: startTicket }} />;
-      case "settings": return <Settings projects={projects} version={version} onProjects={(next) => { setProjects(next); if (projectId && !next.some((p) => p.id === projectId)) { setProjectId(next[0]?.id ?? null); remember("kona.project", next[0]?.id ?? ""); } }} />;
+      case "settings": return <ProjectSettings project={project} accounts={accounts} groups={groupNames(projects)} runningHere={state.order.filter((id) => state.sessions[id].run !== "ended" && samePlace(state.sessions[id].folder, project.folder)).length}
+        onProject={(next) => setProjects((cur) => (cur ?? []).map((p) => (p.id === next.id ? next : p)))}
+        onRemoved={(id) => { setProjects((cur) => (cur ?? []).filter((p) => p.id !== id)); setProjectId(null); remember("kona.project", ""); setPlace("office"); setPerson(null); setWelcomeView("home"); setGreeted(false); }} />;
       case "servers": return <Servers project={project} roles={roles} />;
       case "brain": return <BrainPlace project={project} tab={brainTab} onTab={setBrainTab} onAsk={askClaude} />;
       case "leftovers": return <Leftovers state={state} roles={roles} overview={lo} onRefresh={() => { void leftoverOverview().then(setLo); }} />;
@@ -415,10 +424,8 @@ export default function App() {
 
   let content: React.ReactNode;
   let sheet: React.ReactNode = null;
-  if (place === "accounts" && !adding && !project) {
-    content = <Accounts accounts={accounts} onChanged={setAccounts} />; // no project yet, so there is no office to open it over
-  } else if (adding || !project) {
-    content = <AddProject first={!project} accounts={accounts} onDone={added} onCancel={() => setAdding(false)} onOpenAccounts={() => { setAdding(false); setPlace("accounts"); }} />;
+  if (!project) {
+    content = <div className="flex flex-1 items-center justify-center text-text-tertiary">Opening Kona…</div>; // only for a moment: with no project the welcome page is shown (above)
   } else {
     content = editing
       ? <OfficeEditor key={project.id} names={names} map={officeMap} hasOwn={ownMap} broken={brokenMap} guard={sheetGuard}
@@ -443,8 +450,8 @@ export default function App() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <TopBar project={project} onHome={() => leave(() => { setAdding(false); setGreeted(false); })} sheetOpen={sheet !== null || editing} place={place}
-        onPlace={(p) => leave(() => { setAdding(false); setPerson(null); setPlace(p); })} onAttention={() => leave(() => { const w = state.order.map((id) => state.sessions[id]).find((s) => s.run === "waiting" && project && samePlace(s.folder, project.folder)); if (w) openPerson(w.roleId ?? "secretary"); })} attention={attention} leftBehind={leftTotal} plan={state.plans[current?.accountId ?? accountOf(project) ?? lastAccount]}
+      <TopBar project={project} onHome={() => leave(() => { setWelcomeView("home"); setGreeted(false); })} sheetOpen={sheet !== null || editing} place={place}
+        onPlace={(p) => leave(() => { setPerson(null); setPlace(p); })} onAttention={() => leave(() => { const w = state.order.map((id) => state.sessions[id]).find((s) => s.run === "waiting" && project && samePlace(s.folder, project.folder)); if (w) openPerson(w.roleId ?? "secretary"); })} attention={attention} leftBehind={leftTotal} plan={state.plans[current?.accountId ?? accountOf(project) ?? lastAccount]}
         limitLine={PLAIN_LINES.limit} accountLabel={project ? accounts.find((a) => a.id === (current?.accountId ?? accountOf(project)))?.label ?? null : null} version={version} />
       <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
         {content}

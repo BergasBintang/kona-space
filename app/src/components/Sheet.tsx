@@ -23,7 +23,7 @@ export function Sheet({ title, subtitle, tabs, active, onTab, onClose, guard, ke
   const typed = useRef(new Typed());
   const [ask, setAsk] = useState<(() => void) | null>(null);
 
-  const unsaved = () => typed.current.unsaved([...(root.current?.querySelectorAll("textarea, input") ?? [])].filter(isText));
+  const unsaved = () => typed.current.unsaved([...(root.current?.querySelectorAll("textarea, input") ?? [])].filter(isText).filter((e) => !e.hasAttribute("data-autosaves"))); // a field that saves itself when the owner leaves it (data-autosaves) never counts as unsaved
   const leave = (go: () => void) => { if (unsaved()) setAsk(() => go); else go(); };
   const latest = useRef({ leave, onClose });
   latest.current = { leave, onClose };

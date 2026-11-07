@@ -13,11 +13,11 @@ const KEEP_HEAD: usize = 5_000;
 const KEEP_TAIL: usize = 8_000;
 
 /// Claude Code's folder name for a working folder: every character that is not a letter or digit becomes a dash.
-fn slug(p: &str) -> String {
+pub fn slug(p: &str) -> String {
     p.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '-' }).collect()
 }
 
-fn config_root(account_dir: Option<&str>) -> Option<PathBuf> {
+pub fn config_root(account_dir: Option<&str>) -> Option<PathBuf> {
     match account_dir {
         Some(d) => Some(PathBuf::from(d)),
         None => std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME")).map(|h| PathBuf::from(h).join(".claude")),
@@ -109,6 +109,7 @@ pub async fn run_haiku(system: &str, prompt: &str, account_dir: Option<&str>) ->
     if let Some(d) = account_dir {
         cmd.env("CLAUDE_CONFIG_DIR", d);
     }
+    crate::accounts::shut_out_pc_login(&mut cmd);
     let mut child = cmd.spawn().map_err(|e| format!("Could not start Claude Code: {e}"))?;
     if let Some(h) = child.raw_handle() {
         crate::job::adopt(h as _);

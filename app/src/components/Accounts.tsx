@@ -1,5 +1,6 @@
-// The Accounts place: which Claude logins Kona can use. Each account is a folder Claude Code owns; Kona only asks
-// whether it is signed in and never keeps a token. Two or three accounts of your own, each for its own purpose.
+// The accounts: which Claude logins Kona can use (decision 87). Each account is a login folder that belongs to Kona alone, so a login or logout of
+// the terminal, VS Code or the Claude app on this PC never changes it. Kona only asks whether it is signed in and never keeps a token.
+// Two or three accounts of your own, each for its own purpose. Shown inside Settings on the welcome page (`embedded`) and as the Accounts page of a project.
 import { useCallback, useEffect, useState } from "react";
 import { accountStatus, addAccount, removeAccount, renameAccount, signInAccount, type Account, type AccountStatus } from "../lib/api";
 import { Button, Glyph } from "./ui";
@@ -8,7 +9,6 @@ import { Help } from "./Help";
 function Card({ account, status, onChanged, onRemoved, onRefresh }: {
   account: Account; status: AccountStatus | undefined; onChanged: (a: Account) => void; onRemoved: (id: string) => void; onRefresh: () => void;
 }) {
-  const isMain = account.id === "main";
   const [name, setName] = useState<string | null>(null); // not null while renaming
   const [signing, setSigning] = useState(false);
   const [confirm, setConfirm] = useState(false);
@@ -33,10 +33,9 @@ function Card({ account, status, onChanged, onRemoved, onRefresh }: {
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1.5">
           {name === null
-            ? <div className="flex items-center gap-2.5"><h2 className="m-0 min-w-0 truncate text-[19px] leading-7 font-bold">{account.label}</h2>
-                <Help title="About this account"><p className="m-0">{isMain ? "The login already on this PC, the one the terminal uses." : "Its own login folder, kept apart from the main account. It starts clean: sessions on this account do not see your personal Claude settings, skills or servers from the main account."}</p></Help></div>
+            ? <h3 className="m-0 min-w-0 truncate text-[19px] leading-7 font-bold">{account.label}</h3>
             : <input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void rename(); if (e.key === "Escape") { e.preventDefault(); setName(null); } }}
-                aria-label="Account name" className="h-10 w-[260px] border border-line-strong bg-inset px-3 text-[15px] text-text" />}
+                aria-label="Account name" className="h-12 w-[260px] px-2 text-[15px] text-text" />}
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[14px] leading-5">
             {status === undefined
               ? <span className="text-text-tertiary">Checking…</span>
@@ -54,49 +53,80 @@ function Card({ account, status, onChanged, onRemoved, onRefresh }: {
       </div>
 
       {account.config_dir && <span className="truncate font-mono text-[12px] leading-5 text-text-tertiary" title={account.config_dir}>{account.config_dir}</span>}
-      {signing && <p className="m-0 text-[13px] leading-5 text-text-secondary">A sign-in page opened in your browser. Finish it there, then come back. Kona never sees your password.</p>}
+      {signing && <p className="m-0 text-[13px] leading-5 text-text-secondary">A sign-in page opened in your browser. It shows the Claude login your browser is on; to use another, switch there. Finish it, then come back. Kona never sees your password.</p>}
       {error && <div className="flex items-start gap-2.5 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
-      {!isMain && (
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-[13px] leading-5 text-text-tertiary">{confirm ? "Kona forgets this account. The folder and its login stay on the disk." : ""}</span>
-          <Button variant={confirm ? "danger" : "ghost"} small onClick={remove}>{confirm ? "Yes, remove this account" : "Remove account"}</Button>
-        </div>
-      )}
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[13px] leading-5 text-text-tertiary">{confirm ? "Kona forgets this account, and the projects that used it have none. The folder and its login stay on the disk." : ""}</span>
+        <Button variant={confirm ? "danger" : "ghost"} small onClick={remove}>{confirm ? "Yes, remove this account" : "Remove account"}</Button>
+      </div>
     </div>
   );
 }
 
-export function Accounts({ accounts, onChanged }: { accounts: Account[]; onChanged: (next: Account[]) => void }) {
+const HELP = (
+  <Help title="Accounts">
+    <p className="m-0">An account is a Claude login that belongs to Kona alone. Kona keeps it in its own folder, so signing in or out of the terminal, VS Code or the Claude app on this PC never changes it, and Kona never changes theirs.</p>
+    <p className="m-0">To add one: type a name, press Add and sign in, and finish the sign-in in your browser. The page shows whichever Claude login your browser is on. To use another login, switch to it in the browser first, then press the button.</p>
+    <p className="m-0">Every project uses one account, chosen on the welcome page. Each account has its own limits. Use a second one for a real separate purpose, such as work and personal, not to get around a limit.</p>
+  </Help>
+);
+
+export function Accounts({ accounts, onChanged, embedded = false }: { accounts: Account[]; onChanged: (next: Account[]) => void; embedded?: boolean }) {
   const [status, setStatus] = useState<Record<string, AccountStatus>>({});
   const [label, setLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [signingNew, setSigningNew] = useState<string | null>(null); // the name of an account that was just added and is being signed in
 
   const refresh = useCallback(() => {
     accounts.forEach((a) => { accountStatus(a.id).then((s) => setStatus((cur) => ({ ...cur, [a.id]: s }))).catch(() => setStatus((cur) => ({ ...cur, [a.id]: { logged_in: false } }))); });
   }, [accounts]);
   useEffect(refresh, [refresh]);
 
+  // add the account, then open its sign-in at once: one press does both. If the sign-in is not finished the account stays, with a Sign in button on its card.
   const add = async () => {
-    try { const a = await addAccount(label); onChanged([...accounts, a]); setLabel(""); setError(null); } catch (e) { setError(String(e)); }
+    setError(null);
+    let a: Account;
+    try { a = await addAccount(label); } catch (e) { setError(String(e)); return; }
+    onChanged([...accounts, a]); setLabel("");
+    setSigningNew(a.label);
+    try { await signInAccount(a.id); } catch (e) { setError(`${a.label} was added, but not signed in: ${String(e)}`); }
+    setSigningNew(null);
+    accountStatus(a.id).then((s) => setStatus((cur) => ({ ...cur, [a.id]: s }))).catch(() => {});
   };
 
+  const body = (
+    <>
+      {accounts.length === 0 && <p className="m-0 text-[14px] leading-5 text-text-secondary">Kona has no account yet. Add one below; a project needs one.</p>}
+      {accounts.map((a) => (
+        <Card key={a.id} account={a} status={status[a.id]} onRefresh={refresh}
+          onChanged={(x) => onChanged(accounts.map((y) => (y.id === x.id ? x : y)))} onRemoved={(id) => onChanged(accounts.filter((y) => y.id !== id))} />
+      ))}
+      <div className="flex flex-col gap-3 border border-dashed border-line-strong p-5">
+        <div className="flex items-center gap-2.5"><h3 className="m-0 text-[17px] leading-6 font-bold">Add an account</h3></div>
+        <div className="flex gap-3">
+          <input value={label} onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && label.trim() && !signingNew) void add(); }} placeholder="Work"
+            aria-label="Name of the new account" className="h-12 min-w-0 flex-1 px-2 text-[15px] text-text placeholder:text-text-tertiary" />
+          <Button onClick={add} disabled={!label.trim() || signingNew !== null}>{signingNew ? "Waiting for the browser…" : "Add and sign in"}</Button>
+        </div>
+        {signingNew && <p className="m-0 text-[13px] leading-5 text-text-secondary">A sign-in page for {signingNew} opened in your browser. It shows the Claude login your browser is on; to use another, switch there. Finish it, then come back.</p>}
+        {error && <div className="flex items-start gap-2.5 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
+      </div>
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <section className="flex flex-col gap-4" aria-label="Accounts">
+        <div className="flex items-center gap-2.5"><h2 className="m-0 text-[18px] leading-7 font-bold">Accounts</h2>{HELP}</div>
+        {body}
+      </section>
+    );
+  }
   return (
     <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
       <div className="flex w-full flex-col gap-6 px-8 pt-8 pb-10">
-        <div className="flex items-center gap-3"><h1 className="m-0 text-[30px] leading-[38px] font-bold">Accounts</h1><Help title="Accounts"><p className="m-0">The Claude logins Kona can use. Each project uses one of them, chosen on the welcome page.</p><p className="m-0">Each account has its own limits. Use a second account for a real separate purpose, such as work and personal, not to get around a limit.</p></Help></div>
-        {accounts.map((a) => (
-          <Card key={a.id} account={a} status={status[a.id]} onRefresh={refresh}
-            onChanged={(x) => onChanged(accounts.map((y) => (y.id === x.id ? x : y)))} onRemoved={(id) => onChanged(accounts.filter((y) => y.id !== id))} />
-        ))}
-        <div className="flex flex-col gap-3 border border-dashed border-line-strong p-5">
-          <div className="flex items-center gap-2.5"><h2 className="m-0 text-[17px] leading-6 font-bold">Add an account</h2><Help title="Add an account"><p className="m-0">Kona makes an empty login folder for it. Press Sign in on the new card to log in once.</p></Help></div>
-          <div className="flex gap-3">
-            <input value={label} onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && label.trim()) void add(); }} placeholder="Work"
-              aria-label="Name of the new account" className="h-11 min-w-0 flex-1 border border-line-strong bg-inset px-3.5 text-[15px] text-text placeholder:text-text-tertiary" />
-            <Button onClick={add} disabled={!label.trim()}>Add account</Button>
-          </div>
-          {error && <div className="flex items-start gap-2.5 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
-        </div>
+        <div className="flex items-center gap-3"><h1 className="m-0 text-[30px] leading-[38px] font-bold">Accounts</h1>{HELP}</div>
+        {body}
       </div>
     </main>
   );

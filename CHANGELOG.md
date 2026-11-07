@@ -2,6 +2,15 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.38.0, 2026-11-07
+
+Every login is Kona's own, the welcome page has the settings and the groups, and a project has settings of its own.
+
+- **No account follows the PC's login any more.** The account that was "Main" used the login of the PC's terminal, so signing in or out there changed what Kona showed. Every account now has its own login folder, and an account that had none gets one at the next start (empty and signed out, with its name and its projects; its earlier conversations are copied into it, nothing is moved or deleted). Sign in to it once. A fresh Kona starts with no account; **Add and sign in** makes one in a single press. Sessions never see the PC's `ANTHROPIC_API_KEY` or token variables.
+- **The welcome page has Settings** (accounts, sessions by default, size, updates, backups, about) and the projects in **groups stacked A to Z**, the projects of a group side by side in a row that scrolls sideways by itself. A card says which login its account is (the e-mail), has a small dialog for its group, and has the same shape whether its account is signed in (Open) or signed out (Sign in). A **search box** (from four projects on) finds a project by its name, group, folder or account, and a **+ Project** button under Settings adds one.
+- **A project has its own Settings:** its account, how many sessions it may run at once (one project 3, another 2), its name and group, its folder and Remove. The list of projects, the size and the updates are no longer there.
+- **Add a project is a page of the welcome page.** Cancel and the back button return to the projects, and no other project's name is in the top bar. Its folder is a field as wide and as high as the others, and a project can be given a group there.
+
 ## 0.37.0, 2026-11-07
 
 Servers is now Connections, the Costs page shows every cut at once, and the Brain's notes read like files.

@@ -152,12 +152,30 @@ fn list_projects(projects: State<'_, Projects>) -> Vec<Project> {
 }
 
 #[tauri::command]
-fn add_project(projects: State<'_, Projects>, accounts: State<'_, Accounts>, folder: String, name: Option<String>, account: Option<String>) -> Result<AddResult, String> {
+fn add_project(projects: State<'_, Projects>, accounts: State<'_, Accounts>, folder: String, name: Option<String>, account: Option<String>, group: Option<String>) -> Result<AddResult, String> {
     if let Some(a) = account.as_deref().map(str::trim).filter(|a| !a.is_empty()) && accounts.get(a).is_none() { return Err("That account does not exist".into()); }
-    let r = projects.add(&folder, name, account)?;
+    let r = projects.add(&folder, name, account, group)?;
     // a new project starts with the skills that come with Kona and each person's starting tree (decision 67); if that fails the project is still fine, only without them
     if let Err(e) = skills::seed_new_project(std::path::Path::new(&folder)) { eprintln!("could not give the new project its skills: {e}"); }
     Ok(r)
+}
+
+/// File a project under a group of the welcome page (an empty word: no group).
+#[tauri::command]
+fn set_project_group(projects: State<'_, Projects>, id: String, group: Option<String>) -> Result<Project, String> {
+    projects.set_group(&id, group)
+}
+
+/// How many sessions may run at once in one project (none: the default of Settings on the welcome page).
+#[tauri::command]
+fn set_project_sessions(projects: State<'_, Projects>, id: String, max_sessions: Option<u32>) -> Result<Project, String> {
+    projects.set_sessions(&id, max_sessions)
+}
+
+/// The name Kona shows for a project. The folder keeps its own name.
+#[tauri::command]
+fn rename_project(projects: State<'_, Projects>, id: String, name: String) -> Result<Project, String> {
+    projects.rename(&id, &name)
 }
 
 /// Forget a project. Its files are never touched.
@@ -878,15 +896,24 @@ pub fn run() {
                     }
                 }
             });
-            app.manage(Projects::load(&base));
+            let projects = Projects::load(&base);
+            let accounts = Accounts::load(&base);
+            // an account of an older Kona that followed the PC's login got a folder of its own: its projects' earlier conversations are copied there, so History and Resume keep working
+            for id in accounts.take_migrated() {
+                let (Some(dir), Some(old)) = (accounts.get(&id).and_then(|a| a.config_dir), summary::config_root(None)) else { continue };
+                let folders: Vec<String> = projects.all().into_iter().filter(|p| p.account.as_deref() == Some(id.as_str())).map(|p| p.folder).collect();
+                let n = accounts::carry_history(&old, std::path::Path::new(&dir), &folders);
+                if n > 0 { eprintln!("copied {n} earlier conversations to the login folder of the account {id}"); }
+            }
+            app.manage(projects);
             app.manage(Roles::load(&base));
-            app.manage(Accounts::load(&base));
+            app.manage(accounts);
             app.manage(Voice::load(&base));
             app.manage(ssh::Servers::load(&base));
             app.manage(backup::SettingsStore::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![cost_hours, read_skill_files, save_skill_folder, default_role_kit, apply_default_tree, check_claude, save_tool, delete_tool, read_skill, write_skill, delete_skill, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, cost_rows, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, office_say, mockup_ticket_draft, note_check, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, workflow_list, workflow_save, workflow_delete, run_list, run_save, run_delete, office_map_load, office_map_save, office_map_reset, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file, mock_base, mock_cards, mock_files])
+        .invoke_handler(tauri::generate_handler![cost_hours, read_skill_files, save_skill_folder, default_role_kit, apply_default_tree, check_claude, save_tool, delete_tool, read_skill, write_skill, delete_skill, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, set_project_group, set_project_sessions, rename_project, cost_rows, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, office_say, mockup_ticket_draft, note_check, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, workflow_list, workflow_save, workflow_delete, run_list, run_save, run_delete, office_map_load, office_map_save, office_map_reset, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file, mock_base, mock_cards, mock_files])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

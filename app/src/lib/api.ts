@@ -2,7 +2,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { Branch } from "./skilltree.ts";
 
-export type Project = { id: string; name: string; folder: string; account?: string | null };
+export type Project = { id: string; name: string; folder: string; account?: string | null; group?: string | null; max_sessions?: number | null };
 export type AddResult = { project: Project; hidden_folder: boolean; git_ignored: boolean };
 export type Role = { id: string; /** the person's own name: Kiki */ person: string; /** the job: Product */ name: string; group: string; model: string; mode: string; brief: string; persona?: string; voice: VoiceSettings; needs: string[]; own_copy?: boolean };
 /** "Kiki, Product": the person and the job (decision 62). */
@@ -65,7 +65,10 @@ export type FileView =
   | { kind: "toolarge"; size: number };
 
 export const listProjects = () => invoke<Project[]>("list_projects");
-export const addProject = (folder: string, name?: string, account?: string) => invoke<AddResult>("add_project", { folder, name: name ?? null, account: account ?? null });
+export const addProject = (folder: string, name?: string, account?: string, group?: string) => invoke<AddResult>("add_project", { folder, name: name ?? null, account: account ?? null, group: group ?? null });
+export const setProjectGroup = (id: string, group: string | null) => invoke<Project>("set_project_group", { id, group });
+export const setProjectSessions = (id: string, maxSessions: number | null) => invoke<Project>("set_project_sessions", { id, maxSessions });
+export const renameProject = (id: string, name: string) => invoke<Project>("rename_project", { id, name });
 export const setProjectAccount = (id: string, account: string) => invoke<Project>("set_project_account", { id, account });
 export const removeProject = (id: string) => invoke<void>("remove_project", { id });
 export const listTools = () => invoke<ToolInfo[]>("list_tools");

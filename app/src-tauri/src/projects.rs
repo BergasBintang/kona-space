@@ -16,6 +16,12 @@ pub struct Project {
     /// the one account every session in this project uses (an account id); none until the owner picks one
     #[serde(default)]
     pub account: Option<String>,
+    /// the group the welcome page files it under (a plain word or two); none means "No group"
+    #[serde(default)]
+    pub group: Option<String>,
+    /// how many sessions may run at once in this project; none means the default of Settings on the welcome page
+    #[serde(default)]
+    pub max_sessions: Option<u32>,
 }
 
 #[derive(Serialize)]
@@ -44,6 +50,13 @@ pub fn norm(p: &Path) -> String {
     s.to_string_lossy().trim_start_matches(r"\\?\").replace('\\', "/").trim_end_matches('/').to_lowercase()
 }
 
+/// A group name as kept: trimmed, one line, short; empty means none.
+fn clean_group(g: Option<String>) -> Option<String> {
+    let g: String = g?.split_whitespace().collect::<Vec<_>>().join(" ");
+    let g: String = g.chars().take(40).collect();
+    if g.is_empty() { None } else { Some(g) }
+}
+
 impl Projects {
     pub fn load(base: &Path) -> Self {
         let file = base.join("projects.json");
@@ -67,7 +80,7 @@ impl Projects {
         self.list.lock().unwrap().clone()
     }
 
-    pub fn add(&self, folder: &str, name: Option<String>, account: Option<String>) -> Result<AddResult, String> {
+    pub fn add(&self, folder: &str, name: Option<String>, account: Option<String>, group: Option<String>) -> Result<AddResult, String> {
         let path = Path::new(folder);
         if !path.is_dir() {
             return Err("That folder does not exist".into());
@@ -77,7 +90,7 @@ impl Projects {
             return Err("That folder is already a project".into());
         }
         let name = name.filter(|n| !n.trim().is_empty()).unwrap_or_else(|| path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| folder.to_string()));
-        let project = Project { id: uuid::Uuid::new_v4().to_string(), name, folder: folder.to_string(), github: None, account: account.filter(|a| !a.trim().is_empty()) };
+        let project = Project { id: uuid::Uuid::new_v4().to_string(), name, folder: folder.to_string(), github: None, account: account.filter(|a| !a.trim().is_empty()), group: clean_group(group), max_sessions: None };
 
         // the hidden folder for Kona's notes and tickets, kept out of Git without touching any tracked file
         let hidden_folder = fs::create_dir_all(path.join(".kona")).is_ok();
@@ -106,6 +119,45 @@ impl Projects {
         let out = p.clone();
         self.save(&list)?;
         Ok(out)
+    }
+
+    /// File the project under a group of the welcome page (an empty word means no group).
+    pub fn set_group(&self, id: &str, group: Option<String>) -> Result<Project, String> {
+        let mut list = self.list.lock().unwrap();
+        let p = list.iter_mut().find(|p| p.id == id).ok_or("That project does not exist any more")?;
+        p.group = clean_group(group);
+        let out = p.clone();
+        self.save(&list)?;
+        Ok(out)
+    }
+
+    /// How many sessions may run at once in this project (none: the default of Settings).
+    pub fn set_sessions(&self, id: &str, n: Option<u32>) -> Result<Project, String> {
+        if let Some(n) = n && !(1..=3).contains(&n) { return Err("The number of sessions must be between 1 and 3".into()); }
+        let mut list = self.list.lock().unwrap();
+        let p = list.iter_mut().find(|p| p.id == id).ok_or("That project does not exist any more")?;
+        p.max_sessions = n;
+        let out = p.clone();
+        self.save(&list)?;
+        Ok(out)
+    }
+
+    /// Change the name Kona shows (the folder is never renamed).
+    pub fn rename(&self, id: &str, name: &str) -> Result<Project, String> {
+        let name = name.trim();
+        if name.is_empty() { return Err("A project needs a name".into()); }
+        let mut list = self.list.lock().unwrap();
+        let p = list.iter_mut().find(|p| p.id == id).ok_or("That project does not exist any more")?;
+        p.name = name.to_string();
+        let out = p.clone();
+        self.save(&list)?;
+        Ok(out)
+    }
+
+    /// The most sessions that may run at once in the project of this folder, when it has a number of its own.
+    pub fn sessions_cap(&self, folder: &str) -> Option<u32> {
+        let want = norm(Path::new(folder));
+        self.list.lock().unwrap().iter().find(|p| norm(Path::new(&p.folder)) == want).and_then(|p| p.max_sessions)
     }
 
     /// An account was removed: the projects that used it have none until the owner picks another.

@@ -143,6 +143,26 @@ impl Sessions {
     pub fn running(&self) -> Vec<String> {
         self.map.lock().unwrap().keys().cloned().collect()
     }
+
+    /// How many sessions are running in the project of this folder.
+    pub fn running_in(&self, folder: &str) -> usize {
+        let want = crate::projects::norm(std::path::Path::new(folder));
+        self.map.lock().unwrap().values().filter(|h| h.folder == want).count()
+    }
+}
+
+/// The most sessions that may run on this PC at all, whatever each project allows: each `claude` program takes about 400 MB.
+const PC_CEILING: usize = 6;
+
+/// Why a new session may not start now, or None. Each project has its own number (or the default of Settings); the whole PC has a ceiling.
+fn cap_refusal(here: usize, all: usize, cap: usize) -> Option<String> {
+    if here >= cap {
+        return Some(format!("{cap} {} already open in this project. Stop one first: each uses about 400 MB of this PC's memory. (You can change the number in this project's settings.)", if cap == 1 { "session is" } else { "sessions are" }));
+    }
+    if all >= PC_CEILING {
+        return Some(format!("{PC_CEILING} sessions are open across all projects, the most this PC can carry (each uses about 400 MB). Stop one first."));
+    }
+    None
 }
 
 /// The real program behind the `claude` command. npm leaves a small `.cmd` shim in the PATH; the program is next to it.
@@ -171,10 +191,11 @@ pub fn claude_version(exe: &PathBuf) -> Option<String> {
 
 pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Option<Role>, account: Option<Account>, persona: Persona, project_name: String, ticket: Option<Ticket>, work_dir: String, digest: Option<String>, ssh_hosts: Vec<crate::ssh::Host>, kit: crate::skills::Kit, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
     let exe = find_claude().ok_or("Claude Code was not found on this PC")?;
-    // each `claude` program takes about 400 MB; on this PC two at once is the limit (a setting)
-    let cap = app.try_state::<crate::backup::SettingsStore>().map(|s| s.get().max_sessions).unwrap_or(2) as usize;
-    if sessions.running().len() >= cap {
-        return Err(format!("{cap} sessions are already open. Stop one first: each uses about 400 MB of this PC's memory. (You can change the limit in Settings.)"));
+    // each `claude` program takes about 400 MB: every project has its own number of sessions at once (its settings), or the default of Settings on the welcome page
+    let default_cap = app.try_state::<crate::backup::SettingsStore>().map(|s| s.get().max_sessions).unwrap_or(2);
+    let cap = app.try_state::<crate::projects::Projects>().and_then(|p| p.sessions_cap(&folder)).unwrap_or(default_cap) as usize;
+    if let Some(why) = cap_refusal(sessions.running_in(&folder), sessions.running().len(), cap) {
+        return Err(why);
     }
     // a person does one thing at a time in a project: a second conversation with them is refused, whatever asked for it (the screen checks first, and says which one is open)
     if let Some(r) = &role && let Some(other) = sessions.busy(&r.id, &folder) {
@@ -225,10 +246,11 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     } else {
         cmd.args(["--session-id", &id]);
     }
-    // each account is its own login folder, chosen here; Main keeps Claude Code's usual one
+    // each account is its own login folder, chosen here; the login of the PC's own terminal never reaches a session (decision 87)
     if let Some(dir) = account.as_ref().and_then(|a| a.config_dir.as_ref()) {
         cmd.env("CLAUDE_CONFIG_DIR", dir);
     }
+    crate::accounts::shut_out_pc_login(&mut cmd);
     cmd.current_dir(&work_dir)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -370,6 +392,14 @@ mod tests {
         // a branch without a note on its skill still names the skill
         let bare = Kit { branches: vec![Branch { name: "A".into(), when: String::new(), skills: vec!["x".into()] }], ..Default::default() };
         assert!(skill_notes(&bare).unwrap().contains("- Branch \"A\"\n  - x"));
+    }
+
+    #[test]
+    fn each_project_has_its_own_number_of_sessions_and_the_pc_has_a_ceiling() {
+        assert!(cap_refusal(2, 2, 3).is_none(), "a project that allows three may start a third");
+        assert!(cap_refusal(3, 3, 3).unwrap().contains("3 sessions are already open in this project"));
+        assert!(cap_refusal(1, 1, 1).unwrap().contains("1 session is already open"));
+        assert!(cap_refusal(0, 6, 3).unwrap().contains("across all projects"), "a quiet project is still stopped by a full PC");
     }
 
     #[test]

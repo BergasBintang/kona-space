@@ -1,8 +1,10 @@
-// The Settings place: how many sessions may run at once, the projects (removing one), backups, and where Kona keeps
-// its things. Nothing here changes a project's own files.
+// The settings of Kona itself, on the welcome page: the accounts, how many sessions a project may run at once when it has no number of its own,
+// the size of the window, updates, backups, and where Kona keeps its things. Nothing here belongs to one project (those are in ProjectSettings),
+// and nothing here changes a project's own files.
 import { useCallback, useEffect, useState } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { backupNow, deleteBackup, getSettings, listBackups, removeProject, setSettings, type BackupInfo, type Project, type Settings as SettingsT } from "../lib/api";
+import { backupNow, deleteBackup, getSettings, listBackups, setSettings, type Account, type BackupInfo, type Settings as SettingsT } from "../lib/api";
+import { Accounts } from "./Accounts";
 import { Button, Glyph } from "./ui";
 import { Confirm } from "./Confirm";
 import { Help } from "./Help";
@@ -14,14 +16,13 @@ import { KonaMark } from "./KonaMark";
 const size = (b: number) => (b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`);
 const when = (name: string) => name.replace(/^(\d{4}-\d{2}-\d{2})-(\d{2})-(\d{2})$/, "$1 $2:$3");
 
-export function Settings({ projects, version, onProjects }: { projects: Project[]; version: string; onProjects: (next: Project[]) => void }) {
+export function GeneralSettings({ accounts, onAccounts, version }: { accounts: Account[]; onAccounts: (next: Account[]) => void; version: string }) {
   const [s, setS] = useState<SettingsT | null>(null);
   const [backups, setBackups] = useState<BackupInfo[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [dropBackup, setDropBackup] = useState<BackupInfo | null>(null);
-  const [dropProject, setDropProject] = useState<Project | null>(null);
   const [zoom, setZoomState] = useState<Zoom>(getZoom());
   useEffect(() => onZoom(setZoomState), []);
   const update = useUpdate();
@@ -40,6 +41,8 @@ export function Settings({ projects, version, onProjects }: { projects: Project[
         <h1 className="m-0 text-[30px] leading-[38px] font-bold">Settings</h1>
         {notice && <div role="status" className="flex items-start gap-2.5 border border-line-subtle bg-surface-2 px-4 py-3 text-[14px] leading-5"><Glyph state="done" size={16} /> <span className="break-all">{notice}</span></div>}
         {error && <div className="flex items-start gap-2.5 text-[14px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
+
+        <Accounts accounts={accounts} onChanged={onAccounts} embedded />
 
         <section className="flex flex-col gap-3" aria-label="Size">
           <div className="flex items-center gap-2.5"><h2 className="m-0 text-[18px] leading-7 font-bold">Size</h2><Help title="Size"><p className="m-0">How big everything is drawn. Smaller fits more on a small screen.</p><p className="m-0">Ctrl and minus or plus change it from anywhere; Ctrl and 0 goes back to 100%.</p></Help></div>
@@ -62,22 +65,10 @@ export function Settings({ projects, version, onProjects }: { projects: Project[
           </div>
         </section>
 
-        <section className="flex flex-col gap-3" aria-label="Sessions at once">
-          <div className="flex items-center gap-2.5"><h2 className="m-0 text-[18px] leading-7 font-bold">Sessions at once</h2><Help title="Sessions at once"><p className="m-0">Each running session uses about 400 MB of this PC's memory. Kona refuses to start more than this many at once.</p></Help></div>
+        <section className="flex flex-col gap-3" aria-label="Sessions at once by default">
+          <div className="flex items-center gap-2.5"><h2 className="m-0 text-[18px] leading-7 font-bold">Sessions at once</h2><Help title="Sessions at once"><p className="m-0">How many sessions one project may run at once, unless that project has its own number (in its settings, under Sessions at once).</p><p className="m-0">Each running session uses about 400 MB of this PC's memory. Kona refuses to start more than the project allows, and never more than 6 in all.</p></Help></div>
           {s && <div className="max-w-[240px]"><Select ariaLabel="Sessions at once" value={String(s.max_sessions)} onChange={(v) => { setError(null); void setSettings({ ...s, max_sessions: Number(v) }).then(setS).catch((e) => setError(String(e))); }}
-            options={[1, 2, 3].map((n) => ({ value: String(n), label: `${n} ${n === 1 ? "session" : "sessions"}`, hint: n === 2 ? "The usual for this 7 GB PC" : undefined }))} /></div>}
-        </section>
-
-        <section className="flex flex-col gap-3" aria-label="Projects">
-          <h2 className="m-0 text-[18px] leading-7 font-bold">Projects</h2>
-          {projects.map((p) => (
-            <div key={p.id} className="flex flex-col gap-3 border border-line-subtle bg-surface-1 p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex min-w-0 flex-col"><span className="truncate font-bold">{p.name}</span><span className="truncate font-mono text-[12px] leading-5 text-text-tertiary" title={p.folder}>{p.folder}</span></div>
-                <Button variant="ghost" small onClick={() => setDropProject(p)}>Remove…</Button>
-              </div>
-            </div>
-          ))}
+            options={[1, 2, 3].map((n) => ({ value: String(n), label: `${n} ${n === 1 ? "session" : "sessions"}`, hint: n === 2 ? "The usual for a small PC" : undefined }))} /></div>}
         </section>
 
         <section className="flex flex-col gap-3" aria-label="Backups">
@@ -103,11 +94,6 @@ export function Settings({ projects, version, onProjects }: { projects: Project[
       {dropBackup && (
         <Confirm title="Delete this backup?" confirmLabel="Delete it" danger onConfirm={() => { void deleteBackup(dropBackup.name).then(() => { setDropBackup(null); load(); }).catch((e) => { setError(String(e)); setDropBackup(null); }); }} onCancel={() => setDropBackup(null)}>
           <p className="m-0">The backup of {when(dropBackup.name)} ({dropBackup.files} files, {size(dropBackup.bytes)}) is deleted from the disk. Your projects and Kona's live data are not touched.</p>
-        </Confirm>
-      )}
-      {dropProject && (
-        <Confirm title={`Remove ${dropProject.name} from Kona?`} confirmLabel="Remove it" danger onConfirm={() => { void removeProject(dropProject.id).then(() => { onProjects(projects.filter((x) => x.id !== dropProject.id)); setDropProject(null); setNotice(`Removed ${dropProject.name}. Its files were not touched.`); }).catch((e) => { setError(String(e)); setDropProject(null); }); }} onCancel={() => setDropProject(null)}>
-          <p className="m-0">Kona forgets this project. Its folder, its code and its hidden .kona folder (tickets and brain notes) stay exactly where they are, and adding the project again brings them back.</p>
         </Confirm>
       )}
     </main>

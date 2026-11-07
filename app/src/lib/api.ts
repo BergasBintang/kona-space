@@ -170,6 +170,9 @@ export async function accountStatusCached(id: string, maxAgeMs = 60_000): Promis
 export const forgetAccountStatus = (id: string) => { statusCache.delete(id); };
 export const signInAccount = async (id: string) => { try { return await invoke<void>("sign_in_account", { id }); } finally { statusCache.clear(); } };
 export const listDir = (path: string) => invoke<Entry[]>("list_dir", { path });
+/** What Git says about the changed files of a project's folder (U new, A added, M changed, D deleted, C clash); empty when it is not a Git folder. */
+export type GitMark = { path: string; code: string; dir: boolean };
+export const gitMarks = (folder: string) => invoke<GitMark[]>("git_marks", { folder });
 export const readFile = (path: string) => invoke<FileView>("read_file", { path });
 
 // The mockup previewer (decision 75): a mockup is a card, a folder of `.kona/mockups`; its pages are loaded from `${mockBase}/${projectId}/${card}/${file}`.

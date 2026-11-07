@@ -807,6 +807,13 @@ fn list_dir(projects: State<'_, Projects>, path: String) -> Result<Vec<Entry>, S
     files::list_dir(&projects, &path)
 }
 
+/// The letters for the file tree (U new, A added, M changed, D deleted, C clash) from Git; nothing when the folder is not in a repository.
+#[tauri::command]
+async fn git_marks(projects: State<'_, Projects>, folder: String) -> Result<Vec<files::GitMark>, String> {
+    if !projects.allows(std::path::Path::new(&folder)) { return Ok(vec![]); }
+    tauri::async_runtime::spawn_blocking(move || files::git_marks(&folder)).await.map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn read_file(projects: State<'_, Projects>, path: String) -> Result<FileView, String> {
     files::read_file(&projects, &path)
@@ -913,7 +920,7 @@ pub fn run() {
             app.manage(backup::SettingsStore::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![cost_hours, read_skill_files, save_skill_folder, default_role_kit, apply_default_tree, check_claude, save_tool, delete_tool, read_skill, write_skill, delete_skill, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, set_project_group, set_project_sessions, rename_project, cost_rows, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, office_say, mockup_ticket_draft, note_check, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, workflow_list, workflow_save, workflow_delete, run_list, run_save, run_delete, office_map_load, office_map_save, office_map_reset, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, read_file, mock_base, mock_cards, mock_files])
+        .invoke_handler(tauri::generate_handler![cost_hours, read_skill_files, save_skill_folder, default_role_kit, apply_default_tree, check_claude, save_tool, delete_tool, read_skill, write_skill, delete_skill, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, set_project_group, set_project_sessions, rename_project, cost_rows, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, office_say, mockup_ticket_draft, note_check, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, workflow_list, workflow_save, workflow_delete, run_list, run_save, run_delete, office_map_load, office_map_save, office_map_reset, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, git_marks, read_file, mock_base, mock_cards, mock_files])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

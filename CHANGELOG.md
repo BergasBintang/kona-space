@@ -2,6 +2,14 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.38.1, 2026-11-07
+
+A server with a Deploy and a Root login is told apart, long words wrap in the chat, and the file tree shows what changed in Git.
+
+- **A root command is no longer refused when the project has both a Deploy and a Root entry on one server.** Kona picked the first entry with that address and then compared the user, so a Sora session was told "registered for the user deploy" for every `ssh root@...`. It now looks at every entry on the address, chooses by the user in the command, then by the role. If no entry has that user, the refusal names the users that exist. Found from an incident note of a real Sora session.
+- **Long words wrap in the chat.** A pasted log with a word that cannot break (a long plugin list) ran out of its bubble and made the whole chat scroll sideways, which cut the left of the text off. Text now wraps anywhere, and the chat does not scroll sideways. Code blocks keep their own scroll.
+- **The Files tree shows what Git sees, like an editor:** **U** a new file not in Git yet, **A** added, **M** changed, **C** a clash to fix, and a small square on a folder in the strongest colour of what is inside it (**D**, deleted, shows there too, because a deleted file is no longer in the tree). The words are in the hover text and for a screen reader, so colour is never the only sign. It reads again every 4 seconds, only reads, and shows nothing in a folder that is not a Git folder.
+
 ## 0.38.0, 2026-11-07
 
 Every login is Kona's own, the welcome page has the settings and the groups, and a project has settings of its own.

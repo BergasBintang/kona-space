@@ -180,7 +180,7 @@ export function Markdown({ text, resolve = () => null, open = () => {}, wiki = t
     }
   }
   return (
-    <div className={chat ? "flex flex-col gap-3" : "flex flex-col gap-3 text-[15px] text-text-secondary"}>
+    <div className={chat ? "flex min-w-0 flex-col gap-3 [overflow-wrap:anywhere]" : "flex flex-col gap-3 text-[15px] text-text-secondary"}>
       {front && !chat && <FrontCard meta={meta} />}
       {blocks}
     </div>

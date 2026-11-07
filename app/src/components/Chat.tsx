@@ -181,7 +181,7 @@ function Transcript({ s, who, onAnswer, onQuestion }: { s: Session; who: string;
   // scroll the transcript itself: scrollIntoView also scrolls every box around it, which moved the office behind the page while the sheet slid in
   useEffect(() => { const el = box.current; if (el) el.scrollTop = el.scrollHeight; }, [s.items.length, s.draft, s.run]);
   return (
-    <div ref={box} className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-8 pt-6 pb-3">
+    <div ref={box} className="flex min-h-0 flex-1 flex-col gap-5 overflow-x-hidden overflow-y-auto px-8 pt-6 pb-3">
       {s.items.length === 0 && !s.draft && (
         <p className="m-0 max-w-[560px] text-text-tertiary">Ask {who} about this folder. Press Enter to send. Paste a picture to send it along.</p>
       )}
@@ -189,23 +189,23 @@ function Transcript({ s, who, onAnswer, onQuestion }: { s: Session; who: string;
         if (it.kind === "user")
           return (
             <div key={it.id} className="flex justify-end">
-              <div className="flex max-w-[560px] flex-col gap-2 bg-surface-3 px-[18px] py-3.5">
+              <div className="flex max-w-[560px] min-w-0 flex-col gap-2 bg-surface-3 px-[18px] py-3.5 [overflow-wrap:anywhere]">
                 {it.images.length > 0 && <div className="flex flex-wrap gap-2">{it.images.map((src, i) => <img key={i} src={src} alt="A picture you sent" className="h-20" />)}</div>}
                 <span className="whitespace-pre-wrap">{it.text}</span>
               </div>
             </div>
           );
-        if (it.kind === "assistant") return <div key={it.id} className="flex max-w-[calc(980px*var(--k))] flex-col gap-1"><span className="font-pixel text-[13px] leading-4 font-bold text-text-tertiary">{who}</span><Markdown chat text={it.text} wiki={false} /></div>;
+        if (it.kind === "assistant") return <div key={it.id} className="flex max-w-[calc(980px*var(--k))] min-w-0 flex-col gap-1"><span className="font-pixel text-[13px] leading-4 font-bold text-text-tertiary">{who}</span><Markdown chat text={it.text} wiki={false} /></div>;
         if (it.kind === "tool") return <ToolLine key={it.id} it={it} />;
         if (it.kind === "permission") return <PermissionCard key={it.id} it={it} who={who} onAnswer={(a, r) => onAnswer(it, a, r)} />;
         if (it.kind === "question") return <QuestionCard key={it.id} it={it} who={who} onAnswer={(a) => onQuestion(it, a)} />;
         return (
           <div key={it.id} className={`flex max-w-[calc(980px*var(--k))] items-start gap-2.5 text-[13px] leading-5 ${it.tone === "problem" ? "text-state-left" : "text-text-tertiary"}`}>
-            <Glyph state={it.tone === "problem" ? "left" : "stopped"} size={16} /> <span className="whitespace-pre-wrap">{it.text}</span>
+            <Glyph state={it.tone === "problem" ? "left" : "stopped"} size={16} /> <span className="min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere]">{it.text}</span>
           </div>
         );
       })}
-      {s.draft && <div className="flex max-w-[calc(980px*var(--k))] flex-col gap-1"><span className="font-pixel text-[13px] leading-4 font-bold text-text-tertiary">{who}</span><Markdown chat text={s.draft} wiki={false} /></div>}
+      {s.draft && <div className="flex max-w-[calc(980px*var(--k))] min-w-0 flex-col gap-1"><span className="font-pixel text-[13px] leading-4 font-bold text-text-tertiary">{who}</span><Markdown chat text={s.draft} wiki={false} /></div>}
       {s.run === "working" && <Thinking who={who} />}
     </div>
   );

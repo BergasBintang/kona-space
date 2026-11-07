@@ -296,13 +296,24 @@ pub fn decide(hosts: &[Host], role_id: Option<&str>, cmd: &str) -> Decision {
     if insecure { return Decision::Deny("Refused: Kona never allows switching off the check of the server's identity (StrictHostKeyChecking=no or a null known-hosts file).".into()); }
     let mut found: Vec<Host> = vec![];
     for t in &targets {
-        let Some(h) = hosts.iter().find(|h| h.host.eq_ignore_ascii_case(&t.host)) else {
+        // One address can have several entries (Deploy and Root on the same server): pick by the user the command names, and among those by
+        // the role, so a root command is never judged against the Deploy entry (incident 2026-11-07, Sora session).
+        let same_address: Vec<&Host> = hosts.iter().filter(|h| h.host.eq_ignore_ascii_case(&t.host)).collect();
+        if same_address.is_empty() {
             return Decision::Deny(format!("Refused: {} is not in this project's server list. Allowed for this role: {}. Ask the owner to add it in Kona under Connections; do not try another way to reach it.", t.host, allowed_names(hosts, role_id)));
-        };
-        if !role_id.is_some_and(|r| h.roles.iter().any(|x| x == r)) {
-            return Decision::Deny(format!("Refused: this role may not use the server \"{}\". Allowed for this role: {}. Ask the owner to allow it in Kona under Connections.", h.label, allowed_names(hosts, role_id)));
         }
-        if let Some(u) = &t.user && !u.eq_ignore_ascii_case(&h.user) { return Decision::Deny(format!("Refused: the server \"{}\" is registered for the user {}, not {}.", h.label, h.user, u)); }
+        let of_role = |h: &&Host| role_id.is_some_and(|r| h.roles.iter().any(|x| x == r));
+        let matching: Vec<&Host> = match &t.user {
+            Some(u) => same_address.iter().copied().filter(|h| h.user.eq_ignore_ascii_case(u)).collect(),
+            None => same_address.clone(),
+        };
+        if matching.is_empty() {
+            let users: Vec<String> = same_address.iter().map(|h| h.user.clone()).collect();
+            return Decision::Deny(format!("Refused: the server \"{}\" is registered for the user {}, not {}.", same_address[0].label, users.join(" or "), t.user.as_deref().unwrap_or("")));
+        }
+        let Some(h) = matching.iter().copied().find(of_role) else {
+            return Decision::Deny(format!("Refused: this role may not use the server \"{}\". Allowed for this role: {}. Ask the owner to allow it in Kona under Connections.", matching[0].label, allowed_names(hosts, role_id)));
+        };
         if !found.iter().any(|f| f.id == h.id) { found.push(h.clone()); }
     }
     Decision::Ask(found)
@@ -750,6 +761,19 @@ mod tests {
         assert!(matches!(decide(&hosts, Some("devops"), "ssh deploy@elsewhere.example.test ls"), Decision::Deny(m) if m.contains("not in this project's server list")));
         assert!(matches!(decide(&hosts, Some("devops"), "ssh root@web.example.test ls"), Decision::Deny(m) if m.contains("registered for the user deploy")));
         assert!(matches!(decide(&hosts, Some("devops"), "ssh deploy@web.example.test ls && scp x deploy@elsewhere.example.test:/"), Decision::Deny(_)));
+    }
+
+    #[test]
+    fn two_entries_on_one_address_are_told_apart_by_the_user() {
+        // incident 2026-11-07: Deploy and Root on the same server; a root command was judged against the Deploy entry
+        let hosts = vec![host("Server Deploy", "srv.example.test", "deploy", &["devops"]), host("Server Root", "srv.example.test", "root", &["devops"])];
+        match decide(&hosts, Some("devops"), "ssh root@srv.example.test 'tail -n 5 log'") { Decision::Ask(h) => assert_eq!(h[0].label, "Server Root"), _ => panic!("root should ask") }
+        match decide(&hosts, Some("devops"), "ssh -o BatchMode=yes root@srv.example.test ls") { Decision::Ask(h) => assert_eq!(h[0].label, "Server Root"), _ => panic!("root should ask") }
+        match decide(&hosts, Some("devops"), "ssh deploy@srv.example.test ls") { Decision::Ask(h) => assert_eq!(h[0].label, "Server Deploy"), _ => panic!("deploy should ask") }
+        // the role decides between entries of the same user and address; the other entry may be for another role only
+        let hosts = vec![host("Server Deploy", "srv.example.test", "deploy", &["devops"]), host("Server Root", "srv.example.test", "root", &["security"])];
+        assert!(matches!(decide(&hosts, Some("devops"), "ssh root@srv.example.test ls"), Decision::Deny(m) if m.contains("may not use the server \"Server Root\"")));
+        assert!(matches!(decide(&hosts, Some("devops"), "ssh admin@srv.example.test ls"), Decision::Deny(m) if m.contains("registered for the user deploy or root, not admin")));
     }
 
     #[test]

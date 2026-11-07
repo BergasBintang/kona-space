@@ -2,10 +2,11 @@
 // Folders are read one level at a time, only when opened, so a big project costs nothing until you look in it.
 // The viewer follows links between files (with a way back), lists the headings of a long page, finds words in it, copies tables and code, and says when an agent
 // changed the file: the open file and the open folders are looked at again every few seconds while the window is showing.
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { baseName, humanSize, listDir, readFile, type Entry, type FileView, type Project } from "../lib/api";
+import { baseName, gitMarks, humanSize, listDir, readFile, type Entry, type FileView, type GitMark, type Project } from "../lib/api";
+import { GIT_WORD, gitView, type GitCode } from "../lib/gitmarks.ts";
 import { dirOf, resolveLink } from "../lib/brain/outline.ts";
 import { changedSince, readSeen, stamp, writeSeen, type Seen } from "../lib/seen.ts";
 import { buildPage, cssRefs, pageRefs, renameCssRefs } from "../lib/htmlpage.ts";
@@ -33,6 +34,9 @@ const FileIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="shrink-0 text-text-tertiary"><path d="M3.5 2 L9.5 2 L12.5 5 L12.5 14 L3.5 14 Z M9.5 2 L9.5 5 L12.5 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" /></svg>
 );
 
+// the letter beside a file that Git sees as different, like an editor shows: the colour says it too, never alone (the letter and the hover words do)
+const GIT_COLOR: Record<GitCode, string> = { U: "text-state-done", A: "text-state-done", M: "text-state-waiting", D: "text-state-left", C: "text-state-left" };
+
 type Tree = Record<string, Entry[] | "loading" | { error: string }>;
 type Reveal = { dirs: string[]; n: number };
 
@@ -58,6 +62,8 @@ function TreePanel({ project, selected, onPick, root, only, title, seen, reveal 
   const rootDir = root ?? project.folder;
   const [tree, setTree] = useState<Tree>({});
   const [openDirs, setOpenDirs] = useState<Set<string>>(new Set([rootDir]));
+  const [marks, setMarks] = useState<GitMark[]>([]);
+  const git = useMemo(() => gitView(marks), [marks]);
 
   const load = useCallback(async (dir: string) => {
     setTree((t) => ({ ...t, [dir]: "loading" }));
@@ -73,6 +79,15 @@ function TreePanel({ project, selected, onPick, root, only, title, seen, reveal 
     setOpenDirs((cur) => new Set([...cur, ...reveal.dirs]));
     for (const d of reveal.dirs) void load(d);
   }, [reveal, load]);
+
+  // what Git says is read again with the folders: the letters (U, A, M, D) follow a file an agent made or changed. A project that is not a Git folder has none.
+  useEffect(() => {
+    let live = true;
+    const read = () => { if (document.visibilityState === "visible") gitMarks(project.folder).then((m) => { if (live) setMarks((cur) => (JSON.stringify(cur) === JSON.stringify(m) ? cur : m)); }).catch(() => {}); };
+    read();
+    const t = setInterval(read, 4000);
+    return () => { live = false; clearInterval(t); };
+  }, [project.folder]);
 
   // folders that are open are read again every few seconds, so a file an agent made or changed shows up
   useEffect(() => {
@@ -121,6 +136,8 @@ function TreePanel({ project, selected, onPick, root, only, title, seen, reveal 
       const isOpen = e.is_dir && openDirs.has(e.path);
       const on = selected !== null && same(selected, e.path);
       const changed = !e.is_dir && changedSince(seen, e.path, e.modified);
+      const g = git.of(e.path, e.is_dir);
+      const gWord = !g ? "" : e.is_dir && git.of(e.path, false) !== g ? "Has changes inside" : GIT_WORD[g]; // a folder that is itself new says so; one that holds changes says that
       return (
         <div key={e.path}>
           <button
@@ -128,14 +145,21 @@ function TreePanel({ project, selected, onPick, root, only, title, seen, reveal 
             role="treeitem" data-path={e.path} data-parent={dir} data-dir={e.is_dir ? "1" : undefined} aria-level={depth + 1}
             aria-expanded={e.is_dir ? isOpen : undefined}
             aria-current={on ? "true" : undefined}
-            title={changed ? `${e.path}\nChanged since you last opened it` : e.path}
+            title={[e.path, gWord, changed && "Changed since you last opened it"].filter(Boolean).join("\n")}
             className={`flex h-8 w-full items-center gap-1.5 pr-2.5 text-left text-[14px] transition-colors ${on ? "bg-surface-3" : "hover:bg-surface-2"} ${QUIET.has(e.name) ? "text-text-tertiary" : ""}`}
             style={{ paddingLeft: 8 + depth * 18 }}
           >
             {e.is_dir ? <Chevron open={isOpen} /> : <span className="w-4 shrink-0" />}
             {e.is_dir ? <FolderIcon /> : <FileIcon />}
             <span className="truncate">{e.name}</span>
-            {changed && <><span aria-hidden="true" className="ml-auto size-2 shrink-0 bg-accent" /><span className="sr-only">Changed since you last opened it</span></>}
+            {(changed || g) && (
+              <span className="ml-auto flex shrink-0 items-center gap-2">
+                {changed && <><span aria-hidden="true" className="size-2 shrink-0 bg-accent" /><span className="sr-only">Changed since you last opened it</span></>}
+                {g && (e.is_dir
+                  ? <><span aria-hidden="true" className={`size-2 shrink-0 bg-current ${GIT_COLOR[g]}`} /><span className="sr-only">{gWord}</span></>
+                  : <><span aria-hidden="true" className={`font-pixel text-[13px] leading-4 font-bold ${GIT_COLOR[g]}`}>{g}</span><span className="sr-only">{gWord}</span></>)}
+              </span>
+            )}
           </button>
           {isOpen && rows(e.path, depth + 1)}
         </div>

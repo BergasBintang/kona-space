@@ -2,6 +2,15 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.38.3, 2026-11-09
+
+The Accounts page is gone, the default office is laid out again, and the wall outlines are even.
+
+- **The Accounts page of a project and its key cabinet are removed.** It was the same list as Settings on the welcome page, and everything else a project needs about its account is already shown (the top bar has the account and its two plan bars, Costs has an Account cut, the project's Settings choose the account). Add, rename, sign in again and remove an account in Settings on the welcome page. A saved office that still holds a key cabinet opens without it. The messages that said "Open Accounts to sign in" now say where to sign in.
+- **The default office is laid out again.** The big screen that opens the Mockups was half hidden behind the long meeting table, so it was hard to click. It now stands in its own corner of the Lounge, and the people are spaced so no click area covers another on any of the four sides. A new check (`art/check-layout.mjs`, run when the office is built and in a test) measures the click areas on all four sides, that nothing blocks a doorway and that every desk, chair and screen can be reached on foot from the front door. An office you drew yourself is not changed.
+- **The turn-the-device button of the Mockups bar stays on Laptop and Desktop**, greyed out with a hover saying a laptop does not turn on its side, so the other buttons no longer shift.
+- **The outline of the walls has no ridges.** Along a wall the dark line jumped one pixel at every tile (44 to 52 places on each side of the office); it now steps evenly. A test counts them.
+
 ## 0.38.2, 2026-11-08
 
 The dashed edge of every rug in the office lies the same distance inside its rim on all four sides.

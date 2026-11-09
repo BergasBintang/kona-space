@@ -327,7 +327,7 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
             <IconButton key={d.id} icon={DEVICE_ICON[d.id] ?? "deviceLaptop"} label={`${d.label}, ${d.screen.w} px wide`} variant={d.id === device.id ? "primary" : "quiet"} aria-pressed={d.id === device.id} onClick={() => pickDevice(d.id)} />
           ))}
         </div>
-        {device.turns && <IconButton icon="rotate" label={isTurned ? "Stand the device up again" : "Turn the device on its side"} variant={isTurned ? "primary" : "quiet"} aria-pressed={isTurned} onClick={turn} />}
+        <IconButton icon="rotate" label={!device.turns ? `A ${device.label.toLowerCase()} does not turn on its side` : isTurned ? "Stand the device up again" : "Turn the device on its side"} variant={isTurned ? "primary" : "quiet"} aria-pressed={isTurned} disabled={!device.turns} onClick={turn} />
         <IconButton icon="select" label={picking ? "Stop picking parts (Esc)" : "Pick a part and leave a note"} variant={picking ? "primary" : "quiet"} aria-pressed={picking}
           onClick={() => { if (picking) { setPicking(false); setHover(null); closeNote(); } else { setSentLine(null); setPicking(true); } }} />
         <IconButton icon={theme === "dark" ? "sun" : "moon"} label={theme === "dark" ? "Show the page light" : "Show the page dark"} onClick={flipTheme} />

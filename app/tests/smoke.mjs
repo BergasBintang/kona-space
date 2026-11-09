@@ -31,10 +31,11 @@ else {
   ok('a project card opens', await c.waitFor(`[...document.querySelectorAll('button')].some((x) => x.textContent.trim() === 'Open' && !x.disabled)`, 15000, 200) && await click('Open'));
 }
 ok('the top bar is drawn', await c.waitFor(`!!document.querySelector('header')`, 15000, 200));
-ok('the office is drawn with its people and pieces', await c.waitFor(`document.querySelectorAll('[aria-label^="Open "]').length >= 22`, 15000, 200));
+ok('the office is drawn with its people and pieces', await c.waitFor(`document.querySelectorAll('[aria-label^="Open "]').length >= 21`, 15000, 200));
+ok('there is no key cabinet and no Accounts screen in the office any more (the logins are in Settings on the welcome page)', await c.ev(`!document.querySelector('[aria-label="Open Accounts"], [aria-label="Open Key cabinet"]')`));
 ok('Kibby, the office boy, is in the office', await c.waitFor(`!!document.querySelector('button[aria-label^="Talk to Kibby"]')`, 10000, 200));
 ok('there is no Go to list in the top bar', await c.ev(`!document.querySelector('header [aria-label="Go to"]')`));
-const pages = ['Board', 'Meeting', 'Worktrees', 'Brain', 'Files', 'Mockups', 'Leftovers', 'Costs', 'Settings', 'Connections', 'Accounts'];
+const pages = ['Board', 'Meeting', 'Worktrees', 'Brain', 'Files', 'Mockups', 'Leftovers', 'Costs', 'Settings', 'Connections'];
 for (const page of pages) {
   const went = await open(page);
   await c.sleep(900);
@@ -63,7 +64,8 @@ const mapBox = () => c.ev(`(() => { const cv = document.querySelector('canvas[ar
 const wheelOn = (dx, dy, shift) => c.ev(`(() => { const box = document.querySelector('canvas[aria-label^="The Kona office"]').parentElement.parentElement; box.dispatchEvent(new WheelEvent('wheel', { deltaX: ${dx}, deltaY: ${dy}, shiftKey: ${shift}, bubbles: true, cancelable: true })); return true; })()`);
 const press = (label) => c.ev(`(() => { const b = document.querySelector('[aria-label=${JSON.stringify(label)}]'); if (!b || b.disabled) return false; b.click(); return true; })()`);
 let m0 = await mapBox();
-ok('the map is drawn at a whole number of screen pixels for each pixel of the drawing', Math.abs((m0.w * m0.dpr) / (await c.ev(`document.querySelector('canvas[aria-label^="The Kona office"]').width`)) % 1) < 0.001);
+const perPixel = (m0.w * m0.dpr) / (await c.ev(`document.querySelector('canvas[aria-label^="The Kona office"]').width`)); // screen pixels for each pixel of the drawing (0.9999999985 is 1: the distance to the nearest whole number, not "% 1", which called it 0.9999999985 at a 120% view)
+ok('the map is drawn at a whole number of screen pixels for each pixel of the drawing (' + perPixel.toFixed(4) + ')', Math.abs(perPixel - Math.round(perPixel)) < 0.001);
 const ctrlWheel = (dy) => c.ev(`(() => { const box = document.querySelector('canvas[aria-label^="The Kona office"]').parentElement.parentElement; const r = box.getBoundingClientRect(); box.dispatchEvent(new WheelEvent('wheel', { deltaY: ${dy}, ctrlKey: true, clientX: r.x + 200, clientY: r.y + 200, bubbles: true, cancelable: true })); return true; })()`);
 ok('there are no zoom buttons: Ctrl and the wheel zoom', !(await press('Zoom the map in (+)')) && !(await press('Zoom the map out (-)')));
 await ctrlWheel(-100); await c.sleep(300);

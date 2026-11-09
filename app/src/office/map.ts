@@ -15,8 +15,8 @@ const HEX = /^#[0-9a-fA-F]{6}$/;
 const PATTERNS: Pattern[] = ["tiles", "checker", "planks", "stripeI", "carpet"];
 const ATTACH_KINDS: AttachKind[] = ["window", "door", "art", "doorway"];
 const MAX_SIDE = 120;
-/** Kinds of furniture that Kona used to have and no longer has (a screen was retired: the voice booth, the logbook stand). A saved office that still holds one is read without it, without a word. */
-const RETIRED_KINDS = new Set(["voice booth", "logbook stand"]);
+/** Kinds of furniture that Kona used to have and no longer has (a screen was retired: the voice booth, the logbook stand, the key cabinet of the Accounts page). A saved office that still holds one is read without it, without a word. */
+const RETIRED_KINDS = new Set(["voice booth", "logbook stand", "key cabinet"]);
 const isInt = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v);
 /** a copy without the fields that are undefined, so a map that is read and written again comes out the same */
 const clean = <T extends object>(o: T): T => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;

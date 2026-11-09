@@ -1,6 +1,6 @@
 // The accounts: which Claude logins Kona can use (decision 87). Each account is a login folder that belongs to Kona alone, so a login or logout of
 // the terminal, VS Code or the Claude app on this PC never changes it. Kona only asks whether it is signed in and never keeps a token.
-// Two or three accounts of your own, each for its own purpose. Shown inside Settings on the welcome page (`embedded`) and as the Accounts page of a project.
+// Two or three accounts of your own, each for its own purpose. Shown only inside Settings on the welcome page: a project has no Accounts page of its own (decision 89).
 import { useCallback, useEffect, useState } from "react";
 import { accountStatus, addAccount, removeAccount, renameAccount, signInAccount, type Account, type AccountStatus } from "../lib/api";
 import { Button, Glyph } from "./ui";
@@ -71,7 +71,7 @@ const HELP = (
   </Help>
 );
 
-export function Accounts({ accounts, onChanged, embedded = false }: { accounts: Account[]; onChanged: (next: Account[]) => void; embedded?: boolean }) {
+export function Accounts({ accounts, onChanged }: { accounts: Account[]; onChanged: (next: Account[]) => void }) {
   const [status, setStatus] = useState<Record<string, AccountStatus>>({});
   const [label, setLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -94,8 +94,9 @@ export function Accounts({ accounts, onChanged, embedded = false }: { accounts: 
     accountStatus(a.id).then((s) => setStatus((cur) => ({ ...cur, [a.id]: s }))).catch(() => {});
   };
 
-  const body = (
-    <>
+  return (
+    <section className="flex flex-col gap-4" aria-label="Accounts">
+      <div className="flex items-center gap-2.5"><h2 className="m-0 text-[18px] leading-7 font-bold">Accounts</h2>{HELP}</div>
       {accounts.length === 0 && <p className="m-0 text-[14px] leading-5 text-text-secondary">Kona has no account yet. Add one below; a project needs one.</p>}
       {accounts.map((a) => (
         <Card key={a.id} account={a} status={status[a.id]} onRefresh={refresh}
@@ -111,23 +112,6 @@ export function Accounts({ accounts, onChanged, embedded = false }: { accounts: 
         {signingNew && <p className="m-0 text-[13px] leading-5 text-text-secondary">A sign-in page for {signingNew} opened in your browser. It shows the Claude login your browser is on; to use another, switch there. Finish it, then come back.</p>}
         {error && <div className="flex items-start gap-2.5 text-[13px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
       </div>
-    </>
-  );
-
-  if (embedded) {
-    return (
-      <section className="flex flex-col gap-4" aria-label="Accounts">
-        <div className="flex items-center gap-2.5"><h2 className="m-0 text-[18px] leading-7 font-bold">Accounts</h2>{HELP}</div>
-        {body}
-      </section>
-    );
-  }
-  return (
-    <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-      <div className="flex w-full flex-col gap-6 px-8 pt-8 pb-10">
-        <div className="flex items-center gap-3"><h1 className="m-0 text-[30px] leading-[38px] font-bold">Accounts</h1>{HELP}</div>
-        {body}
-      </div>
-    </main>
+    </section>
   );
 }

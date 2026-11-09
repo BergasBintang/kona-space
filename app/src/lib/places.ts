@@ -1,5 +1,5 @@
 // The places of Kona. Each one is a piece of the office that opens a screen (or a person's sheet, for the pages of a person); the top bar lists them too, as a way to jump. Every page has a sheet of its own: no tabs between pages.
-export type Place = "office" | "mockups" | "files" | "accounts" | "costs" | "board" | "workflows" | "worktrees" | "leftovers" | "brain" | "servers" | "settings";
+export type Place = "office" | "mockups" | "files" | "costs" | "board" | "workflows" | "worktrees" | "leftovers" | "brain" | "servers" | "settings";
 
 export const PLACES: { id: Place; label: string }[] = [
   { id: "office", label: "Office" },
@@ -12,6 +12,5 @@ export const PLACES: { id: Place; label: string }[] = [
   { id: "leftovers", label: "Leftovers" },
   { id: "servers", label: "Connections" }, // holds both kinds of entry: a server and a GitHub repo (decision 83)
   { id: "costs", label: "Costs" },
-  { id: "accounts", label: "Accounts" },
   { id: "settings", label: "Settings" },
 ];

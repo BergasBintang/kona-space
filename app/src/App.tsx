@@ -18,7 +18,6 @@ import { PERSON_TABS, PersonSheet, type PersonTab } from "./components/PersonShe
 import type { Attached } from "./components/Chat";
 import { Files } from "./components/Files";
 import { Mockups } from "./components/Mockups";
-import { Accounts } from "./components/Accounts";
 import { Kit } from "./components/Kit";
 import { Costs } from "./components/Costs";
 import { Board } from "./components/Board";
@@ -241,7 +240,7 @@ export default function App() {
     if (busy) { setNotice(busy); return; }
     try {
       const status = await accountStatus(e.account_id);
-      if (!status.logged_in) throw new Error("The account of that conversation is not signed in. Open Accounts to sign in.");
+      if (!status.logged_in) throw new Error("The account of that conversation is not signed in. Sign in from the welcome page, under Settings.");
       await invoke<string>("start_session", { folder: project.folder, roleId: role.id, accountId: e.account_id, useVoice: persona.enabled, ticketId: null, brainDigest: null, model: role.model, mode: role.mode, resume: e.id });
       setDismissed((d) => { const { [e.id]: _gone, ...rest } = d; return rest; });
       setTab("chat");
@@ -269,7 +268,7 @@ export default function App() {
       const accountId = accountOf(project);
       if (!accountId) throw new Error(NO_ACCOUNT);
       const status = await accountStatus(accountId);
-      if (!status.logged_in) throw new Error("That account is not signed in. Open Accounts to sign in.");
+      if (!status.logged_in) throw new Error("That account is not signed in. Sign in from the welcome page, under Settings.");
       const brainDigest = await buildDigest(project.id, { roleId: role.id, roleName: role.name });
       const id = await invoke<string>("start_session", { folder: project.folder, roleId: role.id, accountId, useVoice: persona.enabled, ticketId: null, brainDigest, model: role.model, mode: role.mode, resume: null });
       setLastAccount(accountId); remember("kona.account", accountId);
@@ -288,7 +287,7 @@ export default function App() {
     const accountId = accountOf(project);
     if (!accountId) throw new Error(NO_ACCOUNT);
     const status = await accountStatus(accountId);
-    if (!status.logged_in) throw new Error("That account is not signed in. Open Accounts to sign in.");
+    if (!status.logged_in) throw new Error("That account is not signed in. Sign in from the welcome page, under Settings.");
     const brainDigest = await buildDigest(project.id, { roleId: role.id, roleName: role.name, ticketId: t.id });
     const id = await invoke<string>("start_session", { folder: project.folder, roleId: role.id, accountId, useVoice: persona.enabled, ticketId: t.id, brainDigest, model: role.model, mode: role.mode, resume: null });
     setLastAccount(accountId); remember("kona.account", accountId);
@@ -304,7 +303,7 @@ export default function App() {
     const accountId = accountOf(project);
     if (!accountId) throw new Error(NO_ACCOUNT);
     const status = await accountStatus(accountId);
-    if (!status.logged_in) throw new Error("That account is not signed in. Open Accounts to sign in.");
+    if (!status.logged_in) throw new Error("That account is not signed in. Sign in from the welcome page, under Settings.");
     return officeSay(project.id, accountId, who, history, message);
   };
 
@@ -314,7 +313,7 @@ export default function App() {
     const accountId = accountOf(project);
     if (!accountId) throw new Error(NO_ACCOUNT);
     const status = await accountStatus(accountId);
-    if (!status.logged_in) throw new Error("That account is not signed in. Open Accounts to sign in.");
+    if (!status.logged_in) throw new Error("That account is not signed in. Sign in from the welcome page, under Settings.");
     return mockupTicketDraft(project.id, accountId, prompt);
   };
 
@@ -328,7 +327,7 @@ export default function App() {
     const accountId = accountOf(project);
     if (!accountId) throw new Error(NO_ACCOUNT);
     const status = await accountStatus(accountId);
-    if (!status.logged_in) throw new Error("That account is not signed in. Open Accounts to sign in.");
+    if (!status.logged_in) throw new Error("That account is not signed in. Sign in from the welcome page, under Settings.");
     const brainDigest = await buildDigest(project.id, { roleId: kupa.id, roleName: kupa.name });
     const id = await invoke<string>("start_session", { folder: project.folder, roleId: kupa.id, accountId, useVoice: persona?.enabled ?? false, ticketId: null, brainDigest, model: "sonnet", mode: "plan", resume: null });
     dispatch({ type: "brain-question", sessionId: id, question });
@@ -363,7 +362,7 @@ export default function App() {
     const accountId = accountOf(project);
     if (!accountId) throw new Error(NO_ACCOUNT);
     const status = await accountStatus(accountId);
-    if (!status.logged_in) throw new Error("That account is not signed in. Open Accounts to sign in.");
+    if (!status.logged_in) throw new Error("That account is not signed in. Sign in from the welcome page, under Settings.");
     const brainDigest = await buildDigest(project.id, { roleId: role.id, roleName: role.name });
     const id = await invoke<string>("start_session", { folder: project.folder, roleId: role.id, accountId, useVoice: false, ticketId: null, brainDigest, model: role.model, mode: role.mode, resume: null });
     setLastAccount(accountId); remember("kona.account", accountId);
@@ -405,7 +404,6 @@ export default function App() {
   const pageOf = (which: Place): React.ReactNode => {
     if (!project) return null;
     switch (which) {
-      case "accounts": return <Accounts accounts={accounts} onChanged={setAccounts} />;
       case "files": return <Files project={project} />;
       case "mockups": return <Mockups project={project} send={{ designer: roles.find((r) => r.id === "design")?.person || "the designer", draft: draftMockupTicket, start: startTicket }} />;
       case "settings": return <ProjectSettings project={project} accounts={accounts} groups={groupNames(projects)} runningHere={state.order.filter((id) => state.sessions[id].run !== "ended" && samePlace(state.sessions[id].folder, project.folder)).length}

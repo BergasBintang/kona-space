@@ -4,7 +4,7 @@ Pixel art for Kona (ticket T-0001, decisions 44, 45 and 57 in `kona-space-app.md
 
 ## The standard office
 
-`node build-standard.mjs` writes `app/src/office/standard.json` from a short description of the rooms (floors, walls, doorways, windows, furniture). Change the rooms in that script and run it; do not edit the JSON by hand. It prints the checks of the map (`checkMap`), which must say nothing. Then run `node render-map.mjs ../app/src/office/standard.json <0-3> out/x.png 2` and look at all four sides.
+`node build-standard.mjs` writes `app/src/office/standard.json` from a short description of the rooms (floors, walls, doorways, windows, furniture). Change the rooms in that script and run it; do not edit the JSON by hand. It prints the checks of the map (`checkMap`), which must say nothing. It also runs `node check-layout.mjs`, which measures the click areas, the doorways and the walking routes on all four sides and stops the build when one fails. Then run `node render-map.mjs ../app/src/office/standard.json <0-3> out/x.png 2` and look at all four sides.
 
 ## What is here
 
@@ -23,7 +23,7 @@ The first pipeline (a script that drew the office with thin walls, `office.mjs`,
 
 ## The pieces that open a screen
 
-Since 2026-11-02 each screen that has no person is opened by one piece of the office (decision 61): the brain stand, archive drawers, server terminal, cash desk, key cabinet, gear console, leftovers bin, flow board and (since 2026-11-04, decision 75) the big screen that opens the mockups, and the cork and branch boards on a wall. They are in `app/src/office/engine/furniture.ts` with `opens` and `unique`, each with its own height, outline and main colour so none looks like another (a test checks it). A contact sheet of all of them from the four sides is one small script away (draw the objects of the standard map by `ref`, as `render-map.mjs` does).
+Since 2026-11-02 each screen that has no person is opened by one piece of the office (decision 61): the brain stand, archive drawers, server terminal, cash desk, gear console, leftovers bin, flow board and (since 2026-11-04, decision 75) the big screen that opens the mockups, and the cork and branch boards on a wall. They are in `app/src/office/engine/furniture.ts` with `opens` and `unique`, each with its own height, outline and main colour so none looks like another (a test checks it). A contact sheet of all of them from the four sides is one small script away (draw the objects of the standard map by `ref`, as `render-map.mjs` does).
 
 ## Rules that still hold
 

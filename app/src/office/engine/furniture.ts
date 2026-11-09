@@ -224,11 +224,6 @@ const fixed: Record<string, Spec> = {
     L.b(0.125, 0.125, 0.75, 0.75, 8, M.gold); L.b(0.25, 0.25, 0.5, 0.375, 4, M.white, 8); L.b(0.375, 0.25, 0.25, 0.125, 4, M.black, 12);
     L.fy(0.375, 0.375, 0.625, 13, 15, "#8ed8c9"); L.fy(0.625, 0.375, 0.625, 9, 10, "#3b3f46");
   } },
-  "key cabinet": { label: "Key cabinet", w: 1, d: 1, h: 24, draw: (L) => { // a red cabinet with three long keys hanging on it and a dark lock plate
-    L.b(0.125, 0.125, 0.75, 0.5, 24, M.red); L.fy(0.625, 0.25, 0.75, 3, 21, "#c4695b");
-    [0.25, 0.4375, 0.625].forEach((x) => { L.fy(0.625, x, x + 0.125, 10, 20, "#f3c978"); L.fy(0.625, x - 0.0625, x + 0.1875, 17, 20, "#f3c978"); L.fy(0.625, x + 0.0625, x + 0.125, 8, 10, "#f3c978"); });
-    L.fy(0.625, 0.25, 0.75, 4, 7, "#33241a");
-  } },
   "gear console": { label: "Gear console", w: 1, d: 1, h: 24, draw: (L) => { // a blue column with a big gold cog
     L.b(0.125, 0.125, 0.75, 0.5, 24, M.blue);
     L.fy(0.625, 0.25, 0.75, 9, 19, "#f3c978"); L.fy(0.625, 0.375, 0.625, 12, 16, "#456a92");
@@ -309,7 +304,7 @@ export const KINDS: Record<string, Kind> = {
   "control panel": fixedKind("control panel", "machines"),
   // the pieces that open a screen, one for each screen that has no worker (the two on walls, the cork board and the branch board, are in decor.ts: WALL_PAGES)
   "brain stand": fixedKind("brain stand", "pages", "brain"), "archive drawers": fixedKind("archive drawers", "pages", "files"),
-  "server terminal": fixedKind("server terminal", "pages", "servers"), "cash desk": fixedKind("cash desk", "pages", "costs"), "key cabinet": fixedKind("key cabinet", "pages", "accounts"),
+  "server terminal": fixedKind("server terminal", "pages", "servers"), "cash desk": fixedKind("cash desk", "pages", "costs"),
   "gear console": fixedKind("gear console", "pages", "settings"), "leftovers bin": fixedKind("leftovers bin", "pages", "leftovers"), "big screen": fixedKind("big screen", "pages", "mockups"),
   "flow board": {
     label: "Flow board", group: "boards", defaults: {}, params: [], size: (o) => swap(o, 2, 1), // a pale blue board of boxes joined by arrows, one of them branching; a blue rail on top and a stripe on the back, so it is not taken for a chart

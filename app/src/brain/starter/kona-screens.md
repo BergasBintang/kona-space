@@ -15,5 +15,5 @@ source: starter
 - **Connections:** the servers and the GitHub repos a project may reach, and which roles may use each. A role that is refused a server asks the owner to add it here.
 - **Roles:** the ten starting roles and your own. See [[roles-and-permission-modes]].
 - **Voice:** how Claude and Kona talk to you.
-- **Accounts:** the Claude logins Kona can use, chosen per session.
+- **Accounts:** the Claude logins Kona can use. They live in Settings on the welcome page (press the Kona button at the top left); each project uses one, chosen there or in the project's own Settings.
 - **Brain:** this place. See [[how-the-brain-works]].

@@ -233,7 +233,7 @@ test("the dots of a carpet stay on the carpet tile they belong to, on every side
 });
 
 // The screens that have no worker are opened by a piece of the office (a piece of furniture, or a board on a wall). The workers' screens are opened by their cats.
-const SCREENS = ["accounts", "board", "brain", "costs", "files", "leftovers", "mockups", "servers", "settings", "workflows", "worktrees"];
+const SCREENS = ["board", "brain", "costs", "files", "leftovers", "mockups", "servers", "settings", "workflows", "worktrees"];
 
 test("every screen without a worker has exactly one piece that opens it, and the standard office holds each once", () => {
   const furniture = Object.entries(KINDS).filter(([, k]) => k.opens).map(([kind, k]) => [kind, k.opens!] as const), walls = Object.entries(WALL_PAGES);
@@ -262,6 +262,18 @@ test("nothing stands in front of a doorway: the tiles on both sides of every doo
   }
 });
 
+test("in the standard office every click area keeps at least 95 percent of itself on all four sides (the big screen was once hidden under the long table)", () => {
+  for (let view = 0; view < 4; view++) {
+    const hits = buildScene(STANDARD, view).hits; // the nearest last, and the nearest wins a click
+    hits.forEach((h, n) => {
+      const [x0, y0, x1, y1] = h.rect, over = hits.slice(n + 1).filter((o) => o.rect[0] < x1 && o.rect[2] > x0 && o.rect[1] < y1 && o.rect[3] > y0);
+      let lost = 0;
+      for (let y = Math.floor(y0); y < y1; y++) for (let x = Math.floor(x0); x < x1; x++) if (over.some((o) => x >= o.rect[0] && x < o.rect[2] && y >= o.rect[1] && y < o.rect[3])) lost++;
+      assert.ok(lost / ((x1 - x0) * (y1 - y0)) <= 0.05, `side ${view}: ${h.key} loses ${Math.round((100 * lost) / ((x1 - x0) * (y1 - y0)))} percent to ${over.map((o) => o.key).join(", ")}`);
+    });
+  }
+});
+
 test("the pieces that open a screen look different from every other piece and from each other, on every side", () => {
   
   const opens = (k: number) => KINDS[STANDARD.objects[k].kind].opens;
@@ -270,7 +282,7 @@ test("the pieces that open a screen look different from every other piece and fr
     const hash = (k: number) => createHash("sha1").update(Buffer.concat(s.items.filter((t) => t.ref === k && t.img).map((t) => Buffer.concat([Buffer.from(`${t.img!.w}x${t.img!.h}`), Buffer.from(t.img!.d.buffer, t.img!.d.byteOffset, t.img!.d.byteLength)])))).digest("hex");
     const mean = (k: number) => { let n = 0; const sum = [0, 0, 0]; for (const t of s.items.filter((x) => x.ref === k && x.img)) for (let q = 0; q < t.img!.d.length; q += 4) if (t.img!.d[q + 3]) { n++; for (let c = 0; c < 3; c++) sum[c] += t.img!.d[q + c]; } return sum.map((v) => v / n); };
     const pages = STANDARD.objects.map((_, k) => k).filter((k) => opens(k));
-    assert.equal(pages.length, 9, "nine pieces of furniture open a screen");
+    assert.equal(pages.length, 8, "eight pieces of furniture open a screen");
     STANDARD.objects.forEach((o, k) => { if (o.kind === "rug") return; const h = hash(k), other = seen.get(h); if (other && opens(k)) assert.fail(`view ${view}: ${o.kind} looks exactly like ${other}`); seen.set(h, o.kind); });
     for (const a of pages) for (const b of pages) if (a < b) assert.ok(Math.hypot(...mean(a).map((v, c) => v - mean(b)[c])) >= 12, `view ${view}: ${STANDARD.objects[a].kind} and ${STANDARD.objects[b].kind} are too much alike in colour`);
   }
@@ -406,7 +418,7 @@ test("Kibby may walk on any floor tile with no wall and nothing standing on it, 
 
 test("a saved office that still holds a piece Kona retired is read without it and draws", () => {
   const old = structuredClone(STANDARD);
-  old.objects.push({ kind: "voice booth", i: 3, j: 22, facing: 0 }, { kind: "logbook stand", i: 12, j: 23, facing: 0 });
+  old.objects.push({ kind: "voice booth", i: 3, j: 22, facing: 0 }, { kind: "logbook stand", i: 12, j: 23, facing: 0 }, { kind: "key cabinet", i: 22, j: 25, facing: 2 });
   const r = parseMap(JSON.stringify(old));
   assert.ok("map" in r, "error" in r ? r.error : "");
   assert.deepEqual((r as { map: OfficeMap }).map.objects, STANDARD.objects, "the retired pieces are left out");
@@ -498,5 +510,28 @@ test("a rug's dashed edge lies the same distance inside its rim on all four side
       assert.ok(gaps.length >= 2, `rug at ${rug.i},${rug.j}, view ${view}: the gap could be measured`);
       assert.ok(gaps.every((n) => n === 4), `rug at ${rug.i},${rug.j}, view ${view}: the gaps are ${gaps.join(", ")} pixels, they should all be 4`);
     }
+  }
+});
+
+
+test("the outline of the walls has no ridges: a slanted edge steps two pixels in every row, and the line does not jump a pixel where one tile of a run joins the next", () => {
+  // A run of wall is one tile after another. When the later tile won the outline at every joint, the line sat on the top pixel in one tile and on the face pixel in the next: a run of 1 pixel
+  // above a run of 3, once for every tile (the owner called them uneven ridges). That was 44 to 52 places on each side of the standard office. What is left is where a wall meets a post.
+  for (let view = 0; view < 4; view++) {
+    const s = buildScene(STANDARD, view), W = s.width, H = s.height, dark = new Uint8Array(W * H);
+    for (const it of s.items) if (it.img && (it.kind === "wall" || it.kind === "post")) {
+      for (let y = 0; y < it.img.h; y++) for (let x = 0; x < it.img.w; x++) { const o = (y * it.img.w + x) * 4, d = it.img.d; if (d[o + 3] && d[o] === 0x33 && d[o + 1] === 0x24 && d[o + 2] === 0x1a) dark[(it.y + y) * W + it.x + x] = 1; }
+    }
+    const runs = (y: number) => { const r: [number, number][] = []; let x = 0; while (x < W) { if (!dark[y * W + x]) { x++; continue; } const from = x; while (x < W && dark[y * W + x]) x++; r.push([from, x - from]); } return r; };
+    const ridges: string[] = []; let steps = 0;
+    for (let y = 0; y < H - 1; y++) {
+      const next = runs(y + 1);
+      for (const [a, len] of runs(y)) {
+        if (len === 2) steps++;
+        if (len === 1) for (const [c, lc] of next) if (lc === 3 && (c === a + 1 || c === a - 3)) ridges.push(`${a},${y}`);
+      }
+    }
+    assert.ok(steps > 3000, `view ${view}: ${steps} even steps to look at`);
+    assert.ok(ridges.length <= 20, `view ${view}: ${ridges.length} places where the line jumps a pixel (${ridges.slice(0, 8).join(" ")}); it should be about a dozen, at the posts`);
   }
 });

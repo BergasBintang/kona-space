@@ -75,7 +75,11 @@ export function renderWalls(boxes: WallBox[], iso: Iso): Item[] {
     }
   });
 
-  // outlines: where a surface meets another surface or open air, on the nearer one's pixel
+  // outlines: where a surface meets another surface or open air, on the nearer one's pixel.
+  // Two tiles of one straight run (the same height, the same width, side by side) are one wall, so neither is nearer: between the top and the face of the run the line is
+  // always on the same side of the edge. If the later tile won there, the line would jump a pixel at every joint and the edge would show a ridge every tile.
+  const sameRun = (p: (typeof info)[number], q: (typeof info)[number]) => p.kind === "wall" && q.kind === "wall" && p.h === q.h && (
+    (p.v0 === q.v0 && p.v1 === q.v1 && (p.u1 === q.u0 || q.u1 === p.u0)) || (p.u0 === q.u0 && p.u1 === q.u1 && (p.v1 === q.v0 || q.v1 === p.v0)));
   const mark: number[] = [];
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const o = y * W + x, t = tag[o];
@@ -85,7 +89,7 @@ export function renderWalls(boxes: WallBox[], iso: Iso): Item[] {
       if (nt === t) continue;
       if (nt === 0) { mark.push(o); break; }
       const a = info[owner[o]].depth, b = info[owner[n]].depth;
-      if (a > b || (a === b && t > nt)) { mark.push(o); break; }
+      if (sameRun(info[owner[o]], info[owner[n]]) ? t > nt : a > b || (a === b && t > nt)) { mark.push(o); break; }
     }
   }
   for (const o of mark) img.set(o % W, Math.floor(o / W), OUT);

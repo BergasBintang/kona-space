@@ -135,7 +135,7 @@ v.play().catch((e) => say('playfailed', { why: String(e) }));`);
   i2 = await frameInfo();
   ok("turned on its side the page sees 844 x 390", i2?.vw >= 844 - 0.02 && i2?.vw < 845 && i2?.vh >= 390 - 0.02 && i2?.vh < 391 && (await pressed("Stand the device up again")) === "true", `${i2?.vw} x ${i2?.vh}`);
   await press("Laptop, 1024 px wide"); await idle(500);
-  ok("rotate is not offered for a laptop", await c.ev(`!${button("Turn the device on its side")} && !${button("Stand the device up again")}`));
+  ok("rotate stays in place but is disabled for a laptop", await c.ev(`!${button("Turn the device on its side")} && !${button("Stand the device up again")} && ${button("A laptop does not turn on its side")}?.disabled === true`));
   await press("Phone, 390 px wide"); await idle(500);
   ok("the turn is remembered for the next phone", await c.ev(`!!${button("Stand the device up again")}`));
   await press("Stand the device up again"); await idle(400);

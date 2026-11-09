@@ -42,7 +42,7 @@ export function GeneralSettings({ accounts, onAccounts, version }: { accounts: A
         {notice && <div role="status" className="flex items-start gap-2.5 border border-line-subtle bg-surface-2 px-4 py-3 text-[14px] leading-5"><Glyph state="done" size={16} /> <span className="break-all">{notice}</span></div>}
         {error && <div className="flex items-start gap-2.5 text-[14px] leading-5 text-state-left"><Glyph state="left" size={16} /> {error}</div>}
 
-        <Accounts accounts={accounts} onChanged={onAccounts} embedded />
+        <Accounts accounts={accounts} onChanged={onAccounts} />
 
         <section className="flex flex-col gap-3" aria-label="Size">
           <div className="flex items-center gap-2.5"><h2 className="m-0 text-[18px] leading-7 font-bold">Size</h2><Help title="Size"><p className="m-0">How big everything is drawn. Smaller fits more on a small screen.</p><p className="m-0">Ctrl and minus or plus change it from anywhere; Ctrl and 0 goes back to 100%.</p></Help></div>

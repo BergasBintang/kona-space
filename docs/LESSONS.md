@@ -777,3 +777,18 @@ The owner closed the last ten tickets (T-0018 to T-0027), so all 27 are Done, an
 | "Can we make something like cloudflared ourselves?" | The program on the PC is the small part; the public server is what costs | Decision 90 (still in discussion). Do not build a relay for every user; see the row |
 
 **Checked (dev window, throwaway project `leftover-demo`, 2026-11-11):** a real session waiting on a question moved the count and the card; the "!" badge centred by measurement; per-device notes saved and shown; 218 tests. **Not checked:** the waiting mark on welcome-page cards (not built), the selected state of the Every device / Only X buttons (subtle), notes for another device are not dimmed.
+
+## 27. What was found while building the terminal (2026-11-11)
+
+| Seen | Cause | Keep |
+|---|---|---|
+| Ctrl+C did nothing in the new terminal: `ping -t` and `Start-Sleep` kept going, even when the 0x03 byte was written straight to the shell | The dev window had been started from a tool that switches Ctrl+C off for itself, and a program passes that on to what it starts | `terminal.rs` calls `SetConsoleCtrlHandler(None, 0)` before it starts a shell. Seen working afterwards. If Ctrl+C ever fails again, test it first with a window started a different way |
+| A test that wrote to a shell with no screen on it hung (no file was made) | A pseudo-terminal shell first asks the screen a question and waits for the answer; xterm.js answers it, a bare test does not | Test a shell only through the real xterm screen in the window |
+| After a hot reload the list of shells in the page was empty | Reloading `lib/terminal.ts` made a new empty list; the Rust shell kept running unseen | The reload of that file loses the link to running shells (dev only); a full window restart is the clean way to test |
+| Two ways to prove "the shell dies with Kona": counting PowerShell programs after killing the window | The job object (`job.rs`) | Seen: 0 left. Kona's window and its helper were children of app.exe, the shell too |
+| The terminal never said the shell had ended after `exit` | On Windows the output pipe of a pseudo-terminal stays open after the shell ends; it only closes when the terminal itself is closed, so "pipe closed" never came | `terminal.rs` asks the shell every 0.4 s whether it has ended (`try_wait`) and then announces it. Never wait for the end of the pipe |
+| A paste came out twice in a test | The test was run against an old copy of the screen: after a hot reload the old terminal was still on the page, so two handlers pasted | After changing the terminal screen, reload the whole window (`location.reload()`) before testing; a hot reload of that component can leave the old one running |
+| The last line of the terminal touched the frame's bottom edge | The padding was on the box xterm measures, so the fit counted the padding wrongly | Padding goes on an outer box; the box xterm fits has none |
+
+**Checked (dev window, 2026-11-11):** a command and its output, the folder, colours readable on the paper background, Ctrl+C, leaving the page and coming back (screen redrawn), the Leftovers page ignores the shell, shells gone when Kona is stopped. **Not checked:** typing a long line that wraps while the window is resized, Unicode (emoji, Indonesian letters) in the output, 1000+ lines of output, the Git Bash choice.
+

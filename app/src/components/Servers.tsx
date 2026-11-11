@@ -236,7 +236,7 @@ export function Servers({ project, roles }: { project: Project; roles: Role[] })
   const group = (name: string, items: Server[], kind: string, addLabel: string, empty: string) => (
     <div role="group" aria-label={name} className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-4 border-b-2 border-line-strong pb-3">
-        <h2 className="m-0 flex items-baseline gap-3 text-[22px] leading-8 font-bold">{name}<span className="text-[15px] font-normal text-text-tertiary">{items.length}</span></h2>
+        <h2 className="m-0 flex items-baseline gap-3 text-[22px] leading-8 font-bold">{name}<span className="text-[15px] font-normal text-text-tertiary">{items.length}</span>{name === "Servers" && <Help title="Servers and repos"><p className="m-0">The servers and GitHub repos {project.name} may reach. Kona keeps where the key files are, never the keys.</p><p className="m-0">A role can use one only if it is listed here for that role, and every command still asks you first.</p></Help>}</h2>
         <Button variant="quiet" small onClick={() => { setDraft(blank(project.id, kind)); setError(null); }}>{addLabel}</Button>
       </div>
       {items.length === 0 && <p className="m-0 text-[14px] leading-5 text-text-secondary">{empty}</p>}
@@ -247,8 +247,6 @@ export function Servers({ project, roles }: { project: Project; roles: Role[] })
   return (
     <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
       <div className="flex w-full flex-col gap-8 px-8 pt-8 pb-10">
-        <div className="flex items-center gap-3"><h1 className="m-0 text-[30px] leading-[38px] font-bold">Connections</h1><Help title="Connections"><p className="m-0">The servers and GitHub repos {project.name} may reach. Kona keeps where the key files are, never the keys.</p><p className="m-0">A role can use one only if it is listed here for that role, and every command still asks you first.</p></Help></div>
-
         {list === null && <p className="m-0 text-text-tertiary">Reading the list…</p>}
         {list && group("Servers", servers, "", "Add a server", "No servers yet. Until you add one, no role can run ssh, scp or sftp in this project.")}
         {list && group("GitHub repos", repos, "github", "Add a GitHub repo", "No GitHub repos yet.")}

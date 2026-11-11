@@ -28,7 +28,7 @@ import cats from "./office/cats.json";
 import { Worktrees } from "./components/Worktrees";
 import { Leftovers } from "./components/Leftovers";
 import { BRAIN_TABS, BrainPlace, type BrainTab } from "./components/brain/Brain";
-import { Servers } from "./components/Servers";
+import { SERVERS_TABS, ServersPage, type ServersTab } from "./components/ServersPage";
 import { GeneralSettings } from "./components/Settings";
 import { ProjectSettings } from "./components/ProjectSettings";
 import { groupNames } from "./lib/groups";
@@ -67,6 +67,7 @@ export default function App() {
   const [person, setPerson] = useState<string | null>(null); // the person whose sheet is open (a role id): what a click on a cat opens
   const [tab, setTab] = useState<PersonTab>("chat");
   const [brainTab, setBrainTab] = useState<BrainTab>("map");
+  const [serversTab, setServersTab] = useState<ServersTab>("connections");
   const [personError, setPersonError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<Record<string, true>>({}); // sessions the owner put away with New conversation: they stay in the list of what ran, but are not shown with the person
   const [kits, setKits] = useState<Record<string, RoleKit>>({}); // what each role may use in the open project (its skills and connectors)
@@ -414,7 +415,7 @@ export default function App() {
       case "settings": return <ProjectSettings project={project} accounts={accounts} groups={groupNames(projects)} runningHere={state.order.filter((id) => state.sessions[id].run !== "ended" && samePlace(state.sessions[id].folder, project.folder)).length}
         onProject={(next) => setProjects((cur) => (cur ?? []).map((p) => (p.id === next.id ? next : p)))}
         onRemoved={(id) => { setProjects((cur) => (cur ?? []).filter((p) => p.id !== id)); setProjectId(null); remember("kona.project", ""); setPlace("office"); setPerson(null); setWelcomeView("home"); setGreeted(false); }} />;
-      case "servers": return <Servers project={project} roles={roles} />;
+      case "servers": return <ServersPage project={project} roles={roles} tab={serversTab} />;
       case "brain": return <BrainPlace project={project} tab={brainTab} onTab={setBrainTab} onAsk={askClaude} />;
       case "leftovers": return <Leftovers state={state} roles={roles} overview={loHere} folder={project?.folder}onRefresh={() => { void leftoverOverview().then(setLo); }} />;
       case "worktrees": return <Worktrees project={project} onChanged={() => {}} />;
@@ -438,7 +439,8 @@ export default function App() {
       : <Office map={officeMap} looks={looks} seated={seated} sheetOpen={place !== "office" || person !== null} alerts={leftTotal > 0 ? { leftovers: leftTotal } : undefined} names={names} onOpen={openPlace} onOpenPerson={openPerson} onSay={sayToOffice} onEdit={() => setEditing(true)} />;
     if (place !== "office") {
       const info = PLACES.find((x) => x.id === place);
-      const brainTabs = place === "brain" ? { tabs: BRAIN_TABS, active: brainTab, onTab: (id: string) => setBrainTab(id as BrainTab), keepDraftOnTab: true } : {};
+      const brainTabs = place === "brain" ? { tabs: BRAIN_TABS, active: brainTab, onTab: (id: string) => setBrainTab(id as BrainTab), keepDraftOnTab: true }
+        : place === "servers" ? { tabs: SERVERS_TABS, active: serversTab, onTab: (id: string) => setServersTab(id as ServersTab), keepDraftOnTab: true } : {};
       sheet = <Sheet key="sheet" title={info?.label ?? place} {...brainTabs} onClose={closeSheet} guard={sheetGuard}>{pageOf(place)}</Sheet>;
     } else if (person && personRole) {
       sheet = (

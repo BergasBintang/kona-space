@@ -12,8 +12,12 @@ export type PickMessage =
   | { kind: "rect"; box: Box; vw: number; vh: number }
   | { kind: "gone" };
 
-/** A pin: a part of a page and what the owner wants changed there. `n` is its place in the list, from 1. */
-export type Pin = Part & { id: number; note: string };
+/** The one device a note is for. */
+export type Scope = { id: string; label: string };
+/** A pin: a part of a page and what the owner wants changed there. `n` is its place in the list, from 1. `only` is the one device it is for; without it the note is for every device. */
+export type Pin = Part & { id: number; note: string; only?: Scope };
+/** Where a note applies, in words */
+export const scopeLine = (p: Pick<Pin, "only">): string => (p.only ? `Only ${p.only.label}` : "Every device");
 
 export const NOTE_MAX = 600;
 export const PINS_MAX = 40;
@@ -74,16 +78,18 @@ export function measureLine(m: Measures): string {
     .filter((s) => s !== "").join(" · ");
 }
 
-export function addPin(pins: Pin[], p: Part, note: string, id: number): Pin[] {
+export function addPin(pins: Pin[], p: Part, note: string, id: number, only?: Scope): Pin[] {
   const text = note.trim().slice(0, NOTE_MAX);
   if (!text || pins.length >= PINS_MAX) return pins;
-  return [...pins, { ...p, id, note: text }];
+  return [...pins, only ? { ...p, id, note: text, only } : { ...p, id, note: text }];
 }
 export const removePin = (pins: Pin[], id: number): Pin[] => pins.filter((p) => p.id !== id);
 export const editPin = (pins: Pin[], id: number, note: string): Pin[] => pins.map((p) => (p.id === id ? { ...p, note: note.slice(0, NOTE_MAX) } : p));
 
-/** What the page's helper needs to draw the pins: the number of each (its place in the list), where it is and on which page */
-export const pinsForPage = (pins: Pin[]) => pins.map((p, i) => ({ n: i + 1, place: p.place, page: p.page }));
+/** What the page's helper needs to draw the pins: the number of each (its place in the list, counting the notes of other devices too), where it is and on which page.
+ *  A note for one device is left out when another device is shown, because the page looks different there. */
+export const pinsForPage = (pins: Pin[], device?: string) =>
+  pins.map((p, i) => ({ p, n: i + 1 })).filter(({ p }) => !p.only || device === undefined || p.only.id === device).map(({ p, n }) => ({ n, place: p.place, page: p.page }));
 
 /** Where the note box goes: beside the part (to its right when it fits, else to its left, else below it), kept inside the room. All numbers are in screen pixels of the room. */
 export function placeNote(part: Box, room: { w: number; h: number }, size: { w: number; h: number }, gap = 10): { left: number; top: number } {

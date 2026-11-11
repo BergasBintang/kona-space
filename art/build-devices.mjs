@@ -26,8 +26,8 @@ const DEVICES = [
   { id: "phone-s", label: "Small phone", screen: [320, 568], mat: "dark", bezel: [10, 7, 10, 7], radius: 7, screenRadius: 4, turns: true, detail: { kind: "speaker", side: "top" } },
   { id: "phone", label: "Phone", screen: [390, 844], mat: "dark", bezel: [10, 7, 10, 7], radius: 7, screenRadius: 5, turns: true, detail: { kind: "speaker", side: "top" } },
   { id: "tablet", label: "Tablet", screen: [768, 1024], mat: "dark", bezel: [11, 11, 11, 11], radius: 8, screenRadius: 3, turns: true, detail: { kind: "camera", side: "top" } },
-  { id: "laptop", label: "Laptop", screen: [1024, 640], mat: "light", bezel: [7, 7, 9, 7], radius: 5, screenRadius: 1, turns: false, detail: { kind: "camera", side: "top" }, base: true },
-  { id: "monitor", label: "Desktop", screen: [1440, 900], mat: "light", bezel: [8, 8, 14, 8], radius: 4, screenRadius: 1, turns: false, detail: null, stand: true },
+  { id: "laptop", label: "Laptop", screen: [1024, 640], mat: "dark", bezel: [7, 7, 9, 7], radius: 5, screenRadius: 1, turns: false, detail: { kind: "camera", side: "top" }, base: true },
+  { id: "monitor", label: "Desktop", screen: [1440, 900], mat: "dark", bezel: [8, 8, 14, 8], radius: 4, screenRadius: 1, turns: false, detail: null, stand: true },
 ];
 
 // distance from the outside of a rounded rectangle, negative inside (pixel centres)
@@ -97,7 +97,7 @@ function camera(mat) {
 
 // the laptop's base: a 9-slice in one direction (a left cap, a repeating middle 1 px wide, a right cap); the ends slope in
 function laptopBase() {
-  const c = MATERIAL.light, cap = 10, H = 9, W = cap * 2 + 1, slope = 3, img = new Img(W, H);
+  const c = MATERIAL.dark, cap = 10, H = 9, W = cap * 2 + 1, slope = 3, img = new Img(W, H);
   const inset = (y) => Math.floor((y * slope) / (H - 1)); // how far in from the end this row starts
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const d = Math.min(x, W - 1 - x); // distance from the nearer end
@@ -120,7 +120,7 @@ function notch(mat) {
 }
 // the monitor's stand: a neck and a foot, one fixed picture centred under the screen
 function monitorStand() {
-  const c = MATERIAL.light, W = 36, H = 18, img = new Img(W, H);
+  const c = MATERIAL.dark, W = 36, H = 18, img = new Img(W, H);
   for (let y = 0; y < 13; y++) for (let x = 13; x < 23; x++) img.set(x, y, x === 13 || x === 22 ? c.O : x === 14 ? c.H : x >= 20 ? c.D : c.W);
   for (let y = 13; y < H; y++) for (let x = 0; x < W; x++) {
     const inset = y === 13 ? 8 : y === 14 ? 3 : y === 15 ? 1 : 0, d = Math.min(x, W - 1 - x);
@@ -215,7 +215,7 @@ for (const p of placed) {
       for (let xx = 0; xx < mid; xx++) { const o = (yy * img.w + cap) * 4; if (img.d[o + 3]) sheet.set(bx + cap + xx, by + yy, [img.d[o], img.d[o + 1], img.d[o + 2], 255]); }
       for (let xx = 0; xx < cap; xx++) { const o = (yy * img.w + cap + 1 + xx) * 4; if (img.d[o + 3]) sheet.set(bx + cap + mid + xx, by + yy, [img.d[o], img.d[o + 1], img.d[o + 2], 255]); }
     }
-    const nt = notch("light");
+    const nt = notch("dark");
     sheet.blit(nt, bx + Math.floor((baseW - nt.w) / 2), by + 1);
   }
   if (p.stand) { const st = monitorStand(); sheet.blit(st, p.x + Math.floor((p.img.w - st.w) / 2), p.y + p.img.h); }

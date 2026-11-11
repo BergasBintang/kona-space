@@ -8,14 +8,14 @@ import { createTicket, mockBase, mockCards, mockFiles, type MockCard, type Proje
 import { buildPrompt, fallbackDraft, parseDraft, type Draft, type DraftContext } from "../lib/mockdraft";
 import { Confirm } from "./Confirm";
 import { MARGIN, MAX_ZOOM, clampZoom, filesSignature, fitScale, frameMessage, layout, pageUrl, percent, stepZoom, wheelZoom, type Device } from "../lib/mockview";
-import { NOTE_MAX, addPin, editPin, measureLine, pageFile, partLabel, pickMessage, pinsForPage, placeNote, removePin, toScreen, type Box, type Part, type Pin } from "../lib/mockpick";
+import { NOTE_MAX, addPin, editPin, measureLine, pageFile, partLabel, pickMessage, pinsForPage, placeNote, removePin, scopeLine, toScreen, type Box, type Part, type Pin } from "../lib/mockpick";
 import { Help } from "./Help";
 import { IconButton, type IconName } from "./Icon";
 import { Button, ago } from "./ui";
 
 // pins stay while the app is open, so leaving a mockup by mistake does not lose them (they are not written to disk)
 const kept = new Map<string, Pin[]>();
-const NOTE_SIZE = { w: 280, h: 190 };
+const NOTE_SIZE = { w: 320, h: 262 }; // the height is the most it takes (the two choices may wrap onto two lines)
 const field = "border border-line-strong bg-inset px-3 text-[14px] text-text placeholder:text-text-tertiary";
 
 const PICTURES = import.meta.glob("../assets/devices/*.png", { eager: true, query: "?url", import: "default" }) as Record<string, string>;
@@ -107,6 +107,7 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
   const [hover, setHover] = useState<Part | null>(null);
   const [target, setTarget] = useState<{ part: Part; box: Box } | null>(null);
   const [noteText, setNoteText] = useState("");
+  const [everyDevice, setEveryDevice] = useState(false); // a new note is for the device on screen unless this is chosen
   const [, bump] = useState(0); // a new number draws the note box again (the sheet was moved under it)
   const nextId = useRef(pins.reduce((m, p) => Math.max(m, p.id), 0) + 1);
 
@@ -115,8 +116,8 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
   const lay = useMemo(() => layout(device, isTurned), [device, isTurned]);
   const fit = fitScale(lay, room);
   const scale = zoom === null ? fit : clampZoom(zoom, fit);
-  const now = useRef({ scale, fit, theme, picking, pins, target });
-  now.current = { scale, fit, theme, picking, pins, target };
+  const now = useRef({ scale, fit, theme, picking, pins, target, deviceId });
+  now.current = { scale, fit, theme, picking, pins, target, deviceId };
   const back = useRef(onBack);
   back.current = onBack;
 
@@ -137,11 +138,11 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
     if (!w) return;
     w.postMessage({ kona: "theme", value: now.current.theme }, "*");
     w.postMessage({ kona: "pick", on: now.current.picking }, "*");
-    w.postMessage({ kona: "pins", list: pinsForPage(now.current.pins) }, "*");
+    w.postMessage({ kona: "pins", list: pinsForPage(now.current.pins, now.current.deviceId) }, "*");
   }, []);
-  useEffect(() => { tell(); }, [theme, picking, pins, tell]);
+  useEffect(() => { tell(); }, [theme, picking, pins, deviceId, tell]);
   useEffect(() => { kept.set(keptKey, pins); }, [keptKey, pins]);
-  const closeNote = useCallback(() => { setTarget(null); setNoteText(""); frame.current?.contentWindow?.postMessage({ kona: "clear" }, "*"); }, []);
+  const closeNote = useCallback(() => { setTarget(null); setNoteText(""); setEveryDevice(false); frame.current?.contentWindow?.postMessage({ kona: "clear" }, "*"); }, []);
   /** Esc: first the open note, then pick mode, then the sheet goes back to the cards */
   const escape = useCallback(() => {
     if (document.querySelector("[role=dialog]")) return;
@@ -151,7 +152,7 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
   }, [closeNote]);
   const addNote = () => {
     if (!target) return;
-    const next = addPin(pins, target.part, noteText, nextId.current);
+    const next = addPin(pins, target.part, noteText, nextId.current, everyDevice ? undefined : { id: device.id, label: device.label });
     if (next !== pins) { nextId.current++; setPins(next); }
     closeNote();
   };
@@ -161,7 +162,11 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
   const [sendError, setSendError] = useState<string | null>(null);
   const [sentLine, setSentLine] = useState<string | null>(null);
   const cancelled = useRef(false);
-  const context = (): DraftContext => ({ cardId: card.id, cardName: card.name, device: device.label, width: lay.screen.w, theme });
+  const context = (): DraftContext => {
+    // notes made on other devices: the ticket says all the devices they were seen on (and no single width)
+    const seen = [...new Set([device.label, ...pins.flatMap((p) => (p.only ? [p.only.label] : []))])];
+    return { cardId: card.id, cardName: card.name, device: seen.join(" and "), width: seen.length > 1 ? 0 : lay.screen.w, theme };
+  };
   const startSend = async () => {
     if (pins.length === 0) return;
     const ctx = context(), mine = pins;
@@ -391,6 +396,10 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
         <div role="group" aria-label="Note for this part" className="px-card absolute z-10 flex flex-col gap-1.5 p-2" style={{ left: noteAt.left, top: noteAt.top, width: NOTE_SIZE.w }}>
           <span className="truncate text-[14px] leading-5 font-bold">{partLabel(target.part)}</span>
           <span className="truncate text-[12px] leading-4 text-text-secondary">{measureLine(target.part)}</span>
+          <div role="group" aria-label="Which devices this note is for" className="flex flex-wrap gap-1.5">
+            <Button small variant="quiet" on={everyDevice} aria-pressed={everyDevice} onClick={() => setEveryDevice(true)}>Every device</Button>
+            <Button small variant="quiet" on={!everyDevice} aria-pressed={!everyDevice} onClick={() => setEveryDevice(false)}>Only {device.label}</Button>
+          </div>
           <textarea autoFocus value={noteText} onChange={(e) => setNoteText(e.target.value.slice(0, NOTE_MAX))} rows={3} aria-label="What should change here?" placeholder="What should change here?"
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addNote(); } }} className={`py-2 leading-5 ${field}`} />
           <div className="flex justify-end gap-2">
@@ -414,7 +423,7 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
                   <span className="min-w-0 flex-1 truncate text-[13px] leading-5 font-bold" title={`${partLabel(p)} · ${pageFile(p.page)}`}>{partLabel(p)}</span>
                   <IconButton icon="trash" label={`Remove note ${i + 1}`} variant="ghost" onClick={() => setPins((cur) => removePin(cur, p.id))} />
                 </div>
-                <span className="truncate text-[12px] leading-4 text-text-tertiary">{pageFile(p.page)}</span>
+                <span className="truncate text-[12px] leading-4 text-text-tertiary">{scopeLine(p)} · {pageFile(p.page)}</span>
                 <textarea value={p.note} rows={2} aria-label={`Note ${i + 1}`} onChange={(e) => setPins((cur) => editPin(cur, p.id, e.target.value))} className={`py-1.5 leading-5 ${field}`} />
               </li>
             ))}

@@ -2,7 +2,7 @@
 // the scratch files Claude keeps for each session. Kona only stops or deletes after the owner confirms, and shows exactly what first.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { ignoreLeftover, roleLabel, sessionTemp, sessionTempClean, stopLeftover, type LeftoverItem, type LeftoverOverview, type Role, type TempInfo } from "../lib/api";
+import { ignoreLeftover, roleLabel, samePlace, sessionTemp, sessionTempClean, stopLeftover, type LeftoverItem, type LeftoverOverview, type Role, type TempInfo } from "../lib/api";
 import type { State } from "../lib/sessions";
 import { Button, Glyph } from "./ui";
 import { Confirm } from "./Confirm";
@@ -32,7 +32,7 @@ function Row({ it, who, onStop, onIgnore }: { it: LeftoverItem; who: string; onS
   );
 }
 
-export function Leftovers({ state, roles, overview, onRefresh }: { state: State; roles: Role[]; overview: LeftoverOverview; onRefresh: () => void }) {
+export function Leftovers({ state, roles, overview, folder, onRefresh }: { state: State; roles: Role[]; overview: LeftoverOverview; folder?: string; onRefresh: () => void }) {
   const [temps, setTemps] = useState<TempInfo[]>([]);
   const [stopping, setStopping] = useState<LeftoverItem | null>(null);
   const [cleaning, setCleaning] = useState<TempInfo | null>(null);
@@ -41,7 +41,7 @@ export function Leftovers({ state, roles, overview, onRefresh }: { state: State;
   const [notice, setNotice] = useState<string | null>(null);
   const [showIgnored, setShowIgnored] = useState(false);
 
-  const ids = useMemo(() => state.order, [state.order]);
+  const ids = useMemo(() => state.order.filter((id) => !folder || samePlace(state.sessions[id].folder, folder)), [state.order, state.sessions, folder]);
   const loadTemps = useCallback(() => { if (ids.length) sessionTemp(ids).then(setTemps).catch(() => setTemps([])); else setTemps([]); }, [ids]);
   useEffect(() => { loadTemps(); }, [loadTemps]);
   useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(null), 9000); return () => clearTimeout(t); }, [notice]);
@@ -95,7 +95,7 @@ export function Leftovers({ state, roles, overview, onRefresh }: { state: State;
         )}
 
         <section className="flex flex-col gap-3" aria-label="Scratch files">
-          <div className="flex items-center gap-2.5"><h2 className="m-0 text-[17px] leading-6 font-bold">Scratch files</h2><Help title="Scratch files"><p className="m-0">Claude keeps a folder of temporary files (and pasted pictures) for each session. Only finished sessions can be cleaned.</p></Help></div>
+          <div className="flex items-center gap-3"><h2 className="m-0 text-[30px] leading-[38px] font-bold">Scratch files</h2><Help title="Scratch files"><p className="m-0">Claude keeps a folder of temporary files (and pasted pictures) for each session. Only finished sessions can be cleaned.</p></Help></div>
           {bigTemps.length === 0 && <p className="m-0 text-[14px] leading-5 text-text-tertiary">No scratch files for the sessions open in this window.</p>}
           {bigTemps.map((t) => {
             const live = state.sessions[t.session_id]?.run !== "ended";

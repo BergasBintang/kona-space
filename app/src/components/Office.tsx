@@ -193,8 +193,9 @@ function Living({ scene, looks, names, places, k, sheetOpen, chatting, onTalk, c
 /** The small picture over each piece of the office that opens a screen: what that screen is about (the pieces are faint at rest, so the office does not turn into a sign board). */
 const CLUE: Record<string, IconName> = { brain: "bulb", files: "folder", servers: "server", costs: "coin", accounts: "key", settings: "gear", leftovers: "crate", workflows: "flow", board: "board", worktrees: "branch", mockups: "deviceMonitor" };
 
-export const Office = memo(function Office({ map, looks = NO_LOOKS, names = NO_NAMES, seated = NOBODY, sheetOpen, onOpen, onOpenPerson, onSay, onEdit }: {
-  map: OfficeMap; looks?: Record<string, Look>; /** what each role is called */ names?: Record<string, string>; /** who sits at the meeting table now: person -> chair number (the meeting that runs) */ seated?: Record<string, number>; sheetOpen: boolean; onOpen: (p: Place) => void; onOpenPerson: (role: string) => void; /** one reply from an office boy */ onSay: (who: Who, history: Turn[], message: string) => Promise<string>; onEdit?: () => void;
+const NO_ALERTS: Partial<Record<Place, number>> = {};
+export const Office = memo(function Office({ map, looks = NO_LOOKS, names = NO_NAMES, seated = NOBODY, sheetOpen, alerts = NO_ALERTS, onOpen, onOpenPerson, onSay, onEdit }: {
+  map: OfficeMap; looks?: Record<string, Look>; /** what each role is called */ names?: Record<string, string>; /** who sits at the meeting table now: person -> chair number (the meeting that runs) */ seated?: Record<string, number>; sheetOpen: boolean; /** a red mark over the piece of a screen that has something wrong right now: how many (the programs left behind) */ alerts?: Partial<Record<Place, number>>; onOpen: (p: Place) => void; onOpenPerson: (role: string) => void; /** one reply from an office boy */ onSay: (who: Who, history: Turn[], message: string) => Promise<string>; onEdit?: () => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -359,10 +360,16 @@ export const Office = memo(function Office({ map, looks = NO_LOOKS, names = NO_N
               ))}
             </Living>
           </div>
-          {!sheetOpen && HITS.filter((h) => h.kind === "piece" && h.opens && CLUE[h.opens] && h.key !== hover).map((h) => (
-            <span key={`clue-${h.key}`} aria-hidden data-clue={h.opens} className="pointer-events-none absolute z-[1] flex size-6 -translate-x-1/2 -translate-y-full items-center justify-center border-2 border-line-strong bg-surface-2 text-text opacity-55"
-              style={{ left: left + ((h.rect[0] + h.rect[2]) / 2) * k, top: top + h.rect[1] * k - 2 }}><Icon name={CLUE[h.opens!]} /></span>
-          ))}
+          {!sheetOpen && HITS.filter((h) => h.kind === "piece" && h.opens && CLUE[h.opens] && h.key !== hover).map((h) => {
+            const n = alerts[h.opens as Place] ?? 0; // something is wrong: the icon turns into a red "!" (and how many, when more than one)
+            return n > 0 ? (
+              <span key={`clue-${h.key}`} role="img" aria-label={`${n} left behind`} data-clue={h.opens} data-alert={h.opens} className="font-pixel pointer-events-none absolute z-[1] flex h-6 min-w-6 -translate-x-1/2 -translate-y-full items-center justify-center gap-1 border-2 border-line-strong bg-state-left px-1 text-[15px] leading-none font-bold text-on-danger"
+                style={{ left: left + ((h.rect[0] + h.rect[2]) / 2) * k, top: top + h.rect[1] * k - 2 }}><svg aria-hidden width="4" height="16" viewBox="0 0 4 16" shapeRendering="crispEdges" fill="currentColor"><rect width="4" height="10" /><rect y="12" width="4" height="4" /></svg>{n > 1 && n}</span>
+            ) : (
+              <span key={`clue-${h.key}`} aria-hidden data-clue={h.opens} className="pointer-events-none absolute z-[1] flex size-6 -translate-x-1/2 -translate-y-full items-center justify-center border-2 border-line-strong bg-surface-2 text-text opacity-55"
+                style={{ left: left + ((h.rect[0] + h.rect[2]) / 2) * k, top: top + h.rect[1] * k - 2 }}><Icon name={CLUE[h.opens!]} /></span>
+            );
+          })}
           {hovered && (
             <span aria-hidden className="font-pixel pointer-events-none absolute z-[2] flex -translate-x-1/2 -translate-y-full items-center gap-1.5 border-2 border-brand bg-surface-2 px-1.5 text-[13px] leading-5 font-bold whitespace-nowrap text-text"
               style={{ left: left + ((hovered.rect[0] + hovered.rect[2]) / 2) * k, top: top + hovered.rect[1] * k - 4 }}>{labelOf(hovered)}</span>

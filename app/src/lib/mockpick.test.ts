@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PINS_MAX, addPin, cleanText, editPin, measureLine, pageFile, partLabel, pickMessage, pinsForPage, placeNote, removePin, toScreen, type Part } from "./mockpick.ts";
+import { PINS_MAX, addPin, cleanText, editPin, measureLine, pageFile, partLabel, pickMessage, pinsForPage, placeNote, removePin, scopeLine, toScreen, type Part } from "./mockpick.ts";
 
 const part = (over: Record<string, unknown> = {}) => ({ kona: "pick", part: "hero-title", tag: "h1", text: "Welcome", place: "body:nth-of-type(1)>h1:nth-of-type(1)", within: ["hero"], page: "/p1/site/index.html", padding: "8px 12px", gap: "", radius: "4px", border: "none", w: 320, h: 48, x: 10, y: 20, rw: 320, rh: 48, vw: 1024, vh: 640, ...over });
 
@@ -88,4 +88,17 @@ test("the labels", () => {
   assert.equal(pageFile("/p1/site/pages/a%20b.html"), "pages/a b.html");
   assert.equal(pageFile("/p1/site/"), "index.html");
   assert.equal(cleanText(5, 10), "");
+});
+
+test("a note is for every device unless it names one, and a note for one device is only drawn on that device", () => {
+  const p = { part: "site-nav", tag: "nav", text: "", place: "body>nav", within: [], page: "/p/c/index.html", padding: "", gap: "", radius: "", border: "", w: 390, h: 65 } as Part;
+  let pins = addPin([], p, "bigger menu", 1, { id: "phone", label: "Phone" });
+  pins = addPin(pins, p, "red button", 2);
+  assert.equal(pins[0].only?.label, "Phone");
+  assert.equal(pins[1].only, undefined, "no device named: every device");
+  assert.equal(scopeLine(pins[0]), "Only Phone");
+  assert.equal(scopeLine(pins[1]), "Every device");
+  assert.deepEqual(pinsForPage(pins, "phone").map((x) => x.n), [1, 2]);
+  assert.deepEqual(pinsForPage(pins, "monitor").map((x) => x.n), [2], "the phone note is hidden on the desktop, and the number stays the list's own");
+  assert.deepEqual(pinsForPage(pins).map((x) => x.n), [1, 2], "no device given: everything");
 });

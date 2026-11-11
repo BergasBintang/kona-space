@@ -58,8 +58,18 @@ test("the plain draft uses the owner's own words and names every pin", () => {
   const d = fallbackDraft(ctx, [pin(1), pin(2, { part: "", tag: "p", text: "", note: "tighter spacing" })]);
   assert.equal(d.title, "The site: 2 changes from review");
   assert.ok(d.description.startsWith(whereLine(ctx)));
-  assert.match(d.description, /1\. hero-title \(index\.html, 320 x 48 px\): make it bigger/);
-  assert.match(d.description, /2\. p \(index\.html, 320 x 48 px\): tighter spacing/);
+  assert.match(d.description, /1\. hero-title \(index\.html, 320 x 48 px, every device\): make it bigger/);
+  assert.match(d.description, /2\. p \(index\.html, 320 x 48 px, every device\): tighter spacing/);
   const one = fallbackDraft(ctx, [pin(1, { note: "x".repeat(100) })]);
   assert.ok(one.title.length <= 100 && one.title.startsWith("The site: "));
+});
+
+test("each pin tells the model, and the plain list, which devices it is for", () => {
+  const pins = [pin(1, { only: { id: "phone", label: "Phone" } }), pin(2)];
+  const json = JSON.parse(buildPrompt(ctx, pins).prompt.split("\n\n").slice(1).join("\n\n"));
+  assert.equal(json.pins[0].applies_to, "only on Phone");
+  assert.equal(json.pins[1].applies_to, "every device");
+  const d = fallbackDraft(ctx, pins);
+  assert.match(d.description, /only phone/);
+  assert.match(d.description, /every device/);
 });

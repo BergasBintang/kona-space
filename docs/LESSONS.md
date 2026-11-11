@@ -698,7 +698,7 @@ The owner closed the last ten tickets (T-0018 to T-0027), so all 27 are Done, an
 | Adding that starter note made an old question answer from it: "drag a card to In progress" found the Mockups note first, and the first-answer rate fell from 85.0% to 83.7% | The note used "card" and "drag" in everyday senses | After any starter note, run `node tests/search-eval.mjs`; reword the common words ("card" became "folder", "drag" became "move by hand"); add questions about the new note. The baseline is now TP 40, top-1 88.4% |
 | The owner asked about vector search for the Brain | At 27 notes the keyword search misses 2 of 10 "same idea, other words" questions; a model costs a 235 MB download, a second engine and the honest "Not in the brain" | Scrapped for now (decision 85). Revisit with hundreds of notes or repeated real misses; first try `aliases:` and one cheap Haiku rewrite |
 | "Deploy" was meant as a Kona release | The same word means a server in the Miralis repos | In the Miralis repos "deploy" means a server. In Kona, "deploy" and "release" mean the signed installer on GitHub (docs/RELEASING.md) |
-| "Wait, not like that, the usual way" after I started `npx tauri dev` | The README says `npm run tauri dev` (the same program). What the owner meant was never said | Open: ask once for the exact way, and write it in the README |
+| "Wait, not like that, the usual way" after I started `npx tauri dev` | The README says `npm run tauri dev` (the same program). What the owner meant was never said | Settled 2026-11-11: the owner confirmed `npm run tauri dev` from the `app` folder is the usual way (the README already says so). Start it that way |
 
 **Checked by the owner, not by Claude:** the owner saw the Connections form and cards, the Costs lists and charts, the Brain notes list, the Board dialog and the notes list through pictures, and said the arrow on a piece "is better". Claude did not open these new screens in the window itself: they are proven by `tsc`, the unit tests and the owner's pictures only.
 
@@ -760,3 +760,20 @@ The owner closed the last ten tickets (T-0018 to T-0027), so all 27 are Done, an
 | The smoke test failed on "a whole number of screen pixels" | `ratio % 1` called 0.9999999985 "not whole" at a 120 percent view | Compare the distance to the nearest whole number, never `% 1` of a float |
 
 **Rule that came out of it:** a line of pixels is judged by its run lengths (two in every row on a 2:1 edge), counted by a script on all four sides, not by eye.
+
+## 26. What was found in the session of 2026-11-11 (Leftovers per project, the red "!", notes per device, dark frames, sharing talk)
+
+| Seen | Cause | Keep |
+|---|---|---|
+| The top-bar "left behind" and "waiting on you" counts were app-wide, and the Leftovers page too | They were counted over every session, not the open project's | Both are narrowed by the project folder (`samePlace`); a session whose folder is not known still shows everywhere, so nothing is hidden by mistake |
+| The owner said "look at the font size I marked" and I first read it as the page title | The two headings meant were "Leftovers" and "Scratch files" | When a marked picture is ambiguous, say which two things I think were marked before changing sizes |
+| A "!" drawn with a font letter looked off-centre to the owner | Font glyphs carry side space | Draw such marks as two pixel rectangles in an SVG and measure the centre |
+| The "!" on the Leftovers piece is hidden by the hover name label when the pointer is on the crate | The label is drawn over the badge | Open: not changed, owner has not asked |
+| Notes in the Mockups pick-a-part box did not say whether they were for every device or one | The pin only kept the part and the note | A pin has an optional `only` (one device); the box says "Every device" or "Only <device>", the ticket draft is told, and a test covers it |
+| The laptop and desktop frames were light while phone and tablet were dark | `build-devices.mjs` had `mat` set per device | Change the script, run it, copy the outputs by hand to `app/src/assets/devices/` (the app reads that copy, not `art/out`) |
+| The window went blank after editing `Mockups.tsx` ("does not provide an export named Mockups") | Vite read the file in the middle of a save and cached it empty; touching files did not help | Stop and restart the Vite process |
+| A heredoc edit of `lib.rs` lost the `\n\` line ending inside the long prompt string | The shell ate the backslash | Insert with `chr(92)` and print the line with `repr` to check |
+| Regex with `\n` inside a test-driver string collapsed | Escapes are reduced twice on the way | Split on `String.fromCharCode(10)` instead |
+| "Can we make something like cloudflared ourselves?" | The program on the PC is the small part; the public server is what costs | Decision 90 (still in discussion). Do not build a relay for every user; see the row |
+
+**Checked (dev window, throwaway project `leftover-demo`, 2026-11-11):** a real session waiting on a question moved the count and the card; the "!" badge centred by measurement; per-device notes saved and shown; 218 tests. **Not checked:** the waiting mark on welcome-page cards (not built), the selected state of the Every device / Only X buttons (subtle), notes for another device are not dimmed.

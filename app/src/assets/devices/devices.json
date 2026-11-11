@@ -256,8 +256,8 @@
       },
       "turns": false,
       "k": 2,
-      "material": "light",
-      "backdrop": "#1b1712",
+      "material": "dark",
+      "backdrop": "#14100b",
       "screenRadius": 1,
       "frames": {
         "upright": {
@@ -322,8 +322,8 @@
       },
       "turns": false,
       "k": 2,
-      "material": "light",
-      "backdrop": "#1b1712",
+      "material": "dark",
+      "backdrop": "#14100b",
       "screenRadius": 1,
       "frames": {
         "upright": {

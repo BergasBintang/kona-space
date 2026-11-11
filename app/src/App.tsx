@@ -177,7 +177,7 @@ export default function App() {
   const [seen, setSeen] = useState<Record<string, number>>({}); // for each session, how many turns the owner has seen: "Finish" over a cat stays until the owner opens that person's chat
   const looksSig = looksSignature(state, seen);
   const looks = useMemo(() => officeLooks(project, state, seen), [project, looksSig]); // eslint-disable-line react-hooks/exhaustive-deps
-  const attention = useMemo(() => state.order.filter((id) => state.sessions[id].run === "waiting").length, [state]);
+  const attention = useMemo(() => state.order.filter((id) => state.sessions[id].run === "waiting" && (!project || samePlace(state.sessions[id].folder, project.folder))).length, [state, project]); // only this project's, like the leftovers
   const pickProject = useCallback((id: string) => { setProjectId(id); remember("kona.project", id); setPerson(null); }, []);
   // do a move that leaves the sheet's page (home, another page from the top bar), asking first if the page holds text that was not sent or saved
   const leave = (go: () => void) => { if (sheetGuard.current) sheetGuard.current.leave(go); else go(); };
@@ -221,7 +221,12 @@ export default function App() {
     const t = setInterval(look, place === "leftovers" ? 2500 : 5000);
     return () => { live = false; clearInterval(t); };
   }, [state.order.length, place]);
-  const leftTotal = lo.items.filter((i) => i.left_behind && !i.ignored).length;
+  // only this project's: an item belongs here when the session that started it works in this project's folder. A program whose session cannot be told is shown everywhere, so nothing hides.
+  const loHere = useMemo<LeftoverOverview>(() => {
+    const mine = (sid: string) => { const s = state.sessions[sid]; return !s || !project || samePlace(s.folder, project.folder); };
+    return { items: lo.items.filter((i) => mine(i.session_id)), sessions: lo.sessions.filter((x) => mine(x.id)) };
+  }, [lo, state.sessions, project]);
+  const leftTotal = loHere.items.filter((i) => i.left_behind && !i.ignored).length;
 
   // the earlier conversations of the open person: Claude Code's own transcript files of this project, filed by the role the cost ledger says each one ran as; a conversation with no role on record is
   // filed under the Secretary (the front desk), because the role of an old session was not recorded
@@ -411,7 +416,7 @@ export default function App() {
         onRemoved={(id) => { setProjects((cur) => (cur ?? []).filter((p) => p.id !== id)); setProjectId(null); remember("kona.project", ""); setPlace("office"); setPerson(null); setWelcomeView("home"); setGreeted(false); }} />;
       case "servers": return <Servers project={project} roles={roles} />;
       case "brain": return <BrainPlace project={project} tab={brainTab} onTab={setBrainTab} onAsk={askClaude} />;
-      case "leftovers": return <Leftovers state={state} roles={roles} overview={lo} onRefresh={() => { void leftoverOverview().then(setLo); }} />;
+      case "leftovers": return <Leftovers state={state} roles={roles} overview={loHere} folder={project?.folder}onRefresh={() => { void leftoverOverview().then(setLo); }} />;
       case "worktrees": return <Worktrees project={project} onChanged={() => {}} />;
       case "board": return <Board project={project} roles={roles} state={state} onStart={startTicket} onOpenSession={(id) => openPerson(state.sessions[id]?.roleId ?? "secretary")} />;
       case "workflows": return <Meeting project={project} roles={roles} runs={runner.runs} sessions={state.sessions} dispatch={dispatch} onRun={async (w) => { await runner.startRun(w); }} onStop={(id) => void runner.stop(id)} onRetry={runner.retry} onRemove={(id) => void runner.remove(id)} onSay={runner.say} />;
@@ -430,7 +435,7 @@ export default function App() {
           onSave={async (m) => { await officeMapSave(project.folder, JSON.stringify(m)); setOfficeMap(m); setOwnMap(true); setBrokenMap(null); setNotice("Saved the office of this project."); }}
           onReset={async () => { await officeMapReset(project.folder); setOfficeMap(STANDARD); setOwnMap(false); setBrokenMap(null); setNotice("This project shows the standard office again."); }}
           onClose={() => setEditing(false)} />
-      : <Office map={officeMap} looks={looks} seated={seated} sheetOpen={place !== "office" || person !== null} names={names} onOpen={openPlace} onOpenPerson={openPerson} onSay={sayToOffice} onEdit={() => setEditing(true)} />;
+      : <Office map={officeMap} looks={looks} seated={seated} sheetOpen={place !== "office" || person !== null} alerts={leftTotal > 0 ? { leftovers: leftTotal } : undefined} names={names} onOpen={openPlace} onOpenPerson={openPerson} onSay={sayToOffice} onEdit={() => setEditing(true)} />;
     if (place !== "office") {
       const info = PLACES.find((x) => x.id === place);
       const brainTabs = place === "brain" ? { tabs: BRAIN_TABS, active: brainTab, onTab: (id: string) => setBrainTab(id as BrainTab), keepDraftOnTab: true } : {};

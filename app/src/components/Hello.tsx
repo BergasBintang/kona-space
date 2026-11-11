@@ -13,8 +13,8 @@ import { KonaMark } from "./KonaMark";
 
 type Status = AccountStatus | "asking";
 
-export function Hello({ projects, accounts, version, note = null, onOpen, onAdd, onOpenSettings, onProjects }: {
-  version: string; note?: string | null; projects: Project[]; accounts: Account[]; onOpen: (id: string) => void; onAdd: () => void; onOpenSettings: () => void; onProjects: (next: Project[]) => void;
+export function Hello({ projects, accounts, version, note = null, waiting = {}, finished = {}, onOpen, onAdd, onOpenSettings, onProjects }: {
+  /** how many sessions of each project (by its id) are waiting for the owner */ waiting?: Record<string, number>; /** how many have finished a turn the owner has not seen yet */ finished?: Record<string, number>; version: string; note?: string | null; projects: Project[]; accounts: Account[]; onOpen: (id: string) => void; onAdd: () => void; onOpenSettings: () => void; onProjects: (next: Project[]) => void;
 }) {
   const [status, setStatus] = useState<Record<string, Status>>({});
   const [swapping, setSwapping] = useState<string | null>(null); // the project whose account is being changed
@@ -71,12 +71,13 @@ export function Hello({ projects, accounts, version, note = null, onOpen, onAdd,
     const st = acc ? status[acc.id] : undefined;
     const checking = !!acc && (st === undefined || st === "asking");
     const ok = !!acc && !!st && st !== "asking" && st.logged_in;
-    const email = ok ? (st as AccountStatus).email ?? null : null;
     return (
       <div key={p.id} className="px-card flex flex-1 flex-col gap-4 p-3">
         <div className="flex flex-col gap-1">
           <h3 className="m-0 truncate text-[19px] leading-7 font-bold">{p.name}</h3>
           <span className="truncate font-mono text-[13px] leading-5 text-text-tertiary" title={p.folder}>{p.folder}</span>
+          {(waiting[p.id] ?? 0) > 0 && <span role="status" className="mt-1 flex items-center gap-2 text-[14px] leading-5 font-bold text-state-waiting"><Glyph state="waiting" size={16} />{waiting[p.id]} waiting on you</span>}
+          {(finished[p.id] ?? 0) > 0 && <span role="status" className="mt-1 flex items-center gap-2 text-[14px] leading-5 font-bold text-state-done"><Glyph state="done" size={16} />{finished[p.id]} finished</span>}
         </div>
 
         {!acc && (
@@ -90,8 +91,7 @@ export function Hello({ projects, accounts, version, note = null, onOpen, onAdd,
             <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[14px] leading-5">
               <Glyph state={checking ? "idle" : ok ? "done" : "left"} size={16} />
               <span className="text-text-secondary">Account: <span className="font-bold text-text">{acc.label}</span></span>
-              <span className={ok ? "text-text-tertiary" : checking ? "text-text-tertiary" : "font-bold text-state-left"}>· {checking ? "checking" : ok ? "signed in" : "signed out"}</span>
-              {email && <span className="min-w-0 truncate text-text-tertiary">· {email}</span>}
+              {!checking && !ok && <span className="font-bold text-state-left">· signed out</span>}
             </span>
             {swapping === p.id && picker(p, p.account ?? null)}
           </div>

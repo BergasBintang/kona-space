@@ -2,6 +2,19 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.39.0, 2026-11-11
+
+Kona has a built-in terminal, and the office and the welcome page tell you more about what is waiting for you.
+
+- **A terminal inside Kona.** The Connections page has two views, **Access** (servers and GitHub repos, as before) and **Terminal**. A terminal is a real PowerShell in the project's folder, for git, npm, ssh and the like. It starts only when you press **Start terminal** (a shell uses about 70 MB), keeps running while you look at other pages, and stops when Kona closes or when you press Close (which asks first if a command is still running).
+- **You type in a bar, and every command gets its own header.** The screen shows only output; a separate bar at the bottom takes your line (Enter runs it, Shift+Enter adds a line, Up and Down bring back earlier lines, and a line that looks like a key or token is never remembered). Each command has a small header at the right end of its row: Running with a timer, Done, Failed with the exit code, or Stopped, with Stop while it runs and Copy for its output afterwards. While a command runs, the keyboard goes straight to the screen, so ssh, a password prompt and similar work.
+- **Script buttons.** The project's `package.json` and `composer.json` scripts appear as small buttons above the bar, and you can add your own (a name and a one-line command; a command that looks like it holds a key or token is refused). A button only puts its command in the bar; nothing runs until Enter. When there are too many for the row, the rest are behind **More**, a list with a search box. Your own buttons are kept in Kona's own folder, never in the project, and are included in the backups.
+- **The rest of the terminal:** the header shows the shell's folder and the Git branch, file paths in the output (like `src/App.tsx:42`) open in Files when clicked, Find (Ctrl+F), Copy all, Clear, and copy and paste like Windows Terminal.
+- **Leftovers and "waiting on you" count only the open project**, and a red "!" appears on the Leftovers piece in the office when something was left running.
+- **Mockups:** a note on a part says whether it is for every device or only one, the ticket draft says so, and the laptop and desktop frames are dark like the phone and the tablet.
+- **The welcome page cards** show "N waiting on you" and "N finished" for the sessions of each project, and only the account name (no "signed in" line and no e-mail). Each account name can be used only once on the computer.
+- **An "Open" mark stays over a worker's head** while its chat is open, after you have seen the "Finish" mark and closed the chat.
+
 ## 0.38.3, 2026-11-09
 
 The Accounts page is gone, the default office is laid out again, and the wall outlines are even.

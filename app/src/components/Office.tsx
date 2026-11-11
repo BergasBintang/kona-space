@@ -123,10 +123,10 @@ function Bubbles({ scene, looks, k }: { scene: Scene; looks: Record<string, Look
   return (
     <>
       {bubbles.map(({ role, x, y, look }) => (
-        <span key={role} data-bubble={look.word} className="font-pixel pointer-events-none absolute z-[1] flex -translate-x-1/2 -translate-y-full items-center gap-1.5 border-2 border-line-strong bg-surface-2 px-2 text-[15px] leading-6 font-bold whitespace-nowrap text-text px-shadow"
+        <span key={role} data-bubble={look.word} className={`font-pixel pointer-events-none absolute z-[1] flex -translate-x-1/2 -translate-y-full items-center gap-1.5 border-2 bg-surface-2 px-2 text-[15px] leading-6 font-bold whitespace-nowrap ${look.mode === "open" ? "border-line-subtle text-text-secondary" : "border-line-strong text-text px-shadow"}`}
           style={{ left: x, top: y }}>
           <Glyph state={look.glyph!} size={16} />{look.word}
-          <i aria-hidden className="absolute top-full left-1/2 -mt-[5px] size-2.5 -translate-x-1/2 rotate-45 border-r-2 border-b-2 border-line-strong bg-surface-2" />
+          <i aria-hidden className={`absolute top-full left-1/2 -mt-[5px] size-2.5 -translate-x-1/2 rotate-45 border-r-2 border-b-2 bg-surface-2 ${look.mode === "open" ? "border-line-subtle" : "border-line-strong"}`} />
         </span>
       ))}
     </>

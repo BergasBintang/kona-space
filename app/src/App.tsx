@@ -11,7 +11,7 @@ import { OfficeEditor } from "./components/OfficeEditor";
 import { STANDARD, ensurePages, parseMap } from "./office/map";
 import type { OfficeMap } from "./office/engine/types";
 import { Sheet, type Guard } from "./components/Sheet";
-import { officeLooks, looksSignature } from "./lib/office";
+import { finishedByProject, officeLooks, looksSignature, waitingByProject } from "./lib/office";
 import { Hello, WelcomeBar } from "./components/Hello";
 import { AddProject } from "./components/AddProject";
 import { PERSON_TABS, PersonSheet, type PersonTab } from "./components/PersonSheet";
@@ -48,6 +48,7 @@ const SEAT_OF: Record<string, number> = Object.fromEntries((cats as { rows: { id
 
 export default function App() {
   const [state, dispatch] = useReducer(reducer, undefined, () => ({ ...initialState, plans: loadPlans() }));
+  if (import.meta.env.DEV) (window as unknown as { __konaDispatch: typeof dispatch }).__konaDispatch = dispatch; // for the test drivers in the dev window only
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [projectId, setProjectId] = useState<string | null>(remembered("kona.project"));
   const [roles, setRoles] = useState<Role[]>([]);
@@ -68,6 +69,7 @@ export default function App() {
   const [tab, setTab] = useState<PersonTab>("chat");
   const [brainTab, setBrainTab] = useState<BrainTab>("map");
   const [serversTab, setServersTab] = useState<ServersTab>("connections");
+  const [fileTarget, setFileTarget] = useState<{ path: string; n: number } | null>(null); // a file the terminal asked to see in Files
   const [personError, setPersonError] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<Record<string, true>>({}); // sessions the owner put away with New conversation: they stay in the list of what ran, but are not shown with the person
   const [kits, setKits] = useState<Record<string, RoleKit>>({}); // what each role may use in the open project (its skills and connectors)
@@ -397,7 +399,7 @@ export default function App() {
             ? <AddProject first={projects.length === 0} accounts={accounts} groups={groupNames(projects)} onDone={added} onCancel={() => setWelcomeView("home")} onOpenAccounts={() => setWelcomeView("settings")} />
             : welcomeView === "settings"
               ? <GeneralSettings accounts={accounts} onAccounts={setAccounts} version={version} />
-              : <Hello projects={projects} accounts={accounts} version={version} note={helloNote}
+              : <Hello projects={projects} accounts={accounts} version={version} note={helloNote} waiting={waitingByProject(projects, state)} finished={finishedByProject(projects, state, seen)}
                   onOpen={(id) => { pickProject(id); setHelloNote(null); setGreeted(true); setPlace("office"); }}
                   onAdd={() => setWelcomeView("add")} onOpenSettings={() => setWelcomeView("settings")} onProjects={setProjects} />}
         </div>
@@ -410,12 +412,12 @@ export default function App() {
   const pageOf = (which: Place): React.ReactNode => {
     if (!project) return null;
     switch (which) {
-      case "files": return <Files project={project} />;
+      case "files": return <Files project={project} target={fileTarget} onUsed={() => setFileTarget(null)} />;
       case "mockups": return <Mockups project={project} send={{ designer: roles.find((r) => r.id === "design")?.person || "the designer", draft: draftMockupTicket, start: startTicket }} />;
       case "settings": return <ProjectSettings project={project} accounts={accounts} groups={groupNames(projects)} runningHere={state.order.filter((id) => state.sessions[id].run !== "ended" && samePlace(state.sessions[id].folder, project.folder)).length}
         onProject={(next) => setProjects((cur) => (cur ?? []).map((p) => (p.id === next.id ? next : p)))}
         onRemoved={(id) => { setProjects((cur) => (cur ?? []).filter((p) => p.id !== id)); setProjectId(null); remember("kona.project", ""); setPlace("office"); setPerson(null); setWelcomeView("home"); setGreeted(false); }} />;
-      case "servers": return <ServersPage project={project} roles={roles} tab={serversTab} />;
+      case "servers": return <ServersPage project={project} roles={roles} tab={serversTab} onOpenFile={(path) => { setFileTarget({ path, n: Date.now() }); openPlace("files"); }} />;
       case "brain": return <BrainPlace project={project} tab={brainTab} onTab={setBrainTab} onAsk={askClaude} />;
       case "leftovers": return <Leftovers state={state} roles={roles} overview={loHere} folder={project?.folder}onRefresh={() => { void leftoverOverview().then(setLo); }} />;
       case "worktrees": return <Worktrees project={project} onChanged={() => {}} />;

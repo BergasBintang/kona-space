@@ -100,7 +100,7 @@ impl Accounts {
         }
         let mut list = self.list.lock().unwrap();
         if list.iter().any(|a| a.label.to_lowercase() == label.to_lowercase()) {
-            return Err("Another account already has that name".into());
+            return Err("Another account on this computer already has that name, and each account name can be used only once".into());
         }
         let id = uuid::Uuid::new_v4().to_string();
         let dir = self.base.join("accounts").join(&id);
@@ -118,7 +118,7 @@ impl Accounts {
         }
         let mut list = self.list.lock().unwrap();
         if list.iter().any(|a| a.id != id && a.label.to_lowercase() == label.to_lowercase()) {
-            return Err("Another account already has that name".into());
+            return Err("Another account on this computer already has that name, and each account name can be used only once".into());
         }
         let a = list.iter_mut().find(|a| a.id == id).ok_or("That account does not exist")?;
         a.label = label.to_string();

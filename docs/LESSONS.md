@@ -792,3 +792,66 @@ The owner closed the last ten tickets (T-0018 to T-0027), so all 27 are Done, an
 
 **Checked (dev window, 2026-11-11):** a command and its output, the folder, colours readable on the paper background, Ctrl+C, leaving the page and coming back (screen redrawn), the Leftovers page ignores the shell, shells gone when Kona is stopped. **Not checked:** typing a long line that wraps while the window is resized, Unicode (emoji, Indonesian letters) in the output, 1000+ lines of output, the Git Bash choice.
 
+## 28. The risk test of the terminal (2026-11-11)
+
+| Seen | Cause | Keep |
+|---|---|---|
+| Kona held two PowerShells for one project; the window knew of one | The screen mounts twice in development (React's strict mode) and a quick tab switch does the same: two starts ran at once and the second overwrote the first | One start per project is shared (`starting` in `lib/terminal.ts`). Count shells from the outside (the programs under app.exe), not only from the window's own list |
+| After a full reload of the window (F5) the old shells stayed running, unseen | The page loses its list, the core keeps the shells | The page closes every shell in the core when it loads (`term_close_all`) |
+| The keyboard was not in the terminal after opening it or switching back | Nothing gave it focus | The terminal takes focus when it is shown |
+| Fear: a restart or Kona closing leaves a dev server running | Tested: a `node` child of the shell was gone after Restart, and after Kona was stopped | Seen safe. Closing the pseudo-terminal ends the whole tree, and the job object covers the rest |
+| Fear: Esc in the terminal closes the page | Tested | Seen safe |
+| Fear: the release program (no console window) could not host the shell | Built a release-type program without a console, in a scratch folder (5 minutes, 2 GB) | Seen: output, Ctrl+C and exit all work, and no extra window opens |
+
+**Checked:** 218 tests, 87 Rust tests, the smoke test (52 passes; one run in three stopped with a crash I could not repeat, right after the previous run), a release-style policy added to the window (no violations), accents, Chinese letters and an emoji, 20000 lines (15 s, the window stayed alive), resizing (the shell learns the new width), two projects with their own shells, a shell closing with Kona.
+**Not checked:** the real signed release (a hardened policy applies only there), ssh to a real server by me, vim or other full-screen programs, a huge paste into a program that does not read, many projects with a shell each (about 70 MB for each).
+**Known and left as is:** a program started in the terminal does not show on the Leftovers page; shells of a removed project live until Kona closes; the last 400 KB of output is replayed on return, so a full-screen program may look wrong after leaving the page.
+
+## 29. The terminal with blocks and an input bar (2026-11-11)
+
+| Seen | Cause | Keep |
+|---|---|---|
+| After I rewrote the terminal screen, stray characters showed and the command headers sat in the wrong place | The rewrite dropped the line that loads the terminal's style file; without it the helper boxes show and the headers are not positioned | The style file is imported in `components/term/session.tsx`. After any rewrite of a screen, look at a screenshot before testing anything else |
+| The header of each command (the "Done 0.2 s Copy" part) stayed at the left and covered the command | The terminal's own `anchor: right` option does not set the right edge when the offset is 0 | `index.css` has a rule for `[data-kona-chip]`; the session marks the element. Draw it, take a screenshot, and look |
+| File paths with a drive letter were not found | The pattern needed a name before each slash, and a drive letter is followed by a slash straight away | The pattern allows a slash right after the drive; the tests cover a drive letter with both kinds of slash |
+| The Find box hid the first header | It sits at the top right of the screen, where a first command's header is | Known and fine; it closes with Esc |
+| A window reload left the old shell running when nobody pressed Start | The clean-up ran only when a shell was started | The clean-up runs when the page loads (`lib/terminal.ts`, last lines) |
+| The sliding sheet shook for a moment when it opened with a terminal in it (the owner saw it) | Kona put the cursor into the input bar while the sheet was still sliding in; the browser scrolled the box inside the sheet by about 800 px to show the cursor, then it settled back. The same family as the `scrollIntoView` shake of section 14 | Every `focus()` in a screen that lives in a sheet is `focus({ preventScroll: true })`. Found by sampling every scroll position 40 ms apart while the sheet opened; after the fix nothing scrolled and the sheet slid from 873 to 72 px smoothly. A shake that is gone in a quick look is not gone: sample it |
+| Heredocs with quotes broke whole commands | The tool collapses backslashes and chokes on odd quotes | Write files with the Write tool, not with a heredoc |
+
+**Design as built:** one xterm screen per project kept alive outside the page (so leaving the page loses nothing); the shell prints a private mark (number 7777, base64 JSON) at each prompt from `term_init.ps1`; the input bar sends a line and Kona knows a block starts there, the next mark ends it; while a block runs the keyboard goes to the screen (ssh, a password, `Read-Host` work), when it ends the bar has it again. The terminal starts only when Start is pressed, and Close frees its memory (seen: 0 shells after Close).
+
+**Checked (dev window, 2026-11-11):** lazy start; a block ending Done, Failed (exit 3), Stopped (Stop button) and Running with a timer; the bar disabled while running and the keyboard on the screen, then back; a script button filling the bar; Up in the bar; Read-Host answered from the screen; a path in an error opening Files; Find; Copy of one block; Clear; Restart; Close; leaving and coming back (also a command that ended while away); `exit` typed in the bar; a reload closing the old shell; 229 tests, the Rust tests, the smoke test (52 passes).
+
+**Not checked:** a multi-line paste into the bar; a very long command row (the header covers its end); a custom prompt from the owner's own PowerShell profile (Kona's short prompt replaces it); Tab completion (the bar has none); a slow `git status` in a huge repository (it runs at every prompt); the signed release.
+
+## 30. The header, the script buttons and the drifting headers (2026-11-11)
+
+| Seen | Cause | Keep |
+|---|---|---|
+| The header buttons looked uneven | Three different button styles side by side (plain text, plain text, a framed one of another height) | One style (`quiet`, small) for all of them, a thin divider before Close. Restart was dropped: it is Close plus Start |
+| Closing the terminal threw away a running command without asking | Nothing asked | Close asks when a command runs, and shows the command (`Confirm`); with nothing running it closes at once |
+| "PowerShell" in the header told the owner nothing | There is one shell | Removed. A shell name comes back only when there is a choice of shells |
+| After the window got narrower and wider again, the header of a command sat on the wrong row, and Copy took the wrong text | The terminal's own row markers drift when lines are wrapped again (seen: two rows off) | `relocate()` in `term/session.tsx` finds each command's row by its text after every resize and puts the header and the end of the block back. Checked at 181 columns, 92 columns and 181 again: the three rows and their copies were right each time |
+| Many script buttons would not fit a row | A row of fixed buttons | The buttons that fit are shown, the rest are behind "More · n" (a list; a search box when more than 8 are hidden). The width is measured from an unseen copy of the row (`inert`), by a pure function that has tests (`fitCount`) |
+| My test typed into the bar instead of the "More" list | The list had no search box with 8 or fewer entries, so the keys went on to the bar | Not a fault of the screen, but a reminder: a test that types must check where the focus is first |
+| A test left 14 buttons in the owner's real Kona data file | I saved test buttons for the test project through the core | Cleaned afterwards (the file is `{}` again). A test that writes to Kona's own files must clean up before it ends |
+
+**Built:** own buttons (name and a one-line command) are kept in Kona's own folder in `term-buttons.json` (one file for all projects, never in the project's folder, copied into the backups); the core trims and checks them (40 letters for the name, 500 for the command, one line, no duplicate name; Rust test); the screen also refuses a command that looks like it holds a key, a token or a password. The project's `package.json` scripts and `composer.json` scripts (without the hooks composer runs by itself) are read the same way. A button only puts its line in the bar.
+
+**Checked (dev window):** the row with package scripts; adding a button of your own through the form (it came first, with its accent line and an x on hover); a secret refused; 17 buttons at full width (all fit) and at 700 px (9 shown, "More · 8", the list, picking from it); Close with a command running (asks and shows it), Cancel keeps it running, Close with nothing running does not ask; 233 tests, 88 Rust tests, the smoke test (52).
+**Not checked:** a composer.json on a real project; removing a button with the x or from the list by hand in the real window (only the core's saving was checked); the "More" list with the keyboard arrows; the signed release.
+
+## 31. Marks on the welcome page, the "Open" mark over a head, one account name (2026-11-11)
+
+| Seen | Cause | Keep |
+|---|---|---|
+| A worker's "Finish" mark vanished once the owner had opened the finished chat and closed it again, although the chat was still open | The mark was only "a turn the owner has not seen"; after seeing it the person was drawn as idle, so an open chat could not be told from none | A chat that has been seen but is still open keeps a quiet mark over the head: the dashed ring and the word "Open" (`mode: "open"` in `lib/office.ts`, paler than the other bubbles). It goes when the chat ends, and a chat with no turn has none |
+| From inside one project nothing told the owner that a worker of another project waited or had finished | The counts were narrowed to the open project (earlier in this session) | The welcome page card shows "N waiting on you" (the amber waiting glyph) and "N finished" (the green check) for sessions of that project, counted by `waitingByProject` and `finishedByProject` (with tests). "Finished" means the same as the bubble: a turn the owner has not looked at |
+| The card said "signed in" and showed the account's e-mail | Detail the owner does not need on a card | The card shows only "Account: name". "signed out" is kept, in red, because the Sign in button needs a reason; nothing is said while it is being checked |
+| "The account name should be only one per local computer" | Already true in the core (`accounts.rs`, case does not matter) | Only the message was made plainer: "Another account on this computer already has that name, and each account name can be used only once" |
+| I could not get a real session into the "waiting" state cheaply | A real session needs a permission prompt and costs usage | A dev-only hook (`window.__konaDispatch`, set in `App.tsx` when the app runs in development) feeds fake session records to the reducer. Seen: the card marks, "Questioning", "Finish" and then "Open" after viewing and closing the chat. A reload clears the fake sessions |
+| The owner asked what is this? about a waiting mark on welcome-page project cards, an item I had listed as an open offer | The list used a name only I knew | An open offer is written so that someone who was not there understands it: what the owner would see, where, and when (a small notice on a project's card saying a session is waiting for you) |
+
+**Checked (dev window):** a project with one waiting and one finished session shows both on its card ("1 waiting on you", "1 finished"); opening the project shows "Questioning" and "Finish" over the two heads; opening the finished person's chat and closing it turns "Finish" into "Open" (screenshot looked at); the card shows only the account name; 236 tests, 88 Rust tests.
+**Not checked:** a real session in another project (the records were made up, in the same shape as real ones); the "Open" mark in a crowded room (the bubbles lift above each other, as before); the "left behind" mark on cards (not built; the owner has not asked).

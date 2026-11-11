@@ -138,3 +138,6 @@ body {
 /* find in a file (Files place): every match, and the one being looked at */
 ::highlight(kona-find) { background-color: color-mix(in srgb, var(--color-state-waiting) 32%, transparent); color: inherit; }
 ::highlight(kona-find-now) { background-color: var(--color-accent); color: var(--color-on-accent); }
+
+/* The header of a command in the terminal sits at the right end of its row */
+.xterm-decoration[data-kona-chip] { left: auto !important; right: 0 !important; }

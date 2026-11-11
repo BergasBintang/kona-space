@@ -4,11 +4,15 @@
 // through `term_write`. The shell joins Kona's job object, so it and everything it started stop when Kona closes.
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State};
+
+/// What the shell runs at start: the short prompt and the mark Kona reads at each prompt (see the file).
+const INIT: &str = include_str!("term_init.ps1");
 
 struct Term {
     master: Box<dyn MasterPty + Send>,
@@ -37,6 +41,11 @@ pub fn term_open(app: AppHandle, terms: State<'_, Terms>, folder: String, shell:
         _ => {
             let mut c = CommandBuilder::new("powershell.exe");
             c.arg("-NoLogo");
+            c.arg("-NoExit");
+            // the start-up script, passed encoded (UTF-16, base64) so no quote in it can be mangled on the way
+            let utf16: Vec<u8> = INIT.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
+            c.arg("-EncodedCommand");
+            c.arg(B64.encode(utf16));
             c
         }
     };
@@ -110,3 +119,90 @@ pub fn term_close(terms: State<'_, Terms>, id: String) -> Result<(), String> {
     }
     Ok(())
 }
+
+/// A window that was reloaded has lost track of its shells: they are all closed, so none is left running unseen.
+#[tauri::command]
+pub fn term_close_all(terms: State<'_, Terms>) -> Result<(), String> {
+    for (_, mut t) in terms.0.lock().unwrap().drain() {
+        let _ = t.child.kill();
+    }
+    Ok(())
+}
+
+// ---- the owner's own script buttons of a project (shortcuts that fill the input bar; nothing runs by itself) ----
+// They live in Kona's own folder, one file for all projects, never in the project's folder, and go into the backups.
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct TermButton {
+    pub name: String,
+    pub line: String,
+}
+
+const MAX_BUTTONS: usize = 60;
+
+fn buttons_file(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+    Ok(crate::kona_base(app)?.join("term-buttons.json"))
+}
+
+fn read_buttons(app: &AppHandle) -> HashMap<String, Vec<TermButton>> {
+    buttons_file(app).ok().and_then(|p| std::fs::read_to_string(p).ok()).and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn term_buttons_load(app: AppHandle, project_id: String) -> Result<Vec<TermButton>, String> {
+    Ok(read_buttons(&app).remove(&project_id).unwrap_or_default())
+}
+
+/// What a button may hold: a short name and a one-line command.
+pub fn clean_buttons(list: Vec<TermButton>) -> Result<Vec<TermButton>, String> {
+    if list.len() > MAX_BUTTONS {
+        return Err(format!("A project can have at most {MAX_BUTTONS} buttons."));
+    }
+    let mut out: Vec<TermButton> = Vec::new();
+    for b in list {
+        let (name, line) = (b.name.trim().to_string(), b.line.trim().to_string());
+        if name.is_empty() || name.chars().count() > 40 {
+            return Err("A button needs a name of 1 to 40 letters.".into());
+        }
+        if line.is_empty() || line.chars().count() > 500 || line.chars().any(char::is_control) {
+            return Err("A button needs a command of one line, up to 500 letters.".into());
+        }
+        if out.iter().any(|o| o.name.eq_ignore_ascii_case(&name)) {
+            return Err(format!("There is already a button named \"{name}\"."));
+        }
+        out.push(TermButton { name, line });
+    }
+    Ok(out)
+}
+
+#[tauri::command]
+pub fn term_buttons_save(app: AppHandle, project_id: String, buttons: Vec<TermButton>) -> Result<(), String> {
+    let clean = clean_buttons(buttons)?;
+    let mut all = read_buttons(&app);
+    if clean.is_empty() { all.remove(&project_id); } else { all.insert(project_id, clean); }
+    let path = buttons_file(&app)?;
+    if let Some(dir) = path.parent() { std::fs::create_dir_all(dir).map_err(|e| e.to_string())?; }
+    let tmp = path.with_extension("json.tmp");
+    std::fs::write(&tmp, serde_json::to_string_pretty(&all).map_err(|e| e.to_string())?).map_err(|e| format!("Could not save the buttons: {e}"))?;
+    std::fs::rename(&tmp, &path).map_err(|e| format!("Could not save the buttons: {e}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn b(n: &str, l: &str) -> TermButton { TermButton { name: n.into(), line: l.into() } }
+
+    #[test]
+    fn buttons_are_trimmed_and_checked() {
+        let ok = clean_buttons(vec![b(" Dev ", " npm run dev ")]).unwrap();
+        assert_eq!((ok[0].name.as_str(), ok[0].line.as_str()), ("Dev", "npm run dev"));
+        assert!(clean_buttons(vec![b("", "x")]).is_err());
+        assert!(clean_buttons(vec![b("x", "")]).is_err());
+        assert!(clean_buttons(vec![b("x", "a\nb")]).is_err());
+        assert!(clean_buttons(vec![b(&"n".repeat(41), "x")]).is_err());
+        assert!(clean_buttons(vec![b("x", &"c".repeat(501))]).is_err());
+        assert!(clean_buttons(vec![b("Dev", "a"), b("dev", "b")]).is_err());
+        assert!(clean_buttons((0..61).map(|i| b(&format!("n{i}"), "x")).collect()).is_err());
+    }
+}
+

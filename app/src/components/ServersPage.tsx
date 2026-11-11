@@ -8,13 +8,13 @@ import { Terminal } from "./Terminal";
 export type ServersTab = "connections" | "terminal";
 export const SERVERS_TABS: { id: ServersTab; label: string }[] = [{ id: "connections", label: "Access" }, { id: "terminal", label: "Terminal" }];
 
-export function ServersPage({ project, roles, tab }: { project: Project; roles: Role[]; tab: ServersTab }) {
-  const [opened, setOpened] = useState(false); // the shell starts the first time the Terminal view is opened, not before
+export function ServersPage({ project, roles, tab, onOpenFile }: { project: Project; roles: Role[]; tab: ServersTab; onOpenFile: (absolutePath: string) => void }) {
+  const [opened, setOpened] = useState(false); // the Terminal view is made the first time it is opened (it still starts no shell until Start is pressed)
   useEffect(() => { if (tab === "terminal") setOpened(true); }, [tab]);
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className={tab === "connections" ? "flex min-h-0 min-w-0 flex-1 flex-col" : "hidden"}><Servers project={project} roles={roles} /></div>
-      {opened && <div className={tab === "terminal" ? "flex min-h-0 min-w-0 flex-1 flex-col" : "hidden"}><Terminal project={project} visible={tab === "terminal"} /></div>}
+      {opened && <div className={tab === "terminal" ? "flex min-h-0 min-w-0 flex-1 flex-col" : "hidden"}><Terminal project={project} visible={tab === "terminal"} onOpenFile={onOpenFile} /></div>}
     </div>
   );
 }

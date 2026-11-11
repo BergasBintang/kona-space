@@ -30,15 +30,23 @@ function listenOnce(): Promise<void> {
   return listening;
 }
 
-/** The project's shell: the running one, or a new one in the project's folder. */
-export async function shellFor(projectId: string, folder: string, rows: number, cols: number): Promise<Shell> {
-  await listenOnce();
+const starting = new Map<string, Promise<Shell>>();
+/** The project's shell: the running one, or a new one in the project's folder. Two askers at once (the screen mounted twice, a quick switch of tabs) share one start, never two shells. */
+export function shellFor(projectId: string, folder: string, rows: number, cols: number): Promise<Shell> {
   const have = byProject.get(projectId);
-  if (have && !have.exited) return have;
-  const id = await invoke<string>("term_open", { folder, shell: null, rows, cols });
-  const sh: Shell = { id, chunks: [], bytes: 0, exited: false };
-  byProject.set(projectId, sh); byId.set(id, sh);
-  return sh;
+  if (have && !have.exited) return Promise.resolve(have);
+  const going = starting.get(projectId);
+  if (going) return going;
+  const p = (async () => {
+    await listenOnce();
+    if (have) await closeShell(projectId); // the ended one is let go of, not left in the core
+    const id = await invoke<string>("term_open", { folder, shell: null, rows, cols });
+    const sh: Shell = { id, chunks: [], bytes: 0, exited: false };
+    byProject.set(projectId, sh); byId.set(id, sh);
+    return sh;
+  })().finally(() => starting.delete(projectId));
+  starting.set(projectId, p);
+  return p;
 }
 export const writeShell = (id: string, text: string) => invoke("term_write", { id, data: toB64(text) }).catch(() => {});
 export const resizeShell = (id: string, rows: number, cols: number) => invoke("term_resize", { id, rows, cols }).catch(() => {});
@@ -50,3 +58,11 @@ export async function closeShell(projectId: string) {
 
 // for the test drivers in the dev window only
 if (import.meta.env.DEV) (window as unknown as { __konaShells: typeof byProject }).__konaShells = byProject;
+
+// A page that has just loaded knows of no shell, so any still in the core are orphans (the window was reloaded): they are closed now, not left running unseen.
+void invoke("term_close_all").catch(() => {});
+
+/** The owner's own script buttons of a project; they are kept in Kona's own folder. */
+export type OwnButton = { name: string; line: string };
+export const loadButtons = (projectId: string) => invoke<OwnButton[]>("term_buttons_load", { projectId });
+export const saveButtons = (projectId: string, buttons: OwnButton[]) => invoke<void>("term_buttons_save", { projectId, buttons });

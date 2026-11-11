@@ -464,7 +464,7 @@ function Viewer({ project, entry, note, anchor, canGoBack, backName, onBack, onF
 }
 
 /** The tree and the reader together; `bound` is the folder a link may not leave. */
-function Place({ project, root, only, title }: { project: Project; root?: string; only?: string[]; title?: string }) {
+function Place({ project, root, only, title, target, onUsed }: { project: Project; root?: string; only?: string[]; title?: string; target?: { path: string; n: number } | null; onUsed?: () => void }) {
   const bound = root ?? project.folder;
   const [picked, setPicked] = useState<Entry | null>(null);
   const [trail, setTrail] = useState<Entry[]>([]);
@@ -504,6 +504,21 @@ function Place({ project, root, only, title }: { project: Project; root?: string
     void locate(bound, prev.path).then((f) => { open(f?.entry ?? prev, "back"); if (f) setReveal({ dirs: f.dirs, n: Date.now() }); });
   }, [trail, bound, open]);
 
+  // a file another page asked to show (the terminal, from a path in its output): it opens in the tree and the reader, or says it is not there
+  const used = useRef(onUsed);
+  used.current = onUsed;
+  useEffect(() => {
+    if (!target) return;
+    let live = true;
+    void locate(bound, target.path).then((f) => {
+      if (!live) return;
+      if (!f) setNote({ tone: "warn", text: `${baseName(target.path)} is not in this project.` });
+      else { open(f.entry, "tree"); setReveal({ dirs: f.dirs, n: Date.now() }); }
+      used.current?.(); // asked once: opening Files later by hand must not jump to this file again
+    });
+    return () => { live = false; };
+  }, [target, bound, open]);
+
   // the open file was changed on disk: show the new text, and say so
   const fresh = useCallback((e: Entry) => { mark(e); setPicked(e); setNote({ tone: "info", text: "Updated just now. Someone or something changed this file." }); }, [mark]);
 
@@ -516,8 +531,8 @@ function Place({ project, root, only, title }: { project: Project; root?: string
   );
 }
 
-export function Files({ project }: { project: Project }) {
-  return <Place key={project.id} project={project} />;
+export function Files({ project, target, onUsed }: { project: Project; target?: { path: string; n: number } | null; onUsed?: () => void }) {
+  return <Place key={project.id} project={project} target={target} onUsed={onUsed} />;
 }
 
 /** The same tree and reader, but only for some folders of one place: a person's own skills, read-only. `root` is the project's skills folder, `names` the skills this person has. */

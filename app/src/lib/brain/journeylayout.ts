@@ -4,12 +4,16 @@
 import type { Journey, Step } from "./journey.ts";
 
 export const BOX = { w: 184, h: 64, gapX: 72, gapY: 20, padX: 28, padY: 16 };
+/** most steps stacked in one lane and column; the rest go in a column beside it, so a lane never grows as tall as the whole product */
+export const MAX_STACK = 6;
+/** a step that links to this many others (or is linked from this many) is a hub, such as a menu: its lines are drawn only when it is pointed at */
+export const hubMin = (steps: number) => Math.max(8, Math.ceil(steps * 0.1));
 
 export type EdgeKind = "next" | "button" | "error";
-export type Edge = { from: string; to: string; label: string; kind: EdgeKind; /** goes back to a step that leads here: drawn under the boxes, not across */ back: boolean };
-export type Placed = { id: string; col: number; lane: number; slot: number; x: number; y: number; w: number; h: number };
+export type Edge = { from: string; to: string; label: string; kind: EdgeKind; /** goes back to a step that leads here: drawn under the boxes, not across */ back: boolean; /** one of the many lines of a hub: not drawn until the hub is pointed at (set by layoutJourney) */ hub?: boolean };
+export type Placed = { id: string; col: number; lane: number; slot: number; /** the column beside the first one of this column, when the stack was too tall */ sub: number; x: number; y: number; w: number; h: number };
 export type LaneBand = { id: string; name: string; y: number; h: number; slots: number };
-export type Layout = { cols: number; lanes: LaneBand[]; nodes: Map<string, Placed>; edges: Edge[]; width: number; height: number };
+export type Layout = { cols: number; lanes: LaneBand[]; nodes: Map<string, Placed>; edges: Edge[]; /** how many lines of each hub are not drawn */ hidden: Map<string, number>; width: number; height: number };
 
 /** The lines of a journey: every `next`, and every button and error that names another step. One line for each pair of steps (a branch label beats a button label beats an error text). */
 export function edgesOf(j: Journey): Edge[] {
@@ -80,20 +84,38 @@ function columnsOf(steps: Step[], edges: Edge[]): Map<string, number> {
 
 export function layoutJourney(j: Journey): Layout {
   const edges = edgesOf(j);
-  const col = columnsOf(j.steps, edges);
+  // hubs: a menu that links to twenty screens would put twenty lines across the map and push all twenty into one tall stack
+  const outN = new Map<string, number>(), inN = new Map<string, number>();
+  for (const e of edges) { outN.set(e.from, (outN.get(e.from) ?? 0) + 1); inN.set(e.to, (inN.get(e.to) ?? 0) + 1); }
+  const limit = hubMin(j.steps.length);
+  const hidden = new Map<string, number>();
+  for (const e of edges) {
+    const fromHub = (outN.get(e.from) ?? 0) >= limit, toHub = (inN.get(e.to) ?? 0) >= limit;
+    e.hub = fromHub || toHub;
+    // the note under a box counts only for the menu itself, not for every step it links to
+    if (fromHub) hidden.set(e.from, (hidden.get(e.from) ?? 0) + 1);
+    if (toHub) hidden.set(e.to, (hidden.get(e.to) ?? 0) + 1);
+  }
+  // the columns follow the real way on; a line out of a hub counts only for a step nothing else leads to (it stands just right of the hub)
+  const reached = new Set(edges.filter((e) => !e.hub).map((e) => e.to));
+  const way = edges.filter((e) => !e.hub || ((outN.get(e.from) ?? 0) >= limit && (inN.get(e.to) ?? 0) < limit && !reached.has(e.to)));
+  const col = columnsOf(j.steps, way);
   // a step in a lane that does not exist is still drawn, in a band of its own at the bottom
   const lanes = j.lanes.map((l) => ({ id: l.id, name: l.name }));
   if (j.steps.some((s) => !j.lanes.some((l) => l.id === s.lane))) lanes.push({ id: "", name: "No lane" });
   const laneIndex = (s: Step) => { const i = j.lanes.findIndex((l) => l.id === s.lane); return i >= 0 ? i : lanes.length - 1; };
 
   const taken = new Map<string, number>(); // lane and column: how many steps stand there
-  const placed = new Map<string, { col: number; lane: number; slot: number }>();
+  const placed = new Map<string, { col: number; lane: number; slot: number; sub: number }>();
+  const subs = new Map<number, number>(); // column: how many columns it takes side by side
   for (const s of j.steps) {
     const c = col.get(s.id) ?? 0, l = laneIndex(s);
     const key = l + ":" + c;
-    const slot = taken.get(key) ?? 0;
-    taken.set(key, slot + 1);
-    placed.set(s.id, { col: c, lane: l, slot });
+    const n = taken.get(key) ?? 0;
+    taken.set(key, n + 1);
+    const sub = Math.floor(n / MAX_STACK);
+    subs.set(c, Math.max(subs.get(c) ?? 1, sub + 1));
+    placed.set(s.id, { col: c, lane: l, slot: n % MAX_STACK, sub });
   }
   const slots = lanes.map(() => 1);
   for (const p of placed.values()) slots[p.lane] = Math.max(slots[p.lane], p.slot + 1);
@@ -107,17 +129,37 @@ export function layoutJourney(j: Journey): Layout {
   });
   const nodes = new Map<string, Placed>();
   let cols = 0;
+  for (const s of j.steps) cols = Math.max(cols, placed.get(s.id)!.col + 1);
+  // where each column starts: a column that was split takes the room of every column beside it
+  const startX: number[] = [];
+  let x = BOX.padX;
+  for (let c = 0; c < Math.max(cols, 1); c++) { startX.push(x); x += (subs.get(c) ?? 1) * (BOX.w + BOX.gapX); }
   for (const s of j.steps) {
     const p = placed.get(s.id)!;
-    cols = Math.max(cols, p.col + 1);
-    nodes.set(s.id, { id: s.id, ...p, x: BOX.padX + p.col * (BOX.w + BOX.gapX), y: bands[p.lane].y + BOX.padY + p.slot * (BOX.h + BOX.gapY), w: BOX.w, h: BOX.h });
+    nodes.set(s.id, { id: s.id, ...p, x: startX[p.col] + p.sub * (BOX.w + BOX.gapX), y: bands[p.lane].y + BOX.padY + p.slot * (BOX.h + BOX.gapY), w: BOX.w, h: BOX.h });
   }
-  return { cols, lanes: bands, nodes, edges, width: BOX.padX * 2 + Math.max(cols, 1) * BOX.w + Math.max(cols - 1, 0) * BOX.gapX, height: y };
+  return { cols, lanes: bands, nodes, edges, hidden, width: x - BOX.gapX + BOX.padX, height: y };
 }
 
 /** Can this kind of user reach the step? A step that names no user kind is for everyone: nothing was said to hide it. */
 export function visibleTo(s: Step, kind: string): boolean {
   return !kind || s.access.length === 0 || s.access.includes(kind);
+}
+
+/** The steps one kind of user meets: what the kind can reach, and the work behind it. A step that names no user kind (a server step) is dropped when every step that leads to it is dropped, so a student does not see the admin's server work. */
+export function stepsFor(j: Journey, kind: string): Step[] {
+  if (!kind) return j.steps;
+  const keep = new Map(j.steps.map((s) => [s.id, visibleTo(s, kind)]));
+  const from = new Map<string, string[]>();
+  for (const e of edgesOf(j)) (from.get(e.to) ?? from.set(e.to, []).get(e.to)!).push(e.from);
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const s of j.steps) {
+      const src = from.get(s.id);
+      if (keep.get(s.id) && s.access.length === 0 && !s.start && src && src.every((id) => !keep.get(id))) { keep.set(s.id, false); changed = true; }
+    }
+  }
+  return j.steps.filter((s) => keep.get(s.id));
 }
 
 /** Words cut into at most `lines` lines of about `chars` letters, the last line ending in an ellipsis when the rest does not fit. A word longer than a line is cut. */

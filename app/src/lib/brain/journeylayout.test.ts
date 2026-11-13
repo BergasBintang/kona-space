@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { parseJourney, type Journey } from "./journey.ts";
-import { BOX, edgesOf, layoutJourney, visibleTo, wrapWords } from "./journeylayout.ts";
+import { BOX, MAX_STACK, edgesOf, layoutJourney, stepsFor, visibleTo, wrapWords } from "./journeylayout.ts";
 
 const starter = readFileSync(new URL("../../brain/starter/kona-journey.md", import.meta.url), "utf8");
 const example = (): Journey => parseJourney(starter).journey!;
@@ -126,4 +126,65 @@ test("wrapWords cuts at word ends, shortens the last line and cuts a very long w
   assert.ok(long[1].endsWith("…") && long.every((s) => s.length <= 16));
   assert.deepEqual(wrapWords("Supercalifragilisticexpialidocious", 10, 2), ["Supercalif", "ragilisti…"]);
   assert.deepEqual(wrapWords("   ", 10, 2), []);
+});
+
+test("a menu that links to many steps is a hub: its lines are not drawn, and the steps it opens stand just right of it", () => {
+  const targets = Array.from({ length: 12 }, (_, i) => `t${i}`);
+  const j = make([
+    { id: "menu", start: true, next: targets },
+    ...targets.map((id) => ({ id, buttons: [{ label: "Menu", to: "menu" }], end: true })),
+  ]);
+  const l = layoutJourney(j);
+  assert.ok(l.edges.every((e) => e.hub), "every line of the menu is a hub line");
+  assert.equal(l.hidden.get("menu"), 24);
+  for (const id of targets) assert.equal(l.nodes.get(id)!.col, 1, "a step only the menu leads to is in the column right of it");
+  assert.equal(l.nodes.get("menu")!.col, 0, "the lines back to the menu do not push it to the right");
+});
+
+test("a step that something else leads to keeps its place on the real way, whatever the menu says", () => {
+  const targets = Array.from({ length: 10 }, (_, i) => `t${i}`);
+  const j = make([
+    { id: "menu", start: true, next: ["a", ...targets] },
+    { id: "a", next: ["b"] }, { id: "b", next: ["c"] }, { id: "c", next: ["t0"] },
+    ...targets.map((id) => ({ id, end: true })),
+  ]);
+  const l = layoutJourney(j);
+  assert.equal(l.nodes.get("t0")!.col, 4, "t0 is reached through a, b, c: that counts, not the menu line");
+  assert.equal(l.nodes.get("t1")!.col, 1);
+});
+
+test("a journey with few links per step has no hub", () => {
+  const l = layoutJourney(example());
+  assert.ok(l.edges.every((e) => !e.hub));
+  assert.equal(l.hidden.size, 0);
+});
+
+test("a tall stack goes into columns beside each other, and no box covers another", () => {
+  const targets = Array.from({ length: 20 }, (_, i) => `t${i}`);
+  const j = make([{ id: "a", start: true, next: targets.slice(0, 4) }, ...targets.map((id, i) => ({ id, end: true, ...(i < 4 ? {} : { lane: "app" }) }))]);
+  const l = layoutJourney(j);
+  assert.ok(l.lanes[1].slots <= MAX_STACK, `the lane has ${l.lanes[1].slots} rows`);
+  const boxes = [...l.nodes.values()];
+  for (const a of boxes) for (const b of boxes) if (a.id < b.id) assert.ok(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y, `${a.id} and ${b.id} overlap`);
+  const right = Math.max(...boxes.map((b) => b.x + b.w));
+  assert.equal(l.width, right + BOX.padX, "the picture is as wide as its last box");
+});
+
+test("stepsFor: a kind of user meets its screens and the server work behind them, not another kind's", () => {
+  const j = make([
+    { id: "start", start: true, access: ["student"], next: ["page"] },
+    { id: "page", access: ["student"], next: ["save"] }, { id: "save", next: ["done"] }, { id: "done", end: true, access: ["student"] },
+    { id: "admin-page", access: ["admin"], next: ["admin-save"] }, { id: "admin-save", end: true },
+    { id: "shared", start: true, end: true },
+  ]);
+  assert.deepEqual(stepsFor(j, "student").map((s) => s.id), ["start", "page", "save", "done", "shared"]);
+  assert.deepEqual(stepsFor(j, "admin").map((s) => s.id), ["admin-page", "admin-save", "shared"]);
+  assert.equal(stepsFor(j, "").length, j.steps.length, "no kind picked: every step");
+});
+
+test("the note under a hub counts its own lines only", () => {
+  const targets = Array.from({ length: 12 }, (_, i) => `t${i}`);
+  const l = layoutJourney(make([{ id: "menu", start: true, next: targets }, ...targets.map((id) => ({ id, end: true }))]));
+  assert.equal(l.hidden.get("menu"), 12);
+  assert.equal(l.hidden.get("t0"), undefined);
 });

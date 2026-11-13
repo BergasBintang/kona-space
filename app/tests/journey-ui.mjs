@@ -115,7 +115,9 @@ try {
   ok("the lanes are named in a column at the left", JSON.stringify(mapInfo.lanes) === JSON.stringify(["Person", "App", "Server"]), mapInfo.lanes.join());
   ok("the lines between the steps are drawn", mapInfo.edges >= 6, String(mapInfo.edges));
   await shot("journey-small");
-  const box = (stepId) => c.ev(`(() => { const e = document.querySelector('svg g[data-step=' + ${JSON.stringify(JSON.stringify(stepId))} + ']'); if (!e) return null; e.scrollIntoView({ block: "center", inline: "center" }); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height, label: e.getAttribute('aria-label') }; })()`);
+  const boxNow = (stepId) => c.ev(`(() => { const e = document.querySelector('svg g[data-step=' + ${JSON.stringify(JSON.stringify(stepId))} + ']'); if (!e) return null; e.scrollIntoView({ block: "center", inline: "center" }); const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height, label: e.getAttribute('aria-label') }; })()`);
+  // the map scrolls smoothly: look again when it has stopped, or the box is not where it was measured
+  const box = async (stepId) => { await boxNow(stepId); await wait(600); return boxNow(stepId); };
   const mouse = (type, x, y) => c.send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1 });
   const clickAt = async (x, y) => { await mouse("mouseMoved", x, y); await mouse("mousePressed", x, y); await mouse("mouseReleased", x, y); };
 
@@ -184,7 +186,7 @@ try {
   await shot("journey-names");
   await closeDialog();
 
-  // a kind of user dims what it cannot reach
+  // a kind of user shows only what it can reach
   const pick = async (label, text) => {
     await c.ev(`document.querySelector('[role="combobox"][aria-label=${JSON.stringify(label)}]')?.click(); true`);
     await wait(250);
@@ -193,8 +195,8 @@ try {
     return r;
   };
   ok("a kind of user can be chosen", await pick("Who can see it", "Guest"));
-  const dim = await c.ev(`({ home: document.querySelector('svg g[data-step="home"]').getAttribute('opacity'), signin: document.querySelector('svg g[data-step="sign-in"]').getAttribute('opacity') })`);
-  ok("what a guest cannot reach is dimmed, and what it can reach is not", dim.home === "0.35" && dim.signin === "1", JSON.stringify(dim));
+  const dim = await c.ev(`({ home: !!document.querySelector('svg g[data-step="home"]'), signin: document.querySelector('svg g[data-step="sign-in"]')?.getAttribute('opacity') ?? null, rows: document.querySelectorAll('section[data-sheet] table tbody tr').length })`);
+  ok("what a guest cannot reach is left out of the map and the table, and what it can reach is drawn", dim.home === false && dim.signin === "1", JSON.stringify(dim));
   await shot("journey-guest");
   await pick("Who can see it", "All kinds");
 

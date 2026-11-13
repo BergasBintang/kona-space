@@ -883,3 +883,14 @@ The owner closed the last ten tickets (T-0018 to T-0027), so all 27 are Done, an
 | The real window run was stopped by the outer time limit and left a throwaway project in the owner's list | The cleanup is in a finally block, which a killed process never reaches | After a killed run, look at the project list and remove what is left (done here); the test names its project so it can be found |
 | A first thought was to retire the question box, and the owner asked for a page instead | The box was doing three jobs (search, gap list, ask Claude) on pages that did not need it | Say what a thing is for before removing it; the part worth keeping (the free search first, then the wanted list) became the front of the new page |
 | Real plan use of this ticket: 47 Haiku calls for the measure and about 10 for the window runs and the demo | Cents each | Said in the report; the bars in the top corner showed 19 percent of the session before and after, so the cost was small |
+
+## 34. The Journey on a big product (2026-11-14: a copy of the Quantum Research LMS)
+
+| Seen | Cause | Keep |
+|---|---|---|
+| A map of 83 steps could not be read: Fit stopped at 55 percent, lines crossed the whole map, 59 warnings said the same thing | The view was only tried on 6 and on a made-up 120 steps in a row, never on a product with a menu that links to everything | Try a view on the biggest real product before calling it done; make the test map from the real routes, not from a pattern |
+| Two scroll bars one inside the other | A box that scrolls sideways also scrolls up and down in the browser, inside a box that already scrolled up and down | One scroll box for both ways, with the row of lane names sticky |
+| A big black triangle sat on a note, and the words on a line were cut by a box | The arrowhead grew with the line's thickness; the words were drawn before the boxes | Fixed arrowhead size; draw words in a layer above the boxes |
+| The window test clicked where a box had been | The map scrolls smoothly, so the box was measured while it still moved | Look again after the scroll has stopped, before a click at a measured place |
+| The owner saw my test project on the window they were looking at | The window test runs on the same window | Say before a test run that the window will change, and look at the project list after |
+| The build could not replace the program while the test window was open | The running program locks its file | Rename the running program, build, then ask the owner to close the window |

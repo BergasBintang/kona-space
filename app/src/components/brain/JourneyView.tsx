@@ -4,13 +4,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Brain } from "../../lib/brain/engine.ts";
 import { journeyNotes, parseJourney, type Actor, type Journey, type Problem, type Step } from "../../lib/brain/journey.ts";
-import { layoutJourney, visibleTo } from "../../lib/brain/journeylayout.ts";
+import { layoutJourney, stepsFor } from "../../lib/brain/journeylayout.ts";
 import { Button, Glyph } from "../ui";
 import { Confirm } from "../Confirm";
+import { Chevron } from "../Files";
 import { IconButton } from "../Icon";
 import { Select } from "../pick";
 import { Help } from "../Help";
-import { ACTOR_WORD, ActorMark, Defs, EdgeLine, STATUS_GLYPH, STATUS_WORD, StepBox } from "./JourneyArt";
+import { ACTOR_WORD, ActorMark, Defs, EdgeLabel, EdgeLine, labelFree, STATUS_GLYPH, STATUS_WORD, StepBox } from "./JourneyArt";
 import { JourneyTable } from "./JourneyTable";
 import { checkText, staleness, ticketFact, type CardFact, type Stale, type TicketFact } from "../../lib/brain/journeystale.ts";
 import { compareMarkers, placeOf, withDrafts, type Marker, type Scan } from "../../lib/brain/journeymarks.ts";
@@ -21,10 +22,14 @@ import { journeyCheckPrompt, pagesToRead, readJourneyCheck, type Verdicts } from
 const scans = new Map<string, Scan>();
 
 const KINDS_ALL = "";
+const KIND_H = 30; // room under the last lane for a loop line
+const LANE_W = 104; // the column with the names of the lanes
+const GROUP_MIN = 4; // the same warning about this many steps is shown as one line
 
 export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId: string; accountId: string | null; brain: Brain; onOpen: (id: string) => void }) {
   const notes = useMemo(() => journeyNotes(brain.notes.values()).sort((a, b) => a.title.localeCompare(b.title)), [brain]);
   const [which, setWhich] = useState<string | null>(null);
+  const [kind, setKind] = useState(KINDS_ALL);
   const note = notes.find((n) => n.id === which) ?? notes[0] ?? null;
   const read = useMemo(() => (note ? parseJourney(note.raw) : null), [note]);
   const journey = read?.journey ?? null;
@@ -36,7 +41,11 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
   // a marker the map does not know is drawn as a draft step, in a lane of its own
   const shown = useMemo(() => (journey && marks ? withDrafts(journey, marks.missing) : journey), [journey, marks]);
   const draftIds = useMemo(() => new Set(marks?.missing.map((m) => m.id) ?? []), [marks]);
-  const layout = useMemo(() => (shown ? layoutJourney(shown) : null), [shown]);
+  // a kind of user is picked: only the steps that kind can reach are drawn and laid out again, so the map shrinks to that person's path
+  const drawn = useMemo(() => (shown ? (kind === KINDS_ALL ? shown : { ...shown, steps: stepsFor(shown, kind) }) : null), [shown, kind]);
+  // the table lists the steps of the note (not the drafts found in the code), for the kind of user that is picked
+  const tableOf = useMemo(() => (journey ? (kind === KINDS_ALL ? journey : { ...journey, steps: stepsFor(journey, kind) }) : null), [journey, kind]);
+  const layout = useMemo(() => (drawn ? layoutJourney(drawn) : null), [drawn]);
   const problems = read?.problems ?? [];
   const errors = problems.filter((p) => p.level === "error");
   // what the staleness rule needs from outside the note: the project's tickets and its Mockups cards (a project with neither just has nothing to compare)
@@ -56,7 +65,6 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
   const checks = useMemo(() => checkText(stale), [stale]);
   const flagged = useMemo(() => new Set([...problems.map((p) => p.step), ...stale.filter((s) => s.level === "flag").map((s) => s.step)].filter(Boolean)), [problems, stale]);
 
-  const [kind, setKind] = useState(KINDS_ALL);
   const [picked, setPicked] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const [showProblems, setShowProblems] = useState(false);
@@ -74,8 +82,10 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
       setAi({ stage: "done", answer, pages, verdicts: readJourneyCheck(answer, withText, journey.steps.map((s) => s.id)) });
     } catch (e) { setAi({ stage: "ask", error: String(e) }); }
   };
-  const [zoom, setZoom] = useState<number | null>(null); // null: fitted to the width
+  const [zoom, setZoom] = useState<number | null>(null); // null: the readable size, fitted to the width
   const [width, setWidth] = useState(0);
+  const [high, setHigh] = useState(typeof window === "undefined" ? 900 : window.innerHeight);
+  useEffect(() => { const f = () => setHigh(window.innerHeight); addEventListener("resize", f); return () => removeEventListener("resize", f); }, []);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => { setPicked(null); setHover(null); setKind(KINDS_ALL); setZoom(null); }, [note?.id]);
   useEffect(() => {
@@ -84,7 +94,7 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
     const ro = new ResizeObserver(([e]) => setWidth(e.contentRect.width));
     ro.observe(el);
     return () => ro.disconnect();
-  }, [layout === null]);
+  }, [layout === null, drawn?.steps.length === 0]);
 
   if (notes.length === 0) {
     return <p className="m-0 text-text-tertiary">There is no journey in this project yet.</p>;
@@ -100,9 +110,18 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
   }
 
   // a map that does not fit at a readable size is shown at that size and scrolls inside its box (a long path of 120 steps is wider than any window)
-  const fit = width > 0 ? Math.min(1, Math.max(0.55, (width - 8) / layout.width)) : 1;
+  const fit = width > 0 ? Math.min(1, Math.max(0.55, (width - LANE_W - 8) / layout.width)) : 1;
+  // the whole map in the window, however small that makes it: the box is at most 62% of the window high
+  const fitAll = width > 0 ? Math.max(0.1, Math.min(1, (width - LANE_W - 8) / layout.width, (Math.max(280, high * 0.62) - 4) / (layout.height + KIND_H))) : 1;
   const scale = zoom ?? fit;
+  const atAll = Math.abs(scale - fitAll) < 0.005;
   const active = hover ?? picked;
+  // a menu is pointed at: its lines are fine and have no words, and the steps it opens are marked while the rest is paler, so the many lines read as one fan
+  const hubActive = active !== null && (layout.hidden.get(active) ?? 0) > 0;
+  const linked = new Set<string>();
+  if (hubActive) for (const e of layout.edges) if (e.hub && (e.from === active || e.to === active)) { linked.add(e.from); linked.add(e.to); }
+  // the lanes run the whole width of the box, not only as far as the last step
+  const roomW = width > 0 ? Math.max(layout.width, (width - LANE_W) / scale) : layout.width;
   const view = shown ?? journey;
   const stepOf = (id: string) => view.steps.find((s) => s.id === id);
   const runScan = () => {
@@ -110,9 +129,7 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
     journeyMarkers(projectId).then((s) => { scans.set(projectId, s); setScan(s); }).catch((e) => setScanError(String(e))).finally(() => setScanning(false));
   };
   const pickedStep = picked ? stepOf(picked) ?? null : null;
-  const seen = (s: Step) => visibleTo(s, kind);
   const laneActor = (s: Step) => s.actor ?? journey.lanes.find((l) => l.id === s.lane)?.actor ?? null;
-  const KIND_H = 30; // room under the last lane for a loop line
 
   return (
     <div className="flex min-w-0 flex-col gap-5">
@@ -122,7 +139,7 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
           <Help title="Journey">
             <p className="m-0">The path a person takes through the product, drawn from one note. Each row is a lane. Read the Person lane to follow what someone sees and clicks; read all lanes for the screens and the work behind them.</p>
             <p className="m-0">A box says who acts with a mark and a word: Person, System, AI or People (one person talking to another). The mark at its right says if it is built. A dashed line is a branch for an error.</p>
-            <p className="m-0">Click a box for its details. Pick a kind of user to dim what that kind cannot reach.</p>
+            <p className="m-0">Click a box for its details. Pick a kind of user to see only what that kind can reach. A menu that links to many steps does not draw all its lines: point at it, or click it, and they appear.</p>
           </Help>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -140,9 +157,9 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
           <Button variant="quiet" small onClick={() => setAi({ stage: "ask" })} title="Check the names: ask whether the names of the steps fit their mockup pages, and whether two steps are one">Check names</Button>
           <Button variant="quiet" small onClick={runScan} disabled={scanning} title="Scan the code: look for the kona-step markers in the project's files">{scanning ? "Scanning…" : scan ? "Scan again" : "Scan code"}</Button>
           <div role="group" aria-label="Zoom" className="flex items-center gap-1.5">
-            <IconButton icon="zoomOut" label="Zoom out" onClick={() => setZoom(Math.max(0.3, scale / 1.25))} />
+            <IconButton icon="zoomOut" label="Zoom out" onClick={() => setZoom(Math.max(0.1, scale / 1.25))} />
             <IconButton icon="zoomIn" label="Zoom in" onClick={() => setZoom(Math.min(2, scale * 1.25))} />
-            <IconButton icon="centre" label="Fit all of the map in the window" disabled={zoom === null} onClick={() => setZoom(null)} />
+            <IconButton icon="centre" label={atAll && fitAll < fit - 0.005 ? "Back to a readable size" : "Fit all of the map in the window"} disabled={fitAll >= fit - 0.005 && (zoom === null || atAll)} onClick={() => setZoom(atAll ? null : fitAll)} />
           </div>
         </div>
       </div>
@@ -157,39 +174,49 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
       {journey.steps.length === 0 && draftIds.size === 0 ? (
         <p className="m-0 text-text-tertiary">This journey has no steps yet.</p>
       ) : (
-        <div className="flex max-h-[62vh] min-h-[280px] overflow-y-auto border border-line-subtle bg-inset" role="group" aria-label="Journey map">
-          <div className="flex shrink-0" style={{ height: (layout.height + KIND_H) * scale }}>
-            <div className="relative w-[104px] shrink-0 border-r border-line-subtle bg-surface-1">
+        <div ref={box} className="max-h-[62vh] min-h-[280px] overflow-auto border border-line-subtle bg-inset" role="group" aria-label="Journey map">
+          <div className="flex" style={{ width: LANE_W + roomW * scale, height: (layout.height + KIND_H) * scale }}>
+            <div className="sticky left-0 z-10 w-[104px] shrink-0 border-r border-line-subtle bg-surface-1">
               {layout.lanes.map((l) => (
                 <div key={l.id || "none"} className="absolute right-0 left-0 flex items-start px-3 pt-3 text-[13px] leading-4 font-bold text-text-secondary" style={{ top: l.y * scale, height: l.h * scale }}>
                   <span className="break-words">{l.name}</span>
                 </div>
               ))}
             </div>
-          </div>
-          <div ref={box} className="min-w-0 flex-1 overflow-x-auto">
-            <svg width={layout.width * scale} height={(layout.height + KIND_H) * scale} viewBox={`0 0 ${layout.width} ${layout.height + KIND_H}`} role="img" aria-label={`Journey map with ${view.steps.length} steps`}
+            <svg width={roomW * scale} height={(layout.height + KIND_H) * scale} viewBox={`0 0 ${roomW} ${layout.height + KIND_H}`} role="img" aria-label={`Journey map with ${drawn!.steps.length} steps`}
               onClick={(e) => { if (e.target === e.currentTarget) setPicked(null); }}>
               <Defs />
-              {layout.lanes.map((l, i) => <rect key={l.id || "none"} x={0} y={l.y} width={layout.width} height={l.h} fill={i % 2 ? "var(--color-surface-2)" : "var(--color-inset)"} stroke="var(--color-line-subtle)" />)}
+              {layout.lanes.map((l, i) => <rect key={l.id || "none"} x={0} y={l.y} width={roomW} height={l.h} fill={i % 2 ? "var(--color-surface-2)" : "var(--color-inset)"} stroke="var(--color-line-subtle)" />)}
               {layout.edges.map((e) => {
                 const a = layout.nodes.get(e.from), b = layout.nodes.get(e.to);
                 if (!a || !b) return null;
                 const touches = active !== null && (e.from === active || e.to === active);
-                const blocked = kind !== KINDS_ALL && (!seen(stepOf(e.from)!) || !seen(stepOf(e.to)!));
-                return <EdgeLine key={e.from + ">" + e.to} edge={e} from={a} to={b} bright={touches} dim={blocked || (active !== null && !touches)} />;
+                if (e.hub && !touches) return null; // the lines of a menu show only when it is pointed at
+                return <EdgeLine key={e.from + ">" + e.to} edge={e} from={a} to={b} bright={touches} dim={active !== null && !touches} thin={e.hub && touches} />;
               })}
-              {view.steps.map((s) => (
+              {drawn!.steps.map((s) => (
                 <g key={s.id} onPointerEnter={() => setHover(s.id)} onPointerLeave={() => setHover(null)}>
-                  <StepBox step={s} at={layout.nodes.get(s.id)!} actor={laneActor(s)} on={active === s.id} dim={!seen(s)} flagged={flagged.has(s.id)} draft={draftIds.has(s.id)} onPick={() => setPicked(s.id)} />
+                  <StepBox step={s} at={layout.nodes.get(s.id)!} actor={laneActor(s)} on={active === s.id || linked.has(s.id)} dim={false} faint={hubActive && !linked.has(s.id)} flagged={flagged.has(s.id)} draft={draftIds.has(s.id)} onPick={() => setPicked(s.id)} />
+                  {(layout.hidden.get(s.id) ?? 0) > 0 && active !== s.id && (
+                    <text x={layout.nodes.get(s.id)!.x + 4} y={layout.nodes.get(s.id)!.y + layout.nodes.get(s.id)!.h + 14} fontSize={11} fill="var(--color-text-tertiary)" fontFamily="var(--font-sans)">{layout.hidden.get(s.id)} {layout.hidden.get(s.id) === 1 ? "line" : "lines"} hidden</text>
+                  )}
                 </g>
               ))}
+              {layout.edges.map((e) => {
+                const a = layout.nodes.get(e.from), b = layout.nodes.get(e.to);
+                if (!a || !b || !e.label) return null;
+                const touches = active !== null && (e.from === active || e.to === active);
+                if (e.hub && !touches) return null;
+                if (e.hub && touches) return null; // a menu's lines carry no words
+                if (!touches && !labelFree(e, a, b, layout.nodes.values())) return null;
+                return <EdgeLabel key={e.from + ">" + e.to} edge={e} from={a} to={b} dim={active !== null && !touches} />;
+              })}
             </svg>
           </div>
         </div>
       )}
 
-      <JourneyTable journey={journey} flags={checks} />
+      <JourneyTable journey={tableOf ?? journey} flags={checks} />
 
       {pickedStep && <StepDialog journey={view} step={pickedStep} draft={draftIds.has(pickedStep.id)} places={marks?.found.get(pickedStep.id) ?? marks?.missing.find((m) => m.id === pickedStep.id)?.at ?? []} actor={laneActor(pickedStep)} problems={problems.filter((p) => p.step === pickedStep.id)} stale={stale.filter((s) => s.step === pickedStep.id)} noteExists={(id) => brain.notes.has(id)} onOpenNote={(id) => { setPicked(null); onOpen(id); }} onGo={setPicked} onClose={() => setPicked(null)} />}
       {ai && ai.stage !== "done" && (() => {
@@ -279,15 +306,38 @@ function StepDialog({ journey, step, actor, problems, stale, draft, places, note
 
 function ProblemsDialog({ problems, journey, onGo, onClose }: { problems: Problem[]; journey: Journey; onGo: (id: string) => void; onClose: () => void }) {
   const known = new Set(journey.steps.map((s) => s.id));
+  const nameOf = (id: string) => journey.steps.find((s) => s.id === id)?.name ?? id;
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  // the same sentence about many steps ("The screen X has no mockup", sixty times) is one line with the steps under it
+  const groups = useMemo(() => {
+    const by = new Map<string, Problem[]>();
+    for (const p of problems) { const k = p.level + "|" + (p.step ? p.text.split(`"${p.step}"`).join(`"…"`) : p.text); (by.get(k) ?? by.set(k, []).get(k)!).push(p); }
+    return [...by.entries()].map(([key, list]) => ({ key, list, many: list.length >= GROUP_MIN && list.every((p) => p.step && known.has(p.step) && p.text.includes(`"${p.step}"`)) }));
+  }, [problems]);
+  const sentence = (p: Problem) => p.text.replace(`"${p.step}"`, "…").replace(/^The screen … /, "A screen ");
   return (
     <Confirm title="To check in this journey" cancelLabel="Close" noConfirm confirmLabel="" onConfirm={onClose} onCancel={onClose}>
       <ul className="m-0 flex max-h-[56vh] list-none flex-col gap-2 overflow-y-auto p-0 pr-1">
-        {problems.map((p, i) => (
-          <li key={i} className="flex items-start gap-2 text-[14px] leading-5 text-text">
+        {groups.map((g) => g.many ? (
+          <li key={g.key} className="flex flex-col gap-1.5">
+            <button type="button" aria-expanded={open.has(g.key)} aria-label={`${g.list.length} steps: ${sentence(g.list[0])}`} className="flex w-full cursor-pointer items-start gap-2 border-0 bg-transparent p-0 text-left text-[14px] leading-5 text-text"
+              onClick={() => setOpen((s) => { const n = new Set(s); if (n.has(g.key)) n.delete(g.key); else n.add(g.key); return n; })}>
+              <Glyph state={g.list[0].level === "error" ? "left" : "waiting"} size={16} />
+              <span className="min-w-0 flex-1"><b>{g.list.length} steps:</b> {sentence(g.list[0])}</span>
+              <Chevron open={open.has(g.key)} />
+            </button>
+            {open.has(g.key) && (
+              <ul className="m-0 flex list-none flex-wrap gap-x-3 gap-y-1 p-0 pl-6">
+                {g.list.map((p, i) => <li key={i}><Button variant="ghost" tiny onClick={() => onGo(p.step)}>{nameOf(p.step)}</Button></li>)}
+              </ul>
+            )}
+          </li>
+        ) : g.list.map((p, i) => (
+          <li key={g.key + i} className="flex items-start gap-2 text-[14px] leading-5 text-text">
             <Glyph state={p.level === "error" ? "left" : "waiting"} size={16} />
             <span className="min-w-0 flex-1">{p.text}{p.step && known.has(p.step) ? <> <Button variant="ghost" tiny onClick={() => onGo(p.step)}>Open the step</Button></> : null}</span>
           </li>
-        ))}
+        )))}
       </ul>
     </Confirm>
   );

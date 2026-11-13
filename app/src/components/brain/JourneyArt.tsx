@@ -36,14 +36,14 @@ export function ActorMark({ actor, color }: { actor: Actor; color?: string }) {
 }
 
 /** One step as a box. `dim` is for a step the chosen kind of user cannot reach; `on` for the picked one. */
-export function StepBox({ step, at, actor, on, dim, flagged, draft = false, onPick }: { step: Step; at: Placed; actor: Actor | null; on: boolean; dim: boolean; flagged: boolean; /** found in the code, not yet in the map */ draft?: boolean; onPick: () => void }) {
+export function StepBox({ step, at, actor, on, dim, faint = false, flagged, draft = false, onPick }: { step: Step; at: Placed; actor: Actor | null; on: boolean; dim: boolean; /** only paler, because something else is being looked at */ faint?: boolean; flagged: boolean; /** found in the code, not yet in the map */ draft?: boolean; onPick: () => void }) {
   const a: Actor = actor ?? "system";
   const color = ACTOR_COLOR[a];
   const rx = a === "person" || a === "people" ? 14 : 3;
   const lines = wrapWords(step.name, 24, 2);
   const status = draft ? "Not confirmed" : STATUS_WORD[step.status];
   return (
-    <g transform={`translate(${at.x} ${at.y})`} opacity={dim ? 0.35 : 1} role="button" tabIndex={0} data-step={step.id}
+    <g transform={`translate(${at.x} ${at.y})`} opacity={dim || faint ? 0.35 : 1} role="button" tabIndex={0} data-step={step.id}
       aria-label={`${step.name}. ${ACTOR_WORD[a]}. ${status}.${dim ? " This kind of user cannot reach it." : ""}${flagged ? " Something is wrong with it." : ""}`}
       onClick={onPick} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(); } }} style={{ cursor: "pointer", outline: "none" }} className="journey-box">
       {a === "people" && <rect x={5} y={5} width={at.w} height={at.h} rx={rx} fill="var(--color-surface-1)" stroke={color} strokeWidth={1.5} />}
@@ -65,41 +65,60 @@ export function StepBox({ step, at, actor, on, dim, flagged, draft = false, onPi
 }
 
 /** One line from a step to the next. A line that goes back (a loop) runs under the boxes; an error branch is dashed and ends in a bang. */
-export function EdgeLine({ edge, from, to, bright, dim }: { edge: Edge; from: Placed; to: Placed; bright: boolean; dim: boolean }) {
+/** the curve of a line and the spot for its words */
+function curve(edge: Edge, from: Placed, to: Placed) {
   const sx = from.x + from.w, sy = from.y + from.h / 2, tx = to.x, ty = to.y + to.h / 2;
-  let d: string, lx: number, ly: number;
   if (edge.back || tx <= sx) {
     // out of the bottom of the box and into the bottom of the other, in a loop below both
     const x1 = from.x + from.w / 2, y1 = from.y + from.h, x2 = to.x + to.w / 2, y2 = to.y + to.h;
     const low = Math.max(y1, y2) + 26;
-    d = `M${x1} ${y1} C${x1} ${low} ${x2} ${low} ${x2} ${y2 + 2}`;
-    lx = (x1 + x2) / 2; ly = low - 6;
-  } else {
-    const dx = Math.max(32, (tx - sx) / 2);
-    d = `M${sx} ${sy} C${sx + dx} ${sy} ${tx - dx} ${ty} ${tx - 3} ${ty}`;
-    lx = (sx + tx) / 2; ly = (sy + ty) / 2 - 5;
+    return { d: `M${x1} ${y1} C${x1} ${low} ${x2} ${low} ${x2} ${y2 + 2}`, lx: (x1 + x2) / 2, ly: low - 6 };
   }
-  const label = edge.label.length > 26 ? edge.label.slice(0, 25) + "…" : edge.label;
+  const dx = Math.max(32, (tx - sx) / 2);
+  return { d: `M${sx} ${sy} C${sx + dx} ${sy} ${tx - dx} ${ty} ${tx - 3} ${ty}`, lx: (sx + tx) / 2, ly: (sy + ty) / 2 - 5 };
+}
+
+/** The line only. Its words are drawn by EdgeLabel, in a layer above the boxes, so a box never cuts them. */
+export function EdgeLine({ edge, from, to, bright, dim, thin = false }: { edge: Edge; from: Placed; to: Placed; bright: boolean; dim: boolean; /** one of many lines of a menu: fine */ thin?: boolean }) {
+  const { d } = curve(edge, from, to);
   const stroke = bright ? "var(--color-text)" : "var(--color-line-strong)";
   return (
     <g opacity={dim ? 0.25 : 1} aria-hidden="true" data-edge={`${edge.from}>${edge.to}`}>
-      <path d={d} fill="none" stroke={stroke} strokeWidth={bright ? 2.25 : 1.5} strokeDasharray={edge.kind === "error" ? "5 4" : undefined} markerEnd={`url(#journey-arrow${bright ? "-bright" : ""})`} />
-      {label && (
-        <g>
-          <rect x={lx - label.length * 3 - 4} y={ly - 11} width={label.length * 6 + 8} height={15} fill="var(--color-ground)" opacity={0.92} />
-          <text x={lx} y={ly} textAnchor="middle" fontSize={11} fill="var(--color-text-secondary)" fontFamily="var(--font-sans)">{edge.kind === "error" ? `! ${label}` : label}</text>
-        </g>
-      )}
+      <path d={d} fill="none" stroke={stroke} strokeWidth={thin ? 1.25 : bright ? 2.25 : 1.5} strokeDasharray={edge.kind === "error" ? "5 4" : undefined} markerEnd={`url(#journey-arrow${bright ? "-bright" : ""})`} />
     </g>
   );
+}
+
+/** The words on a line, on a patch of the map's colour so they stay readable over a crossing line. */
+export function EdgeLabel({ edge, from, to, dim }: { edge: Edge; from: Placed; to: Placed; dim: boolean }) {
+  const { lx, ly } = curve(edge, from, to);
+  const label = edge.label.length > 26 ? edge.label.slice(0, 25) + "…" : edge.label;
+  if (!label) return null;
+  const text = edge.kind === "error" ? `! ${label}` : label;
+  return (
+    <g opacity={dim ? 0.25 : 1} aria-hidden="true" data-edge-label={`${edge.from}>${edge.to}`} pointerEvents="none">
+      <rect x={lx - text.length * 3 - 4} y={ly - 11} width={text.length * 6 + 8} height={15} fill="var(--color-ground)" opacity={0.92} />
+      <text x={lx} y={ly} textAnchor="middle" fontSize={11} fill="var(--color-text-secondary)" fontFamily="var(--font-sans)">{text}</text>
+    </g>
+  );
+}
+
+/** Where the words of a line may stand: on its own, a choice (a branch or an error) is always written, but only where no box is under the words. A button's words only when the line is pointed at. */
+export function labelFree(edge: Edge, from: Placed, to: Placed, boxes: Iterable<Placed>): boolean {
+  if (edge.kind === "button") return false;
+  const { lx, ly } = curve(edge, from, to);
+  const text = Math.min(edge.label.length, 26) + (edge.kind === "error" ? 2 : 0);
+  const x0 = lx - text * 3 - 4, x1 = lx + text * 3 + 4, y0 = ly - 11, y1 = ly + 4;
+  for (const b of boxes) if (x0 < b.x + b.w && x1 > b.x && y0 < b.y + b.h && y1 > b.y) return false;
+  return true;
 }
 
 /** the arrow heads, one for a quiet line and one for a bright one */
 export function Defs() {
   return (
     <defs>
-      <marker id="journey-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--color-line-strong)" /></marker>
-      <marker id="journey-arrow-bright" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--color-text)" /></marker>
+      <marker id="journey-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--color-line-strong)" /></marker>
+      <marker id="journey-arrow-bright" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--color-text)" /></marker>
     </defs>
   );
 }

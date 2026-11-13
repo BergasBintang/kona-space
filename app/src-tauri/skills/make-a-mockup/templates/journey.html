@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Journey</title>
+<style>
+  :root { --paper: #f8f1e1; --ground: #f2e9d4; --ink: #2d2218; --ink-2: #54452f; --line: #85755a; --accent: #1a6558; --gold: #b57a14; --blue: #4f6068; --bad: #a33727; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --paper: #2b2a26; --ground: #211f1b; --ink: #f1eadb; --ink-2: #cdbfa3; --line: #8d8061; --accent: #4fb39f; --gold: #e0a93d; --blue: #8fa5ae; --bad: #e0745f; } }
+  [data-theme="dark"] { --paper: #2b2a26; --ground: #211f1b; --ink: #f1eadb; --ink-2: #cdbfa3; --line: #8d8061; --accent: #4fb39f; --gold: #e0a93d; --blue: #8fa5ae; --bad: #e0745f; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ground); color: var(--ink); font: 14px/1.4 system-ui, sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  h1 { margin: 0; font-size: 20px; }
+  select { font: inherit; padding: 4px 8px; background: var(--paper); color: var(--ink); border: 1px solid var(--line); }
+  #map { display: grid; gap: 0; overflow-x: auto; padding: 0 0 16px; }
+  .lane { padding: 12px; font-weight: 700; color: var(--ink-2); border-top: 1px solid var(--line); background: var(--paper); }
+  .cell { padding: 8px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; min-width: 170px; }
+  .step { text-align: left; font: inherit; color: inherit; background: var(--paper); border: 2px solid var(--accent); border-radius: 12px; padding: 8px 10px; cursor: pointer; }
+  .step[data-actor="system"] { border-color: var(--line); border-radius: 3px; }
+  .step[data-actor="ai"] { border-color: var(--gold); border-style: dashed; border-radius: 3px; }
+  .step[data-actor="people"] { border-color: var(--blue); box-shadow: 4px 4px 0 var(--paper), 4px 4px 0 1px var(--blue); }
+  .step[data-dim="1"] { opacity: .35; }
+  .meta { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; font-weight: 700; color: var(--ink-2); }
+  .name { display: block; font-weight: 700; margin-top: 4px; }
+  .more { display: none; margin-top: 8px; border-top: 1px solid var(--line); padding-top: 8px; font-size: 13px; }
+  .step[aria-expanded="true"] .more { display: block; }
+  .more b { display: block; font-size: 11px; color: var(--ink-2); margin-top: 6px; }
+  .more ul { margin: 2px 0 0; padding-left: 18px; }
+  .bad { color: var(--bad); }
+  #note { padding: 8px 16px; color: var(--ink-2); }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title" data-part="title">Journey</h1>
+  <label data-part="user-kind">Who can see it <select id="kind"></select></label>
+  <span id="note" data-part="note"></span>
+</header>
+<div id="map" data-part="journey-map" role="group" aria-label="Journey map"></div>
+<script>
+// The journey of the project, read from the one note that mockup.json names ("journey": "<note id>"). Nothing is copied: change the note and press Refresh.
+// A box starts closed. Press it to see a screen's fields, buttons and errors. Links to tickets and notes cannot open from here, so they are only written out.
+(async function () {
+  var map = document.getElementById("map");
+  var data;
+  try {
+    var r = await fetch("_kona/journey.json", { cache: "no-store" });
+    if (!r.ok) throw new Error(await r.text());
+    data = await r.json();
+  } catch (e) { map.textContent = "The journey could not be read. " + e.message; return; }
+
+  var list = function (v) { return v == null || v === "" ? [] : Array.isArray(v) ? v : [v]; };
+  var text = function (v) { return typeof v === "string" ? v : v == null ? "" : String(v); };
+  var lanes = list(data.lanes).length ? list(data.lanes).map(function (l) { return typeof l === "string" ? { id: l, name: l } : l; }) : [{ id: "person", name: "Person", actor: "person" }, { id: "app", name: "App", actor: "system" }, { id: "server", name: "Server", actor: "system" }];
+  var steps = list(data.steps);
+  var nexts = function (s) { return list(s.next).map(function (n) { return typeof n === "string" ? { to: n, label: "" } : { to: text(n.to), label: text(n.label) }; }); };
+  var leaves = function (s) { return nexts(s).map(function (n) { return n.to; }).concat(list(s.buttons).map(function (b) { return b && b.to; }), list(s.errors).map(function (e) { return e && e.to; })).filter(Boolean); };
+  var byId = {}; steps.forEach(function (s) { byId[s.id] = s; });
+
+  // the column of a step: the longest way from a start, along the ways that do not loop back
+  var out = {}; steps.forEach(function (s) { out[s.id] = leaves(s).filter(function (t) { return byId[t] && t !== s.id; }); });
+  var state = {}, back = {};
+  var roots = steps.filter(function (s) { return s.start; }).concat(steps.filter(function (s) { return !s.start; }));
+  roots.forEach(function (root) {
+    if (state[root.id]) return;
+    var stack = [{ id: root.id, i: 0 }]; state[root.id] = 1;
+    while (stack.length) {
+      var top = stack[stack.length - 1], o = out[top.id];
+      if (top.i >= o.length) { state[top.id] = 2; stack.pop(); continue; }
+      var to = o[top.i++];
+      if (state[to] === 1) back[top.id + ">" + to] = true; else if (!state[to]) { state[to] = 1; stack.push({ id: to, i: 0 }); }
+    }
+  });
+  var indeg = {}, col = {}; steps.forEach(function (s) { indeg[s.id] = 0; col[s.id] = 0; });
+  steps.forEach(function (s) { out[s.id].forEach(function (t) { if (!back[s.id + ">" + t]) indeg[t]++; }); });
+  var queue = steps.filter(function (s) { return indeg[s.id] === 0; }).map(function (s) { return s.id; });
+  for (var k = 0; k < queue.length; k++) out[queue[k]].forEach(function (t) {
+    if (back[queue[k] + ">" + t]) return;
+    col[t] = Math.max(col[t], col[queue[k]] + 1);
+    if (--indeg[t] === 0) queue.push(t);
+  });
+  var cols = Math.max.apply(null, [1].concat(steps.map(function (s) { return col[s.id] + 1; })));
+
+  document.getElementById("title").textContent = text(data.title) || "Journey";
+  var kindSel = document.getElementById("kind");
+  var users = list(data.users).map(function (u) { return typeof u === "string" ? { id: u, name: u } : u; });
+  [{ id: "", name: "All kinds of user" }].concat(users).forEach(function (u) { var o = document.createElement("option"); o.value = u.id; o.textContent = u.name || u.id; kindSel.appendChild(o); });
+  kindSel.parentNode.hidden = users.length === 0;
+  document.getElementById("note").textContent = steps.length + " steps";
+
+  map.style.gridTemplateColumns = "110px repeat(" + cols + ", minmax(170px, 1fr))";
+  var el = function (tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+  var WORD = { built: "Built", "in-progress": "In progress", "not-built": "Not built" }, ACTOR = { person: "Person", system: "System", ai: "AI", people: "People" };
+  var boxes = [];
+  lanes.forEach(function (l) {
+    map.appendChild(el("div", "lane", l.name || l.id));
+    for (var c = 0; c < cols; c++) {
+      var cell = el("div", "cell");
+      steps.filter(function (s) { return s.lane === l.id && col[s.id] === c; }).forEach(function (s) {
+        var actor = s.actor || l.actor || "system";
+        var b = el("button", "step"); b.type = "button"; b.dataset.actor = actor; b.dataset.step = s.id; b.setAttribute("aria-expanded", "false");
+        var meta = el("span", "meta"); meta.appendChild(el("span", "", ACTOR[actor] || actor)); meta.appendChild(el("span", "", WORD[s.status] || "Not built"));
+        b.appendChild(meta); b.appendChild(el("span", "name", text(s.name) || s.id));
+        var more = el("div", "more"), add = function (label, items) { if (!items.length) return; more.appendChild(el("b", "", label)); var ul = el("ul"); items.forEach(function (t) { ul.appendChild(el("li", "", t)); }); more.appendChild(ul); };
+        var nm = function (id) { return byId[id] ? text(byId[id].name) || id : id; };
+        if (s.ai) { var ai = typeof s.ai === "string" ? { does: s.ai } : s.ai; add("What the AI does", [text(ai.does) + (ai.model ? " (" + text(ai.model) + ")" : "")]); }
+        add("Fields", list(s.fields).map(text));
+        add("Buttons and links", list(s.buttons).map(function (x) { return typeof x === "string" ? x : text(x.label) + (x.to ? " leads to " + nm(x.to) : ""); }));
+        add("Errors the person can meet", list(s.errors).map(function (x) { return typeof x === "string" ? x : (x.when ? text(x.when) + ": " : "") + text(x.text) + (x.to ? " leads to " + nm(x.to) : ""); }));
+        add("Leads to", nexts(s).map(function (n) { return (n.label ? n.label + ": " : "") + nm(n.to); }));
+        add("Mockup, tickets and notes", [text(s.mockup), list(s.tickets).map(text).join(", "), list(s.notes).map(text).join(", ")].filter(Boolean));
+        add("Last checked", [text(s.updated) || "never"]);
+        b.appendChild(more);
+        b.addEventListener("click", function () { b.setAttribute("aria-expanded", b.getAttribute("aria-expanded") === "true" ? "false" : "true"); });
+        cell.appendChild(b); boxes.push({ b: b, s: s });
+      });
+      map.appendChild(cell);
+    }
+  });
+  kindSel.addEventListener("change", function () {
+    boxes.forEach(function (x) { var acc = list(x.s.access); x.b.dataset.dim = kindSel.value && acc.length && acc.indexOf(kindSel.value) < 0 ? "1" : "0"; });
+  });
+})();
+</script>
+</body>
+</html>

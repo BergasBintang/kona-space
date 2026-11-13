@@ -88,7 +88,7 @@ fn save_note(ctx: &Ctx, a: &Value) -> Result<String, String> {
         return Err("That text looks like it holds a secret (a key, a token or a password). Leave it out and say where it is kept instead.".into());
     }
     let kind_arg = text_of(a, "kind");
-    if let Some(k) = &kind_arg { if !["decision", "topic", "open", "note"].contains(&k.as_str()) { return Err("kind is one of: decision, topic, open, note".into()); } }
+    if let Some(k) = &kind_arg { if !["decision", "topic", "open", "note", "journey"].contains(&k.as_str()) { return Err("kind is one of: decision, topic, open, note, journey".into()); } }
     let given_id = text_of(a, "id").map(|s| slug(&s)).filter(|s| !s.is_empty());
     if section.is_some() && given_id.is_none() { return Err("To change one section, say which note with its id".into()); }
     let id = given_id.unwrap_or_else(|| slug(&title));
@@ -195,12 +195,12 @@ fn tools() -> Value {
         {"name": "read_note", "description": "Read some lines of one note of the brain, by the note id and line numbers that search_brain gave.",
          "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}, "from_line": {"type": "integer"}, "to_line": {"type": "integer"}}, "required": ["id"]}},
         {"name": "list_notes", "description": "List the notes of this project's brain that belong to the project (not Claude's memory or Kona's starter notes), newest first, one line each: id, kind, date, title. Use it to see what is already written before you add a note.",
-         "inputSchema": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["decision", "topic", "open", "note", "session"], "description": "Only notes of this kind. Optional."}}}},
+         "inputSchema": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["decision", "topic", "open", "note", "journey", "session"], "description": "Only notes of this kind. Optional."}}}},
         {"name": "save_note", "description": "Save something worth keeping into this project's brain, so the owner and every later session can find it with search_brain. Use it for decisions with their reason, facts about the project that the code does not show (how it is deployed, what a name means, a limit, a rule of the owner's), the result of a piece of research, and work still open. Do not save secrets, passwords or keys, what the code or git history already shows, or the chat itself. Search first: if a note on the topic exists, write a new note that links to it with [[its-id]] rather than a copy. Write the body in markdown: a one or two sentence summary first, then short sections. Documents (reports, plans, designs) are notes too: write them here, never as files in docs/. A note you saved before can be updated under the same id: send the whole text again, or only the part that changes with `section` (and `append` to add to the end of that part). The owner's notes are never changed. If you are working on a ticket, Kona adds that ticket to the note itself: do not write it into the title or the front matter.",
          "inputSchema": {"type": "object", "properties": {
             "title": {"type": "string", "description": "What the note is about, in 3 to 10 words."},
             "body": {"type": "string", "description": "The text of the note in markdown, without front matter."},
-            "kind": {"type": "string", "enum": ["decision", "topic", "open", "note"], "description": "decision: something decided, with the reason. topic: how something works or what was found. open: work still to do. note: anything else. Default note."},
+            "kind": {"type": "string", "enum": ["decision", "topic", "open", "note", "journey"], "description": "decision: something decided, with the reason. topic: how something works or what was found. open: work still to do. journey: the map of what a person does in the product, in the format of the starter note kona-journey (the project has one at most). note: anything else. Default note."},
             "id": {"type": "string", "description": "Lower-case letters, digits and dashes. Optional: made from the title when left out."},
             "section": {"type": "string", "description": "To change one part of a note you saved before: its id in id and the heading of that part here (without the #). body then replaces that section only; the rest of the note stays as it is."},
             "append": {"type": "boolean", "description": "With section: add body at the end of that section instead of replacing it."}}, "required": ["body"]}}
@@ -369,6 +369,26 @@ mod tests {
         assert!(text.contains("Changed.") && !text.contains("# How deploys work\n\n# How deploys work"), "the title heading is not written twice");
         assert!(list_notes(&c, &json!({})).contains("how-deploys-work [note]"));
         assert!(list_notes(&c, &json!({"kind": "decision"})).starts_with("The project's brain has no notes"));
+    }
+
+    #[test]
+    fn a_journey_note_can_be_saved_listed_and_changed_by_a_session() {
+        let mut c = ctx("journey");
+        c.ticket = "T-0007".into();
+        let body = "The path a person takes.\n\n```journey\n{\"steps\": [{\"id\": \"a\", \"name\": \"A\", \"lane\": \"app\"}]}\n```";
+        save_note(&c, &json!({"title": "The journey of the product", "kind": "journey", "body": body})).unwrap();
+        let text = note(&c, "the-journey-of-the-product");
+        assert!(text.contains("\nkind: journey\n") && text.contains("\nticket: T-0007\n"), "{text}");
+        assert!(list_notes(&c, &json!({"kind": "journey"})).contains("the-journey-of-the-product [journey]"));
+        assert!(list_notes(&c, &json!({"kind": "decision"})).starts_with("The project's brain has no notes"));
+        // the block is found in what was saved, the way the screen and the Mockups server find it
+        assert!(crate::mock::journey_block(&text).unwrap().contains("\"id\": \"a\""));
+        // saved again from another ticket: the kind stays and both tickets are listed
+        c.ticket = "T-0008".into();
+        save_note(&c, &json!({"title": "The journey of the product", "id": "the-journey-of-the-product", "kind": "journey", "body": body.replace("\"A\"", "\"B\"")})).unwrap();
+        let later = note(&c, "the-journey-of-the-product");
+        assert!(later.contains("\nkind: journey\n") && later.contains("\ntickets: T-0007, T-0008\n") && later.contains("\"name\": \"B\""), "{later}");
+        assert!(save_note(&c, &json!({"title": "x", "kind": "plan", "body": "y"})).unwrap_err().contains("journey"), "an unknown kind names the allowed ones");
     }
 
     #[test]

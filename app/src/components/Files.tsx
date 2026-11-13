@@ -20,7 +20,7 @@ const QUIET = new Set([".git", "node_modules", "target", "dist", ".kona", "__pyc
 const SEP = /[\\/]/;
 const same = (a: string, b: string) => a.toLowerCase().replace(/\//g, "\\") === b.toLowerCase().replace(/\//g, "\\");
 
-function Chevron({ open }: { open: boolean }) {
+export function Chevron({ open }: { open: boolean }) {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="shrink-0 text-text-tertiary" style={{ transform: open ? "rotate(90deg)" : undefined, transition: "transform 120ms" }}>
       <path d="M6 4 L10 8 L6 12" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />

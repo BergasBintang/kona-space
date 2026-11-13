@@ -7,6 +7,9 @@
     { "branch": "Choosing the order", "when": "several things compete for time", "skills": [
       ["prioritise-work", "Deciding what comes first"]
     ] },
+    { "branch": "Mapping the product", "when": "what a person does in the product is unclear or has changed", "skills": [
+      ["build-a-journey", "Write or update the map of what a person does"]
+    ] },
     { "branch": "Handing it over", "when": "the work is clear and someone must do it", "skills": [
       ["slice-the-work", "Too big for one ticket"],
       ["write-a-ticket", "One small piece for one person"]

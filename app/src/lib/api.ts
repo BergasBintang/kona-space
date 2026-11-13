@@ -1,4 +1,5 @@
 // The commands the Rust core offers, with their shapes (see src-tauri/src/lib.rs).
+import type { Scan as JourneyScan } from "./brain/journeymarks.ts";
 import { invoke } from "@tauri-apps/api/core";
 import type { Branch } from "./skilltree.ts";
 
@@ -181,6 +182,13 @@ export type MockFile = { path: string; size: number; modified: number | null };
 export const mockBase = () => invoke<string>("mock_base");
 export const mockCards = (projectId: string) => invoke<MockCard[]>("mock_cards", { projectId });
 export const mockFiles = (projectId: string, card: string) => invoke<MockFile[]>("mock_files", { projectId, card });
+/** The step markers (`kona-step: <id>`) found in the project's code: read only, runs off the window's thread (decision 91) */
+/** On request, one cheap Haiku call: does the journey make sense (decision 91, ticket T-0041). The prompt is built by lib/brain/journeyai.ts. */
+export const journeyCheck = (projectId: string, accountId: string | null, prompt: string) => invoke<string>("journey_check", { projectId, accountId, prompt });
+export const brainChat = (projectId: string, accountId: string | null, prompt: string) => invoke<string>("brain_chat", { projectId, accountId, prompt });
+/** The words visible on the mockup page a journey step names, or null */
+export const mockPageText = (projectId: string, mockup: string) => invoke<string | null>("mock_page_text", { projectId, mockup });
+export const journeyMarkers = (projectId: string) => invoke<JourneyScan>("journey_markers", { projectId });
 
 /** The same place, written the same way, whatever the case or slashes. */
 export const samePlace = (a: string, b: string) => a.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase() === b.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();

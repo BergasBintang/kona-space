@@ -16,6 +16,7 @@ Open `templates/ticket.md`, then write it with `create_ticket` in that shape. Go
 - **What to do:** the smallest change that works. Name the files or screens if you know them; do not guess paths.
 - **Done when:** two or three checks anyone can run, written as what you would see. "The form saves and shows a message", not "works correctly".
 - **Not part of this:** what the person should leave alone.
+- **The journey, when the project has one.** If the work changes a step, a screen, a field or an error of what a person does in the product, add one check to Done when: "The journey note is updated under this ticket, or this line says: Journey: no change". Search the brain for a note of kind journey to know if there is one.
 - **The right person**, by name and job: for Jiro the Frontend. If you are not sure who, open `references/who-does-what.md`.
 
 It starts in Backlog. Mark it Ready only if nothing is still unclear and the person could start now. Afterwards tell the owner in one line what you raised and for whom.

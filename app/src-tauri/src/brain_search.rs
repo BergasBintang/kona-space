@@ -14,7 +14,7 @@ macro_rules! starter {
 /// The starter notes, the same files the screen shows.
 pub static STARTER: &[(&str, &str)] = starter![
     "agents-and-sessions", "claude-md-and-memory", "context-and-cost", "good-tickets-and-prompts", "how-the-brain-works", "kona-board",
-    "kona-costs-and-plan-bars", "kona-leftovers", "kona-mockups", "kona-screens", "roles-and-permission-modes", "safe-habits", "skills-mcp-and-hooks",
+    "kona-costs-and-plan-bars", "kona-journey", "kona-leftovers", "kona-mockups", "kona-screens", "roles-and-permission-modes", "safe-habits", "skills-mcp-and-hooks",
     "start-here", "tickets-and-worktrees",
 ];
 

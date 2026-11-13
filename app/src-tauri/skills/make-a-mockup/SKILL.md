@@ -50,6 +50,10 @@ It runs in a sandbox, so some things that work in a browser do not here.
 - The login page lists three fake accounts and fills the form when one is chosen: one with data, one empty, one whose requests fail. Add a wrong password to the list of things to try. Nothing needs a real secret.
 - Make lists long enough to break the layout (a long name, forty rows), not only three tidy rows.
 
+## A page that shows the project's journey
+
+If the project has a journey note (kind journey, see the starter note `kona-journey`), a card can show it without copying it. Open `templates/journey.html` and save it as the `index.html` of a card. In the card's `mockup.json` add `"journey": "<the note id>"`. The page then reads the note's map at the address `_kona/journey.json`, fresh each time, so Refresh shows a change. Lanes run across, a box starts closed, and pressing a screen opens its fields, buttons and errors. The page must sit at the root of the card, because it asks for `_kona/journey.json` without a leading slash. Links to tickets and notes cannot open from here, so the page only writes them out.
+
 ## Before you say it is done
 
 1. Run the check, or read the four points by hand.

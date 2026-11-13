@@ -33,10 +33,14 @@ The viewer starts on the Laptop and remembers the last device the owner picked. 
 - Pick a part of a page, and leave a numbered note on it. The notes are listed beside the page.
 - Send the notes: Kona turns them into a ticket for the design person.
 
+## Showing the project's journey
+
+A mockup can show the journey note of the project without a copy. Its `mockup.json` names the note with `"journey": "<note id>"`, and its page asks for the address `_kona/journey.json`, which answers with the note's map, fresh each time. Only a note of kind journey can be read that way, and only its map. The page template is in the skill `make-a-mockup`. The format of the note is in [[kona-journey]].
+
 ## Skills for mockups
 
 - `make-a-mockup` draws a new page that runs by itself.
 - `reverse-a-mockup` reads a built project's own source and copies a few pages as a mockup.
 - `build-from-a-mockup` turns an agreed mockup into the project's own code and compares the two at the five widths.
 
-Other screens: [[kona-screens]]. Writing a ticket for the design person: [[good-tickets-and-prompts]].
+Other screens: [[kona-screens]]. Writing a ticket for the design person: [[good-tickets-and-prompts]]. The path through a whole product, which a mockup page can show: [[kona-journey]].

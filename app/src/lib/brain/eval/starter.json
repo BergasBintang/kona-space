@@ -61,5 +61,8 @@
   { "q": "how do I change the font of the file reader", "kind": "near-miss" },
   { "q": "what size is the phone in the mockup viewer", "kind": "exact", "needles": ["390 × 844"] },
   { "q": "which devices does the mockup viewer draw", "kind": "exact", "needles": ["The viewer draws five devices"] },
-  { "q": "where is a mockup saved in the project", "kind": "exact", "needles": [".kona/mockups/<card>/"] }
+  { "q": "where is a mockup saved in the project", "kind": "exact", "needles": [".kona/mockups/<card>/"] },
+  { "q": "what is a journey of a product", "kind": "exact", "needles": ["A journey is the path a person takes through a product"] },
+  { "q": "what does a screen step hold in the journey note", "kind": "exact", "needles": ["A screen step lists its key"] },
+  { "q": "can a journey use Kona's roles as the kinds of user", "kind": "deep", "needles": ["never Kona's roles"] }
 ]

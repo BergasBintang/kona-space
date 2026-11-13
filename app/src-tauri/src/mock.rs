@@ -8,6 +8,7 @@
 //     and sandboxes the page into an opaque origin, so it cannot reach Kona's own window or its commands, even if the iframe's `sandbox` attribute were wrong;
 //   - video and big files are answered in ranges.
 // The two commands below list the cards of a project and the files of a card (the sheet reloads a page when a file changed).
+use crate::{brain, brain_search};
 use serde::Serialize;
 use std::fs;
 use std::io::{Read, Seek, SeekFrom};
@@ -203,6 +204,77 @@ fn inject_helper(html: &[u8]) -> Vec<u8> {
     out
 }
 
+/// The small file of a card (`mockup.json`), when it is a plain file that reads as JSON
+fn card_info(root: &Path) -> Option<serde_json::Value> {
+    let file = root.join("mockup.json");
+    fs::metadata(&file).ok().filter(|m| m.is_file() && m.len() <= INFO_LIMIT).and_then(|_| fs::read_to_string(&file).ok()).and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+}
+
+/// The address a card reads its journey from (decision 91, ticket T-0036). It is not a file of the card: see `journey_reply`.
+pub const JOURNEY_PATH: &str = "_kona/journey.json";
+/// A note bigger than this is not read here
+const NOTE_LIMIT: u64 = 2 * 1024 * 1024;
+
+/// The one block of a journey note (the lines between a line that opens with three backticks and the word `journey`, and the line that closes it). The twin of `journeyBlock` in
+/// `app/src/lib/brain/journey.ts`: a test reads the starter note with it.
+pub fn journey_block(text: &str) -> Result<String, String> {
+    let t = text.replace('\r', "");
+    let mut found: Vec<String> = Vec::new();
+    let mut open: Option<(bool, Vec<&str>)> = None;
+    for l in t.split('\n') {
+        let trimmed = l.trim_start();
+        if trimmed.starts_with("```") {
+            let info = trimmed.trim_start_matches('`').trim();
+            match open.take() {
+                Some((journey, body)) => {
+                    if journey {
+                        found.push(body.join("\n"));
+                    }
+                }
+                None => open = Some((info.split_whitespace().any(|w| w == "journey"), Vec::new())),
+            }
+        } else if let Some((_, body)) = open.as_mut() {
+            body.push(l);
+        }
+    }
+    match found.len() {
+        0 => Err("The note has no journey block.".to_string()),
+        1 => Ok(found.remove(0)),
+        n => Err(format!("The note has {n} journey blocks. A journey note holds exactly one.")),
+    }
+}
+
+/// What a card gets at `_kona/journey.json`: the map of the one note that its `mockup.json` names (`"journey": "<note-id>"`), read fresh at every request, so the page and the
+/// Brain never hold two copies. Only a project note whose front matter says `kind: journey` is given, and only its map block: nothing else of any note can be read from a card.
+/// `None` when the card names no note: the address is then an ordinary path inside the card.
+fn journey_reply(project_folder: &Path, root: &Path, head: bool) -> Option<Reply> {
+    let id = card_info(root)?.get("journey")?.as_str()?.trim().to_string();
+    if !brain::valid_id(&id) {
+        return Some(Reply::text(400, "That is not a note name"));
+    }
+    let Some(dir) = fs::canonicalize(brain::dir(project_folder)).ok() else { return Some(Reply::text(404, "No such note")) };
+    let path = match fs::canonicalize(dir.join(format!("{id}.md"))) {
+        Ok(p) if p.starts_with(&dir) && p.is_file() => p,
+        _ => return Some(Reply::text(404, "No such note")),
+    };
+    if fs::metadata(&path).map(|m| m.len() > NOTE_LIMIT).unwrap_or(true) {
+        return Some(Reply::text(413, "That note is too big"));
+    }
+    let Ok(text) = fs::read_to_string(&path) else { return Some(Reply::text(500, "Could not read the note")) };
+    if brain_search::front_matter(&text).0.get("kind").map(|k| k.as_str()) != Some("journey") {
+        return Some(Reply::text(403, "Only a note of kind journey can be read here"));
+    }
+    let json = match journey_block(&text) {
+        Ok(j) => j,
+        Err(msg) => return Some(Reply::text(422, &msg)),
+    };
+    if serde_json::from_str::<serde_json::Value>(&json).is_err() {
+        return Some(Reply::text(422, "The journey block is not valid JSON"));
+    }
+    let extra = vec![("Content-Type", "application/json; charset=utf-8".to_string()), ("Content-Length", json.len().to_string())];
+    Some(if head { Reply::new(200, Vec::new(), extra) } else { Reply::new(200, json.into_bytes(), extra) })
+}
+
 /// Answer one request. `lookup` turns a project id into the project's folder. `path` is the address path: `/<project-id>/<card>/<file>`.
 ///
 /// A known limit, seen in the real window (T-0015): all cards share one address, and WebView2 sends no `Referer` for a page's own requests, so a page of one card CAN read
@@ -220,7 +292,13 @@ pub fn serve(lookup: &dyn Fn(&str) -> Option<PathBuf>, method: &str, path: &str,
     if !valid_name(pid) || !valid_name(card) {
         return Reply::text(400, "Bad address");
     }
-    let Some(root) = lookup(pid).and_then(|folder| card_root(&folder, card)) else { return Reply::text(404, "No such card") };
+    let Some(folder) = lookup(pid) else { return Reply::text(404, "No such card") };
+    let Some(root) = card_root(&folder, card) else { return Reply::text(404, "No such card") };
+    if rest == JOURNEY_PATH {
+        if let Some(reply) = journey_reply(&folder, &root, method == "HEAD") {
+            return reply;
+        }
+    }
     let file = match resolve(&root, rest) {
         Ok(f) => f,
         Err(Deny(status, msg)) => return Reply::text(status, msg),
@@ -301,6 +379,46 @@ pub fn list_files(project_folder: &Path, card: &str) -> Result<Vec<MockFile>, St
     Ok(out)
 }
 
+/// The words a person sees on an HTML page: comments, scripts, styles and tags taken out, a few entities read, spaces folded, cut to `max` letters.
+pub fn visible_text(html: &str, max: usize) -> String {
+    let low = html.to_ascii_lowercase();
+    let (b, lb) = (html.as_bytes(), low.as_bytes());
+    let mut out: Vec<u8> = Vec::with_capacity(b.len() / 2);
+    let mut i = 0;
+    let skip_to = |from: usize, end: &str| lb[from..].windows(end.len()).position(|w| w == end.as_bytes()).map(|p| from + p + end.len()).unwrap_or(b.len());
+    while i < b.len() {
+        if lb[i..].starts_with(b"<!--") {
+            i = skip_to(i, "-->");
+        } else if lb[i..].starts_with(b"<script") {
+            i = skip_to(i, "</script>");
+        } else if lb[i..].starts_with(b"<style") {
+            i = skip_to(i, "</style>");
+        } else if b[i] == b'<' && b.get(i + 1).is_some_and(|c| c.is_ascii_alphabetic() || *c == b'/' || *c == b'!') {
+            i = lb[i..].iter().position(|c| *c == b'>').map(|p| i + p + 1).unwrap_or(b.len());
+            out.push(b' ');
+        } else {
+            out.push(b[i]);
+            i += 1;
+        }
+    }
+    let text = String::from_utf8_lossy(&out).replace("&nbsp;", " ").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'").replace("&amp;", "&");
+    text.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(max).collect()
+}
+
+/// The visible words of the page a step's `mockup` names (`card` for the card's first page, or `card/page.html`), for the journey check that is asked for on request.
+/// None when there is no such card or page, or when the page is not HTML or is bigger than a megabyte.
+pub fn page_text(project_folder: &Path, mockup: &str, max: usize) -> Option<String> {
+    let (card, page) = mockup.trim().split_once('/').unwrap_or((mockup.trim(), ""));
+    let root = card_root(project_folder, card)?;
+    let rel = if page.is_empty() { card_info(&root).and_then(|v| v.get("entry").and_then(|e| e.as_str()).map(str::to_string)).unwrap_or_else(|| "index.html".to_string()) } else { page.to_string() };
+    let file = resolve(&root, &rel).ok()?;
+    let html = matches!(file.extension().map(|e| e.to_string_lossy().to_lowercase()).as_deref(), Some("html" | "htm"));
+    if !html || fs::metadata(&file).map(|m| m.len() > INFO_LIMIT).unwrap_or(true) {
+        return None;
+    }
+    fs::read_to_string(&file).ok().map(|t| visible_text(&t, max))
+}
+
 #[derive(Serialize, Debug)]
 pub struct Card {
     /// the folder name: the id in the address
@@ -323,7 +441,7 @@ pub fn list_cards(project_folder: &Path) -> Vec<Card> {
         let id = e.file_name().to_string_lossy().into_owned();
         let Some(root) = card_root(project_folder, &id) else { continue };
         let files = list_files(project_folder, &id).unwrap_or_default();
-        let info = fs::metadata(root.join("mockup.json")).ok().filter(|m| m.is_file() && m.len() <= INFO_LIMIT).and_then(|_| fs::read_to_string(root.join("mockup.json")).ok()).and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
+        let info = card_info(&root);
         let text = |k: &str| info.as_ref().and_then(|v| v.get(k)).and_then(|v| v.as_str()).map(|s| s.trim().to_string()).filter(|s| !s.is_empty() && s.len() <= 120);
         let entry = text("entry").filter(|p| resolve(&root, p).is_ok()).or_else(|| resolve(&root, "index.html").ok().map(|_| "index.html".to_string()));
         out.push(Card { name: text("name").unwrap_or_else(|| id.clone()), id, entry, files: files.len(), modified: files.iter().filter_map(|f| f.modified).max() });
@@ -567,5 +685,125 @@ mod tests {
         assert_eq!(mime(Path::new("a.unknown")), "application/octet-stream");
         assert_eq!(percent_decode("a%20b%2Fc").as_deref(), Some("a b/c"));
         assert!(percent_decode("%zz").is_none() && percent_decode("%2").is_none() && percent_decode("%ff").is_none());
+    }
+
+    #[test]
+    fn the_visible_words_of_a_page_are_what_a_person_reads() {
+        let t = visible_text("<!doctype html><html><head><title>T</title><style>p{color:red}</style><script>var x = '<b>no</b>';</script></head><body><!-- hidden --><h1>Sign &amp; go</h1><p class=\"a\">Wrong  email<br>or password</p><SCRIPT>bad()</SCRIPT><input placeholder='x'>Done&nbsp;now</body></html>", 1000);
+        assert_eq!(t, "T Sign & go Wrong email or password Done now");
+        assert_eq!(visible_text("a < b and c > d", 100), "a < b and c > d", "a lone bracket is text");
+        assert_eq!(visible_text("<p>abcdefghij</p>", 4), "abcd");
+        assert_eq!(visible_text("<script>never closed", 100), "");
+        assert_eq!(visible_text("<p>é — ü</p>", 100), "é — ü");
+    }
+
+    #[test]
+    fn a_page_is_found_by_the_name_a_step_gives_and_nothing_else_is_read() {
+        let d = project("pagetext");
+        let site = d.join(".kona").join("mockups").join("site");
+        fs::write(site.join("about.html"), "<h1>About us</h1>").unwrap();
+        fs::write(site.join("mockup.json"), r#"{"entry":"about.html"}"#).unwrap();
+        assert_eq!(page_text(&d, "site/about.html", 100).as_deref(), Some("About us"));
+        assert_eq!(page_text(&d, "site", 100).as_deref(), Some("About us"), "a card alone is its entry page");
+        assert_eq!(page_text(&d, "site/index.html", 100).as_deref(), Some("hello"));
+        for no in ["", "nope/x.html", "site/missing.html", "site/css/a.css", "site/../other/secret.txt", "site/../../outside.txt", "../site/index.html", "site/app.wasm"] {
+            assert_eq!(page_text(&d, no, 100), None, "{no}");
+        }
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    // ---- the journey note a card may read (T-0036) ----
+
+    const JOURNEY_NOTE: &str = "---\ntitle: J\nkind: journey\n---\n# J\n\nWords.\n\n```journey\n{\"steps\": [{\"id\": \"a\", \"name\": \"A\", \"lane\": \"app\"}]}\n```\n";
+
+    /// a project with notes of several shapes and one card for each way a card can name a note
+    fn journey_project(name: &str) -> PathBuf {
+        let d = project(name);
+        let brain = d.join(".kona").join("brain");
+        fs::create_dir_all(&brain).unwrap();
+        fs::write(brain.join("journey.md"), JOURNEY_NOTE).unwrap();
+        fs::write(brain.join("plain.md"), JOURNEY_NOTE.replace("kind: journey", "kind: decision")).unwrap();
+        fs::write(brain.join("two.md"), format!("{JOURNEY_NOTE}\n{JOURNEY_NOTE}")).unwrap();
+        fs::write(brain.join("none.md"), "---\nkind: journey\n---\nno block here\n").unwrap();
+        fs::write(brain.join("bad.md"), "---\nkind: journey\n---\n```journey\n{\"steps\": [\n```\n").unwrap();
+        fs::write(brain.join("big.md"), format!("---\nkind: journey\n---\n{}", "x".repeat(2 * 1024 * 1024 + 10))).unwrap();
+        fs::write(d.join(".kona").join("secret.md"), JOURNEY_NOTE).unwrap();
+        for (card, named) in [("c-ok", "journey"), ("c-plain", "plain"), ("c-two", "two"), ("c-none", "none"), ("c-bad", "bad"), ("c-big", "big"), ("c-ghost", "ghost"), ("c-up", "Journey"), ("c-dots", "../secret"), ("c-slash", "a/b")] {
+            let dir = d.join(".kona").join("mockups").join(card);
+            fs::create_dir_all(&dir).unwrap();
+            fs::write(dir.join("mockup.json"), format!("{{\"journey\": \"{named}\"}}")).unwrap();
+        }
+        // a card that names no note, and has a real file at the same address
+        let own = d.join(".kona").join("mockups").join("c-own").join("_kona");
+        fs::create_dir_all(&own).unwrap();
+        fs::write(own.join("journey.json"), "{\"its\": \"own file\"}").unwrap();
+        d
+    }
+
+    #[test]
+    fn a_card_reads_the_map_of_the_note_it_names_and_only_that() {
+        let d = journey_project("journey-ok");
+        let r = get(&d, "/p1/c-ok/_kona/journey.json");
+        assert_eq!(r.status, 200);
+        assert_eq!(header(&r, "content-type"), Some("application/json; charset=utf-8"));
+        let v: serde_json::Value = serde_json::from_slice(&r.body).unwrap();
+        assert_eq!(v["steps"][0]["id"], "a", "the block, not the note");
+        assert!(!String::from_utf8_lossy(&r.body).contains("Words."), "nothing of the note around the block");
+        // the same safe headers as every other answer
+        assert!(header(&r, "content-security-policy").unwrap().contains("connect-src 'self'"));
+        assert_eq!(header(&r, "cache-control"), Some("no-store"));
+        // a HEAD says the length and sends nothing
+        let f = d.clone();
+        let head = serve(&move |_| Some(f.clone()), "HEAD", "/p1/c-ok/_kona/journey.json", None);
+        assert!(head.status == 200 && head.body.is_empty() && header(&head, "content-length") == Some(r.body.len().to_string().as_str()));
+        // the note is read at every request: a change shows without anything else
+        fs::write(d.join(".kona").join("brain").join("journey.md"), JOURNEY_NOTE.replace("\"id\": \"a\"", "\"id\": \"changed\"")).unwrap();
+        let again: serde_json::Value = serde_json::from_slice(&get(&d, "/p1/c-ok/_kona/journey.json").body).unwrap();
+        assert_eq!(again["steps"][0]["id"], "changed");
+        let _ = fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn a_card_cannot_read_anything_else_through_the_journey_address() {
+        let d = journey_project("journey-deny");
+        let status = |card: &str| get(&d, &format!("/p1/{card}/_kona/journey.json")).status;
+        assert_eq!(status("c-plain"), 403, "a note of another kind is not given");
+        assert_eq!(status("c-ghost"), 404);
+        assert_eq!(status("c-up"), 400, "a name that is not a note id");
+        assert_eq!(status("c-dots"), 400, "a path is not a note id");
+        assert_eq!(status("c-slash"), 400);
+        assert_eq!(status("c-two"), 422);
+        assert_eq!(status("c-none"), 422);
+        assert_eq!(status("c-bad"), 422);
+        assert_eq!(status("c-big"), 413);
+        assert!(!String::from_utf8_lossy(&get(&d, "/p1/c-dots/_kona/journey.json").body).contains("steps"), "the note outside the brain folder is not given");
+        // the other cards' ordinary paths are unchanged, and a similar address is not the journey
+        assert_eq!(get(&d, "/p1/c-ok/_kona/other.json").status, 404);
+        assert_eq!(get(&d, "/p1/c-ok/_kona/journey.json/x").status, 404);
+        assert_eq!(get(&d, "/p1/c-ok/_KONA/journey.json").status, 404);
+        assert_eq!(get(&d, "/p1/c-ok/mockup.json").status, 200, "the card's own small file is still a file of the card");
+        // a card that names no note serves its own file at that address
+        let own = get(&d, "/p1/c-own/_kona/journey.json");
+        assert_eq!(own.status, 200);
+        assert_eq!(own.body, b"{\"its\": \"own file\"}");
+        // a project that has no brain folder at all
+        let bare = project("journey-bare");
+        fs::write(bare.join(".kona").join("mockups").join("site").join("mockup.json"), r#"{"journey":"journey"}"#).unwrap();
+        assert_eq!(get(&bare, "/p1/site/_kona/journey.json").status, 404);
+        let _ = fs::remove_dir_all(&d);
+        let _ = fs::remove_dir_all(&bare);
+    }
+
+    #[test]
+    fn the_block_is_found_the_way_the_screen_finds_it() {
+        assert_eq!(journey_block(JOURNEY_NOTE).unwrap(), "{\"steps\": [{\"id\": \"a\", \"name\": \"A\", \"lane\": \"app\"}]}");
+        assert!(journey_block("```json\n{}\n```\n\n```journey\n{\"x\":1}\n```").unwrap() == "{\"x\":1}", "other fences are ignored");
+        assert!(journey_block("```json journey\r\n{}\r\n```\r\n").is_ok(), "the words json journey open it, and CRLF is fine");
+        assert!(journey_block("# nothing").unwrap_err().contains("no journey block"));
+        assert!(journey_block("```journey\n{}\n```\n```journey\n{}\n```").unwrap_err().contains("2 journey blocks"));
+        // the starter note that teaches the format holds a map that the server can give
+        let (_, text) = brain_search::STARTER.iter().find(|(id, _)| *id == "kona-journey").expect("the starter note is listed");
+        let v: serde_json::Value = serde_json::from_str(&journey_block(text).unwrap()).unwrap();
+        assert_eq!(v["steps"].as_array().unwrap().len(), 6);
     }
 }

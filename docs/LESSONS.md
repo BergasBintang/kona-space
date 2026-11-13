@@ -51,7 +51,7 @@ Every line was paid for with a correction or a wasted hour. Before showing the o
 
 **Tools on this PC**
 
-22. Long scripts: write the file with the Write tool, then run it. No heredocs with quotes or backslashes, and never `python -`. Keep each file's own line endings.
+22. Long scripts: write the file with the Write tool, then run it. No heredocs with quotes, backticks or backslashes, and never `python -` or `python3 -` (it waited for input for two minutes). A change to a file full of backticks goes through the Edit tool or a script file, never through `sed`. Keep each file's own line endings.
 23. A Rust compile error kills the dev window. A backslash in a Rust test string is the usual cause.
 24. Open choices go to the owner through the question tool, the recommended answer first. Ask only what has not been said.
 25. A piece placed in the office is looked at in the picture of the real office, from all four sides, and nothing stands beside a doorway (a test checks it).
@@ -855,3 +855,31 @@ The owner closed the last ten tickets (T-0018 to T-0027), so all 27 are Done, an
 
 **Checked (dev window):** a project with one waiting and one finished session shows both on its card ("1 waiting on you", "1 finished"); opening the project shows "Questioning" and "Finish" over the two heads; opening the finished person's chat and closing it turns "Finish" into "Open" (screenshot looked at); the card shows only the account name; 236 tests, 88 Rust tests.
 **Not checked:** a real session in another project (the records were made up, in the same shape as real ones); the "Open" mark in a crowded room (the bubbles lift above each other, as before); the "left behind" mark on cards (not built; the owner has not asked).
+
+
+## 32. The Journey view (2026-11-13: tickets T-0035 to T-0041)
+
+| Seen | Cause | Keep |
+|---|---|---|
+| A new starter note broke two search questions and made two unrelated questions "partly found" (TP 40 to 42, FN 3 to 4, FP up) | The coverage bars are a knife edge: one rare word in a new section (the words *meet*, *colour*, *card*, *progress*) moved a question across a bar | Measure after every wording change of a starter note, with a scratch script that runs the search with and without the note and prints which questions changed. Then fix the words, not the bars. Do not use ordinary words in a new note when a plainer one is free |
+| The skill told workers to save a note of kind journey; `save_note` did not allow that kind | The skill and the tool were written apart and nothing compared them | Found only while preparing the real conversation. A skill that names a value of a tool is checked against the tool's own schema; there is a Rust test now. Write the real-conversation script before saying a skill is done, not after |
+| The meaning check by Haiku seemed to complain about every clean journey, twice, and was dropped; the owner said to check it again, and it then found 11 of 12 planted problems and reported 0 of 36 clean journeys | **The first measure was made wrongly:** the script started `claude` through a shell (`shell: true` on Windows), which mangled the system prompt (line breaks and quotes), so the instruction never reached the model and it answered the user line alone. Kona itself starts the program with no shell, so the real button was never tested that way | A script that measures a model calls it the way the program does (the same executable, no shell, the same arguments), and a first run in which the model says it does not know what to check is read as a broken harness, not as a bad model. The second design is also better: a fixed answer shape (one verdict line for each step) that is read by a parser, so a small model cannot report what it was not asked |
+| A 120-step journey first fitted at 30 percent and could not be read | The "fit" had a floor of 0.3 and a path of 120 steps in a row is wider than any window | Look at the screenshot of the real amount (lesson 10). The automatic size never goes below 55 percent; the map scrolls inside its box |
+| The second run of the window test failed on the first click, with no error on the page | The narrow-window step had left the test window smaller, so the box was below the fold and the click landed on the office behind the sheet | A window test sets the window size itself at its start, scrolls the target into view before clicking, and puts the window back as it found it. A failure with no page error is a position problem first |
+| The real-conversation script could not build the digest | A built program has no `/src` to import from; only the dev window has | The scripts that need the source run in `tauri dev`; the others run against the built program. Say which in the header of the script |
+| A `sed` over a file with backticks and quotes made a syntax error in the test (twice); `python3 -` hung the shell for two minutes | Lesson 22 of the benchmark, broken again | Now written into the line itself |
+| (a real window run spends the owner's plan: the bars in the top corner showed it, 19 percent of the session after the measures and the conversations) | Cents each, but they add up | Say it in the report: how many calls were made and that the bars moved |
+| The checker for workers is a copy of the reader, and a copy drifts | Two codes for one rule | It is made from the reader by a tool (types stripped), and a test fails when the file in the skill is not what the tool makes, and when the two give different problems on the same texts. A shipped copy of a rule is generated, never written twice |
+| A journey note edited by the owner can no longer be changed by a session | The brain's rule: an edited note is the owner's | Open for the owner: it may need an exception for notes of kind journey. Not decided, so not changed |
+
+**Checked in the real window (built program, throwaway project, nothing of the owner's touched):** the Journey tab, 6 and 120 steps, the dialog, the picker, the kinds of user, a broken note, the narrow window, the table with its Check column, the marker scan, and a Mockups page that draws the journey from the note (the address answers, the ways out stay shut, a changed note shows after Start the page again). **Not checked:** a project with no journey at all; the keyboard path through the boxes; the Journey page in a project with two journeys that have markers.
+
+## 33. The Ask page (2026-11-13: ticket T-0042)
+
+| Seen | Cause | Keep |
+|---|---|---|
+| The first run of the window test did nothing on the page and failed on every question | The test looked for a button by its text, and the first button called Ask is the **tab** called Ask, not the send button | Find a control by where it is (the form, the role), never by text alone when a tab or a heading can carry the same word |
+| Two throwaway scripts waited for something that never matched and then acted too early (the button was still busy), which looked like a bug of the page | The shell turned a double backslash into one, so a pattern with a digit class became the letter d and could never match; the page itself was right | A script with a pattern in it is written with the file tool, not a shell heredoc; and a wait is checked once against a state it must match before anything is concluded about the page |
+| The real window run was stopped by the outer time limit and left a throwaway project in the owner's list | The cleanup is in a finally block, which a killed process never reaches | After a killed run, look at the project list and remove what is left (done here); the test names its project so it can be found |
+| A first thought was to retire the question box, and the owner asked for a page instead | The box was doing three jobs (search, gap list, ask Claude) on pages that did not need it | Say what a thing is for before removing it; the part worth keeping (the free search first, then the wanted list) became the front of the new page |
+| Real plan use of this ticket: 47 Haiku calls for the measure and about 10 for the window runs and the demo | Cents each | Said in the report; the bars in the top corner showed 19 percent of the session before and after, so the cost was small |

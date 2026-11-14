@@ -206,11 +206,6 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
           </Help>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {notes.length > 1 && <div className="w-[220px]"><Select ariaLabel="Journey" value={note.id} onChange={setWhich} search={false} options={notes.map((n) => ({ value: n.id, label: n.title }))} /></div>}
-          {journey.users.length > 0 && (
-            <div className="w-[220px]"><Select ariaLabel="Who can see it" value={kind} onChange={(v) => { setKind(v); setLayerPick(null); setPicked(null); setOpened(null); }} search={false}
-              options={[{ value: KINDS_ALL, label: "All kinds of user" }, ...journey.users.map((u) => ({ value: u.id, label: u.name, hint: u.system || undefined }))]} /></div>
-          )}
           <ChecksMenu problems={problems.length} flagged={errors.length > 0} markers={marks ? marks.missing.length + marks.noPage.length : 0} scanned={!!scan} scanning={scanning}
             onProblems={() => setShowProblems(true)} onMarkers={() => setShowMarks(true)} onNames={() => setAi({ stage: "ask" })} onScan={runScan} />
           <div role="group" aria-label="Zoom" className="flex items-center gap-1.5">
@@ -221,12 +216,26 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
         </div>
       </div>
 
-      {journey.layers.length > 0 && (
-        <div role="group" aria-label="Layer" className="flex flex-wrap items-center gap-2">
-          {journey.layers.map((l) => (
-            <Button key={l.id} variant="quiet" small on={layer === l.id} aria-pressed={layer === l.id} onClick={() => { setLayerPick(l.id); setPicked(null); setOpened(null); }}>{l.name}<span className="font-normal text-text-secondary">{layerCount.get(l.id) ?? 0}</span></Button>
-          ))}
-          <Button variant="quiet" small on={layer === LAYER_ALL} aria-pressed={layer === LAYER_ALL} onClick={() => { setLayerPick(LAYER_ALL); setPicked(null); setOpened(null); }}>All<span className="font-normal text-text-secondary">{byKind?.steps.length ?? 0}</span></Button>
+      {/* what is on the map (a journey, a kind of user, a layer) on one row, all the height of a small button; the tools (Checks, zoom) are on the title row */}
+      {(notes.length > 1 || journey.users.length > 0 || journey.layers.length > 0) && (
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          {(notes.length > 1 || journey.users.length > 0) && (
+            <div className="flex flex-wrap items-center gap-3">
+              {notes.length > 1 && <div className="w-[220px]"><Select small ariaLabel="Journey" value={note.id} onChange={setWhich} search={false} options={notes.map((n) => ({ value: n.id, label: n.title }))} /></div>}
+              {journey.users.length > 0 && (
+                <div className="w-[220px]"><Select small ariaLabel="Who can see it" value={kind} onChange={(v) => { setKind(v); setLayerPick(null); setPicked(null); setOpened(null); }} search={false}
+                  options={[{ value: KINDS_ALL, label: "All kinds of user" }, ...journey.users.map((u) => ({ value: u.id, label: u.name, hint: u.system || undefined }))]} /></div>
+              )}
+            </div>
+          )}
+          {journey.layers.length > 0 && (
+            <div role="group" aria-label="Layer" className="flex flex-wrap items-center gap-2">
+              {journey.layers.map((l) => (
+                <Button key={l.id} variant="quiet" small on={layer === l.id} aria-pressed={layer === l.id} onClick={() => { setLayerPick(l.id); setPicked(null); setOpened(null); }}>{l.name}<span className="font-normal text-text-secondary">{layerCount.get(l.id) ?? 0}</span></Button>
+              ))}
+              <Button variant="quiet" small on={layer === LAYER_ALL} aria-pressed={layer === LAYER_ALL} onClick={() => { setLayerPick(LAYER_ALL); setPicked(null); setOpened(null); }}>All<span className="font-normal text-text-secondary">{byKind?.steps.length ?? 0}</span></Button>
+            </div>
+          )}
         </div>
       )}
       {scanError && <div className="flex items-start gap-2.5 text-[14px] leading-5 text-state-left"><Glyph state="left" size={16} /> {scanError}</div>}

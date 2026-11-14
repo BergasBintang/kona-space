@@ -14,7 +14,7 @@ macro_rules! starter {
 /// The starter notes, the same files the screen shows.
 pub static STARTER: &[(&str, &str)] = starter![
     "agents-and-sessions", "claude-md-and-memory", "context-and-cost", "good-tickets-and-prompts", "how-the-brain-works", "kona-board",
-    "kona-costs-and-plan-bars", "kona-journey", "kona-leftovers", "kona-mockups", "kona-screens", "roles-and-permission-modes", "safe-habits", "skills-mcp-and-hooks",
+    "kona-charts", "kona-costs-and-plan-bars", "kona-journey", "kona-leftovers", "kona-mockups", "kona-screens", "roles-and-permission-modes", "safe-habits", "skills-mcp-and-hooks",
     "start-here", "tickets-and-worktrees",
 ];
 
@@ -333,6 +333,18 @@ mod tests {
                 assert!(a.hits.iter().take(3).any(|h| ids.contains(&h.note_id.as_str())), "\"{q}\" should reach {ids:?}, reached {:?}", a.hits.iter().map(|h| h.note_id.clone()).collect::<Vec<_>>());
             }
         }
+    }
+
+    // the screen reads the whole starter folder, this list is written by hand: a note missing here is a note the workers cannot find (kona-charts was, in 0.40.0)
+    #[test]
+    fn every_starter_file_is_in_the_list_the_tools_read() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../src/brain/starter");
+        let mut on_disk: Vec<String> = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok())
+            .filter_map(|e| e.file_name().to_str().and_then(|n| n.strip_suffix(".md")).map(String::from)).collect();
+        let mut listed: Vec<String> = STARTER.iter().map(|(id, _)| id.to_string()).collect();
+        on_disk.sort();
+        listed.sort();
+        assert_eq!(listed, on_disk, "the list STARTER and the folder app/src/brain/starter must hold the same notes");
     }
 
     #[test]

@@ -2,6 +2,13 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.40.1, 2026-11-14
+
+A fix so the workers know about charts, and a tidier top bar on the Journey page.
+
+- **Workers can find the chart note.** In 0.40.0 a worker that was asked about charts could not find the starter note **Charts in a note**, so it said the page did not exist and offered a different kind of diagram. The note is now in the list the workers search, and their writing rules say to put numbers in a chart block and to read that note for the kinds and settings. This holds for every role. A test now fails if a starter note is missing from that list.
+- **The Journey top bar.** The tools (Checks and the three zoom buttons) sit on the title row. Below it, one row holds what is on the map: the journey and kind-of-user pickers and the layer tabs, all the same height as the buttons beside them.
+
 ## 0.40.0, 2026-11-14
 
 Charts in notes, a Journey page that draws a product's path, and an Ask page in the Brain.

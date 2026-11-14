@@ -34,6 +34,7 @@ const READABLE_FILES: &str = "Markdown files you write are read by the owner in 
 - Docs and notes start with front matter (`title:`, `date:`, `status:` between lines of three dashes), never CLAUDE.md, README.md or a file another tool reads. Then a title, a two-sentence summary and plain headings (Kona lists them).
 - Rows go in a pipe table: header, divider row, short cells. Kona sorts and filters it.
 - A flow, branches, an exchange or states go in a ```mermaid block: `flowchart TD` or `LR`, `sequenceDiagram`, `stateDiagram-v2`. At most about 12 boxes of 2 to 5 words, words on an arrow only for a choice (`B -->|yes| C`), no colours. One sentence under it says what it shows.
+- Numbers to compare go in a ```chart block (a `type:` line, then a pipe table); `read_note` the starter note `kona-charts` for the kinds and settings. Do not use a mermaid pie chart for them.
 - A warning is `> **Warning:** text` (or Note, Tip, Important, Caution). Use it rarely.
 - Link by relative path, `[plan](docs/plan.md)` or `[costs](#costs)`. Checklists are `- [ ]`; indent nested lists two spaces.";
 

@@ -19,10 +19,11 @@ type Common = {
   disabled?: boolean;
   icon?: ReactNode; // a small picture inside the trigger, before the text
   bold?: boolean;
+  small?: boolean; // the height of a small button (40), to sit in one row with small buttons
   className?: string;
 };
 
-function Picker({ multiple, values, onChange, label, ariaLabel, options, placeholder = "Choose", search, disabled, icon, bold, className = "" }: Common & {
+function Picker({ multiple, values, onChange, label, ariaLabel, options, placeholder = "Choose", search, disabled, icon, bold, small, className = "" }: Common & {
   multiple: boolean; values: string[]; onChange: (v: string[]) => void;
 }) {
   const uid = useId();
@@ -87,7 +88,7 @@ function Picker({ multiple, values, onChange, label, ariaLabel, options, placeho
       <button ref={trigger} type="button" disabled={disabled} onClick={() => (open ? close() : openList())} onKeyDown={onKey}
         role="combobox" aria-haspopup="listbox" aria-expanded={open} aria-controls={`${uid}-list`} aria-activedescendant={!showSearch ? active : undefined}
         aria-labelledby={label ? `${uid}-label ${uid}-value` : undefined} aria-label={label ? undefined : ariaLabel}
-        className={triggerBase}>
+        className={small ? triggerBase.replace("h-12", "h-10") : triggerBase}>
         {icon}
         <span id={`${uid}-value`} className={`min-w-0 flex-1 truncate ${shown === null ? "text-text-tertiary" : bold ? "font-bold" : ""}`}>{shown ?? placeholder}</span>
         {CHEVRON}

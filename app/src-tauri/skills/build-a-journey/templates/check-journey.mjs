@@ -15,8 +15,11 @@ export const STATUSES           = ["built", "in-progress", "not-built"];
                                          
 
                                                                                                                                     
-/** a kind of user of the product (a guest, a candidate, an admin): who can reach a step. Not a Kona role. */
-                                                    
+/** a kind of user of the product (a guest, a candidate, an admin): who can reach a step. Not a Kona role. `system` names the way of giving access it belongs to
+ *  (Role, Branch duty, Plan): a product may have more than one, and the picker groups the kinds by it. Empty: the one plain list. */
+                                                                    
+/** a part of the product with its own screens and menu (a login panel, the main panel, the admin panel): the map can show one layer at a time */
+                                                 
                                                    
                                                    
                                                                  
@@ -26,9 +29,13 @@ export const STATUSES           = ["built", "in-progress", "not-built"];
              
                
                
+                                                                                                 
+                
                  
                       
                    
+                                                                                                                                 
+                 
                  
                  
                
@@ -47,7 +54,7 @@ export const STATUSES           = ["built", "in-progress", "not-built"];
                                              
   
 
-                                                                                         
+                                                                                                          
                                                                                                                     
                                                                     
 
@@ -61,7 +68,7 @@ const MAX_BLOCK = 600_000; // characters
 const MAX_STEPS = 2000;
 const ID = /^[a-z0-9][a-z0-9-]*$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
-export const STEP_KEYS = new Set(["id", "name", "lane", "kind", "actor", "access", "next", "start", "end", "status", "updated", "mockup", "tickets", "notes", "see", "fields", "buttons", "errors", "ai"]);
+export const STEP_KEYS = new Set(["id", "name", "lane", "layer", "limits", "kind", "actor", "access", "next", "start", "end", "status", "updated", "mockup", "tickets", "notes", "see", "fields", "buttons", "errors", "ai"]);
 
 // ---- finding the block ----
 
@@ -127,13 +134,23 @@ export function parseJourney(text        )       {
     lanes.push({ id, name, actor: ACTORS.includes(a         ) ? (a         ) : null });
   }
 
+  // layers: optional parts of the product shown one at a time (login, main, admin)
+  const layers          = [];
+  for (const raw of list(root.layers)) {
+    const o                          = isObj(raw) ? raw : { id: raw };
+    const id = str(o.id);
+    if (!ID.test(id)) { err("", `A layer has the id "${id}". An id is lower case letters, numbers and dashes.`); continue; }
+    if (layers.some((l) => l.id === id)) { err("", `Two layers have the id "${id}".`); continue; }
+    layers.push({ id, name: str(o.name) || id });
+  }
+
   const users             = [];
   for (const raw of list(root.users)) {
     const o                          = isObj(raw) ? raw : { id: raw };
     const id = str(o.id);
     if (!ID.test(id)) { err("", `A user kind has the id "${id}". An id is lower case letters, numbers and dashes.`); continue; }
     if (users.some((u) => u.id === id)) { err("", `Two user kinds have the id "${id}".`); continue; }
-    users.push({ id, name: str(o.name) || id });
+    users.push({ id, name: str(o.name) || id, system: str(o.system) });
   }
 
   const steps         = [];
@@ -165,8 +182,8 @@ export function parseJourney(text        )       {
     else if (str(raw.ai)) ai = { does: str(raw.ai), model: "" };
 
     steps.push({
-      id, name: name || id, lane: str(raw.lane), kind: kind === "screen" ? "screen" : "step",
-      actor: ACTORS.includes(actor         ) ? (actor         ) : null, access: strs(raw.access), next,
+      id, name: name || id, lane: str(raw.lane), layer: str(raw.layer), kind: kind === "screen" ? "screen" : "step",
+      actor: ACTORS.includes(actor         ) ? (actor         ) : null, access: strs(raw.access), limits: str(raw.limits), next,
       start: raw.start === true, end: raw.end === true,
       status: STATUSES.includes(status          ) ? (status          ) : "not-built",
       updated, mockup: str(raw.mockup), tickets: strs(raw.tickets), notes: strs(raw.notes), see,
@@ -174,7 +191,7 @@ export function parseJourney(text        )       {
     });
   });
 
-  const journey          = { title: str(root.title), lanes, users, steps };
+  const journey          = { title: str(root.title), lanes, layers, users, steps };
   problems.push(...checkJourney(journey));
   return { journey, problems };
 }
@@ -194,6 +211,7 @@ export function checkJourney(j         )            {
   const ids = new Set(j.steps.map((s) => s.id));
   const lanes = new Map(j.lanes.map((l) => [l.id, l]));
   const kinds = new Set(j.users.map((u) => u.id));
+  const layerIds = new Set(j.layers.map((l) => l.id));
   const into = new Map                ();
   for (const s of j.steps) for (const to of leavesTo(s)) if (to !== s.id) into.set(to, (into.get(to) ?? 0) + 1);
 
@@ -202,6 +220,7 @@ export function checkJourney(j         )            {
     if (!s.lane) err(s.id, `Step "${s.id}" has no lane.`);
     else if (!lane) err(s.id, `Step "${s.id}" is in the lane "${s.lane}", which is not one of the lanes (${j.lanes.map((l) => l.id).join(", ")}).`);
     for (const k of s.access) if (!kinds.has(k)) err(s.id, `Step "${s.id}" can be seen by "${k}", which is not a user kind of this journey.`);
+    if (s.layer && !layerIds.has(s.layer)) err(s.id, `Step "${s.id}" is in the layer "${s.layer}", which is not one of the layers (${j.layers.map((l) => l.id).join(", ") || "none"}).`);
     for (const b of s.next) if (!ids.has(b.to)) err(s.id, `Step "${s.id}" leads to "${b.to}", which is not in the map.`);
     for (const b of s.buttons) if (b.to && !ids.has(b.to)) err(s.id, `The button "${b.label}" of step "${s.id}" leads to "${b.to}", which is not in the map.`);
     for (const e of s.errors) if (e.to && !ids.has(e.to)) err(s.id, `An error of step "${s.id}" leads to "${e.to}", which is not in the map.`);
@@ -222,6 +241,34 @@ export function checkJourney(j         )            {
 /** A step that was last checked before the mockup or a ticket it points to changed is stale; this is the date part of that test (a hint, see decision 91). */
 export function olderThan(updated        , other        )          {
   return DAY.test(updated) && DAY.test(other) && updated < other;
+}
+
+// ---- who can reach a step, in a few words ----
+
+/**
+ * The kinds of user that can reach a step, as the short words a card shows. Everyone when every kind can; "All but X, Y" when only one or two cannot; the names
+ * when one or two can; otherwise the kinds grouped by their access system, with a system written as "any duty" when all its kinds can ("Super Admin or any duty").
+ * A step that names no kind is for everyone: nothing was said to hide it.
+ */
+export function accessWords(access          , users            )         {
+  if (users.length === 0) return "";
+  const can = users.filter((u) => access.includes(u.id));
+  if (can.length === 0 || can.length === users.length) return "Everyone";
+  const cannot = users.filter((u) => !can.includes(u));
+  if (can.length <= 2 && can.length <= cannot.length) return can.map((u) => u.name).join(", "); // few can: name them (with two kinds, "Guest", not "All but Member")
+  if (cannot.length <= 2) return `All but ${cannot.map((u) => u.name).join(", ")}`;
+  if (can.length <= 2) return can.map((u) => u.name).join(", ");
+  const systems = [...new Set(users.map((u) => u.system))];
+  const parts           = [];
+  for (const sys of systems) {
+    const all = users.filter((u) => u.system === sys), some = can.filter((u) => u.system === sys);
+    if (some.length === 0) continue;
+    if (some.length === all.length && all.length > 1 && sys) parts.push(`any ${sys.toLowerCase()}`);
+    else if (some.length <= 2) parts.push(some.map((u) => u.name).join(", "));
+    else parts.push(`${some.length} of ${all.length}${sys ? " " + sys.toLowerCase() + "s" : ""}`);
+  }
+  const text = parts.join(" or ");
+  return text[0].toUpperCase() + text.slice(1);
 }
 
 // ---- finding the journey notes of a project ----

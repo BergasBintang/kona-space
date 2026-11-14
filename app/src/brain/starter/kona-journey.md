@@ -19,7 +19,8 @@ A journey is the path a person takes through a product, written once, in one not
 - `kind` is `step` or `screen`. `status` is `built`, `in-progress` or `not-built`; leave it out and it means not built.
 - `next` lists where the person goes after this step. A branch has a `label`, the choice that leads there. `start` marks where a path begins and `end` where it stops.
 - `actor` says who acts: `person`, `system`, `ai` (with `ai` saying what it does and which model), or `people` (one person talks to another person). A lane can name its usual actor, so a step only writes it when it differs.
-- `access` lists the user kinds who can reach the step. The user kinds are listed once at the top, under `users`. They are the product's own kinds of user (a guest, a member, an admin), never Kona's roles.
+- `access` lists the user kinds who can reach the step. The user kinds are listed once at the top, under `users`. They are the product's own kinds of user (a guest, a member, an admin), never Kona's roles. A step that lists none is for everyone. When a product gives access in more than one way, a kind names its way with `system` (`"system": "Branch duty"`), and the picker shows it beside the kind.
+- `layer` names the part of the product the step belongs to (see below). A step with no layer is shared by every layer, such as server work that several parts use. The layers are listed once under `layers`, each with an `id` and a `name`; the Journey page shows one layer with a tab for each, and a step of another layer joined to it is a faded doorway. `limits` is a few words for what narrows the access without changing the path, such as "own branches only".
 - `updated` is the day someone last checked the step against the product, written 2026-11-13. `mockup` names the mockup folder in the Mockups sheet and, if needed, its page, such as `photo-albums/sign-in.html`. `tickets` and `notes` name what decided it. `see` points to a diagram of the database, the servers or a login that stays separate.
 
 ## A screen holds only what changes where the person goes
@@ -28,7 +29,7 @@ A screen step lists its key `fields`, its `buttons` (each with the step it leads
 
 ## What is checked
 
-These are checked by script, without any model: a step that leads to a step that is not in the map, a step in a lane that does not exist, a user kind that is not listed, two steps with one id, a step that leads nowhere and is not an end, a step nothing leads to that is not a start, a screen with no mockup, a built step that names no ticket and no note, and an AI step that does not say what the AI does.
+These are checked by script, without any model: a step that leads to a step that is not in the map, a step in a lane or a layer that does not exist, a user kind that is not listed, two steps with one id, a step that leads nowhere and is not an end, a step nothing leads to that is not a start, a screen with no mockup, a built step that names no ticket and no note, and an AI step that does not say what the AI does.
 
 ## Keeping it current
 

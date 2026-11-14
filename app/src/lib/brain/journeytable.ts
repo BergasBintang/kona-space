@@ -10,9 +10,14 @@ export const STATUS_TEXT: Record<string, string> = { built: "Built", "in-progres
 export function journeyTable(j: Journey, flags: ReadonlyMap<string, string> = new Map()): Table {
   const lane = new Map(j.lanes.map((l) => [l.id, l.name]));
   const withCheck = [...flags.values()].some(Boolean);
-  const head = withCheck ? [...TABLE_HEAD, "Check"] : TABLE_HEAD;
+  const layers = new Map(j.layers.map((l) => [l.id, l.name]));
+  const withLayer = j.layers.length > 0; // a Layer column after the lane, when the journey has layers
+  const base = withLayer ? [TABLE_HEAD[0], TABLE_HEAD[1], "Layer", ...TABLE_HEAD.slice(2)] : TABLE_HEAD;
+  const head = withCheck ? [...base, "Check"] : base;
   const rows = j.steps.map((s) => {
-    const r = [s.name, lane.get(s.lane) ?? (s.lane || "No lane"), STATUS_TEXT[s.status] ?? s.status, s.tickets.join(", ") || "none", s.mockup || "none", s.updated || "never"];
+    const r = [s.name, lane.get(s.lane) ?? (s.lane || "No lane")];
+    if (withLayer) r.push(layers.get(s.layer) ?? "Shared");
+    r.push(STATUS_TEXT[s.status] ?? s.status, s.tickets.join(", ") || "none", s.mockup || "none", s.updated || "never");
     if (withCheck) r.push(flags.get(s.id) ?? "");
     return r;
   });

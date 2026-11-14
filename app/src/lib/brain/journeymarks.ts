@@ -43,7 +43,7 @@ export function draftName(id: string): string {
 export function withDrafts(j: Journey, missing: readonly Missing[]): Journey {
   if (missing.length === 0) return j;
   const draft = (m: Missing): Step => ({
-    id: m.id, name: draftName(m.id), lane: DRAFT_LANE, kind: "screen", actor: null, access: [], next: [], start: false, end: false, status: "not-built", updated: "",
+    id: m.id, name: draftName(m.id), lane: DRAFT_LANE, layer: "", limits: "", kind: "screen", actor: null, access: [], next: [], start: false, end: false, status: "not-built", updated: "",
     mockup: "", tickets: [], notes: [], see: [], fields: [], buttons: [], errors: [], ai: null,
   });
   return { ...j, lanes: [...j.lanes.filter((l) => l.id !== DRAFT_LANE), { id: DRAFT_LANE, name: "Not confirmed", actor: null }], steps: [...j.steps, ...missing.map(draft)] };

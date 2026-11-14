@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { ACTORS, STATUSES, STEP_KEYS, checkJourney, journeyBlock, journeyNotes, leavesTo, olderThan, parseJourney } from "./journey.ts";
+import { ACTORS, STATUSES, STEP_KEYS, accessWords, checkJourney, journeyBlock, journeyNotes, leavesTo, olderThan, parseJourney } from "./journey.ts";
 
 const starter = readFileSync(new URL("../../brain/starter/kona-journey.md", import.meta.url), "utf8");
 
@@ -174,7 +174,7 @@ test("forgiving forms: next, buttons, errors, see, ai and lists may be written s
   assert.deepEqual(b.errors, [{ text: "Wrong password", when: "", to: "" }]);
   assert.deepEqual(b.see, [{ diagram: "database", note: "" }]);
   assert.deepEqual(b.ai, { does: "Suggests a title", model: "" });
-  assert.deepEqual(r.journey!.users, [{ id: "guest", name: "guest" }]);
+  assert.deepEqual(r.journey!.users, [{ id: "guest", name: "guest", system: "" }]);
   assert.deepEqual(r.problems.filter((p) => p.level === "error"), []);
 });
 
@@ -224,4 +224,50 @@ test("the address a mockup reads its journey from is the same in the server, the
   const page = readFileSync(new URL("../../../src-tauri/skills/make-a-mockup/templates/journey.html", import.meta.url), "utf8");
   for (const [name, text] of [["the starter note kona-mockups", mockups], ["the make-a-mockup skill", skill], ["the page template", page]]) assert.ok(text.includes(address), `${name} does not name ${address}`);
   assert.ok(mockups.includes('"journey": "<note id>"') && skill.includes('"journey": "<the note id>"'), "the key of mockup.json is named");
+});
+
+const withLayers = (body: Record<string, unknown>) => parseJourney("```journey\n" + JSON.stringify(body) + "\n```\n");
+
+test("layers, ways of giving access and limits are read, and a step in a layer that is not listed is an error", () => {
+  const r = withLayers({
+    layers: [{ id: "login", name: "Login" }, { id: "admin", name: "Admin" }],
+    users: [{ id: "teacher", name: "Teacher", system: "Role" }, { id: "manager", name: "Branch manager", system: "Branch duty" }],
+    steps: [{ id: "a", name: "A", lane: "app", actor: "system", layer: "login", access: ["teacher"], limits: "own branches only", start: true, end: true }],
+  });
+  const j = r.journey!;
+  assert.deepEqual(j.layers, [{ id: "login", name: "Login" }, { id: "admin", name: "Admin" }]);
+  assert.deepEqual(j.users.map((u) => u.system), ["Role", "Branch duty"]);
+  assert.equal(j.steps[0].layer, "login");
+  assert.equal(j.steps[0].limits, "own branches only");
+  assert.ok(!r.problems.some((p) => p.level === "error"), JSON.stringify(r.problems));
+  const bad = withLayers({ layers: [{ id: "login" }], steps: [{ id: "a", name: "A", lane: "app", layer: "nowhere", start: true, end: true }] });
+  assert.ok(bad.problems.some((p) => p.level === "error" && /layer "nowhere"/.test(p.text)), "a layer that is not listed is an error");
+  const dup = withLayers({ layers: [{ id: "x" }, { id: "x" }], steps: [] });
+  assert.ok(dup.problems.some((p) => /Two layers/.test(p.text)));
+  assert.ok(STEP_KEYS.has("layer") && STEP_KEYS.has("limits"));
+});
+
+test("a journey with no layers has none, and its steps are in no layer", () => {
+  const j = withLayers({ steps: [{ id: "a", name: "A", lane: "app", start: true, end: true }] }).journey!;
+  assert.deepEqual(j.layers, []);
+  assert.equal(j.steps[0].layer, "");
+  assert.equal(j.steps[0].limits, "");
+});
+
+test("accessWords: who can reach a step, in a few words", () => {
+  const users = [
+    { id: "guest", name: "Guest", system: "Role" }, { id: "student", name: "Student", system: "Role" }, { id: "teacher", name: "Teacher", system: "Role" }, { id: "admin", name: "Super Admin", system: "Role" },
+    { id: "manager", name: "Branch manager", system: "Branch duty" }, { id: "ops", name: "Ops coordinator", system: "Branch duty" }, { id: "academic", name: "Academic coordinator", system: "Branch duty" },
+  ];
+  const all = users.map((u) => u.id);
+  assert.equal(accessWords([], users), "Everyone", "a step that names no kind is for everyone");
+  assert.equal(accessWords(all, users), "Everyone");
+  assert.equal(accessWords(all.filter((k) => k !== "guest"), users), "All but Guest");
+  assert.equal(accessWords(all.filter((k) => k !== "guest" && k !== "student"), users), "All but Guest, Student");
+  assert.equal(accessWords(["student"], users), "Student");
+  assert.equal(accessWords(["teacher", "ops"], users), "Teacher, Ops coordinator");
+  assert.equal(accessWords(["admin", "manager", "ops", "academic"], users), "Super Admin or any branch duty", "a system all of whose kinds can reach it is written as any");
+  assert.equal(accessWords(["x"], []), "", "no kinds listed: nothing to say");
+  const two = [{ id: "guest", name: "Guest", system: "" }, { id: "member", name: "Member", system: "" }];
+  assert.equal(accessWords(["guest"], two), "Guest", "with two kinds the one that can is named, not \"All but Member\"");
 });

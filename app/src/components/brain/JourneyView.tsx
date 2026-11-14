@@ -1,17 +1,19 @@
 // The Journey view of the Brain (ticket T-0037, decision 91): the path a person takes through the product, drawn from the one note of kind `journey`.
 // Lanes run left to right as rows (Person, App, Server by default); each step is a box whose shape, mark and word say who acts; a line is the way on, with the
-// choice written on it; a dashed line is an error branch. A click on a box opens its details in a dialog. The table under the map lists the same steps.
-import { useEffect, useMemo, useRef, useState } from "react";
+// choice written on it; a dashed line is an error branch. Pointing at a box shows its lines; a click pins that focus (everything not joined to it nearly vanishes);
+// a second click on the pinned box opens its details in a dialog; a click on empty map or Esc lets go. The table under the map lists the same steps.
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDismiss } from "../pick/parts";
 import type { Brain } from "../../lib/brain/engine.ts";
-import { journeyNotes, parseJourney, type Actor, type Journey, type Problem, type Step } from "../../lib/brain/journey.ts";
-import { layoutJourney, stepsFor } from "../../lib/brain/journeylayout.ts";
+import { accessWords, journeyNotes, parseJourney, type Actor, type Journey, type Problem, type Step } from "../../lib/brain/journey.ts";
+import { layerView, layoutJourney, stepsFor, type Edge } from "../../lib/brain/journeylayout.ts";
 import { Button, Glyph } from "../ui";
 import { Confirm } from "../Confirm";
 import { Chevron } from "../Files";
 import { IconButton } from "../Icon";
 import { Select } from "../pick";
 import { Help } from "../Help";
-import { ACTOR_WORD, ActorMark, Defs, EdgeLabel, EdgeLine, labelFree, STATUS_GLYPH, STATUS_WORD, StepBox } from "./JourneyArt";
+import { ACTOR_WORD, ActorMark, Defs, EdgeLabel, EdgeLine, labelSpot, STATUS_GLYPH, STATUS_WORD, StepBox, type Rect, type Spot } from "./JourneyArt";
 import { JourneyTable } from "./JourneyTable";
 import { checkText, staleness, ticketFact, type CardFact, type Stale, type TicketFact } from "../../lib/brain/journeystale.ts";
 import { compareMarkers, placeOf, withDrafts, type Marker, type Scan } from "../../lib/brain/journeymarks.ts";
@@ -22,6 +24,13 @@ import { journeyCheckPrompt, pagesToRead, readJourneyCheck, type Verdicts } from
 const scans = new Map<string, Scan>();
 
 const KINDS_ALL = "";
+const LAYER_ALL = "*"; // the tab that shows every layer at once (an id cannot be "*")
+const NO_DOORWAYS = new Map<string, string>();
+/** the layer a journey opens on: the one that holds a start step, unless nothing of it is on show (the kind of user cannot reach it), then the first layer with something on show */
+const startLayer = (j: Journey, count: ReadonlyMap<string, number>) => {
+  const start = j.layers.find((l) => j.steps.some((s) => s.start && s.layer === l.id)) ?? j.layers[0];
+  return (count.get(start.id) ?? 0) > 0 ? start.id : (j.layers.find((l) => (count.get(l.id) ?? 0) > 0) ?? start).id;
+};
 const KIND_H = 30; // room under the last lane for a loop line
 const LANE_W = 104; // the column with the names of the lanes
 const GROUP_MIN = 4; // the same warning about this many steps is shown as one line
@@ -41,10 +50,24 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
   // a marker the map does not know is drawn as a draft step, in a lane of its own
   const shown = useMemo(() => (journey && marks ? withDrafts(journey, marks.missing) : journey), [journey, marks]);
   const draftIds = useMemo(() => new Set(marks?.missing.map((m) => m.id) ?? []), [marks]);
+  // a layer (login, main, admin) is shown at a time; the tab picked by the person, or the layer the journey starts in
+  const [layerPick, setLayerPick] = useState<string | null>(null);
   // a kind of user is picked: only the steps that kind can reach are drawn and laid out again, so the map shrinks to that person's path
-  const drawn = useMemo(() => (shown ? (kind === KINDS_ALL ? shown : { ...shown, steps: stepsFor(shown, kind) }) : null), [shown, kind]);
-  // the table lists the steps of the note (not the drafts found in the code), for the kind of user that is picked
-  const tableOf = useMemo(() => (journey ? (kind === KINDS_ALL ? journey : { ...journey, steps: stepsFor(journey, kind) }) : null), [journey, kind]);
+  const byKind = useMemo(() => (shown ? (kind === KINDS_ALL ? shown : { ...shown, steps: stepsFor(shown, kind) }) : null), [shown, kind]);
+  const layerCount = useMemo(() => new Map((journey?.layers ?? []).map((l) => [l.id, (byKind?.steps ?? []).filter((s) => s.layer === l.id).length])), [journey, byKind]);
+  // with no tab picked the map opens on the layer that holds the start, or, when the kind of user reaches nothing there, on the first layer it does reach
+  const layer = !journey || journey.layers.length === 0 ? "" : layerPick !== null && (layerPick === LAYER_ALL || journey.layers.some((l) => l.id === layerPick)) ? layerPick : startLayer(journey, layerCount);
+  // then only the steps of the layer, with a doorway for each step of another layer that a line joins to it
+  const lv = useMemo(() => (byKind ? layerView(byKind, layer === LAYER_ALL ? "" : layer) : null), [byKind, layer]);
+  const drawn = lv?.journey ?? null;
+  const doorways = lv?.doorways ?? NO_DOORWAYS;
+  // the table lists the steps of the note (not the drafts found in the code and not the doorways), for the kind of user and the layer that are picked
+  const tableOf = useMemo(() => {
+    if (!journey) return null;
+    const k = kind === KINDS_ALL ? journey : { ...journey, steps: stepsFor(journey, kind) };
+    const v = layerView(k, layer === LAYER_ALL ? "" : layer);
+    return { ...v.journey, steps: v.journey.steps.filter((s) => !v.doorways.has(s.id)) };
+  }, [journey, kind, layer]);
   const layout = useMemo(() => (drawn ? layoutJourney(drawn) : null), [drawn]);
   const problems = read?.problems ?? [];
   const errors = problems.filter((p) => p.level === "error");
@@ -65,7 +88,8 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
   const checks = useMemo(() => checkText(stale), [stale]);
   const flagged = useMemo(() => new Set([...problems.map((p) => p.step), ...stale.filter((s) => s.level === "flag").map((s) => s.step)].filter(Boolean)), [problems, stale]);
 
-  const [picked, setPicked] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(null); // the pinned step: its lines stay lit while the pointer moves
+  const [opened, setOpened] = useState<string | null>(null); // the step whose details are open in the dialog (always the pinned one)
   const [hover, setHover] = useState<string | null>(null);
   const [showProblems, setShowProblems] = useState(false);
   const [showMarks, setShowMarks] = useState(false);
@@ -87,7 +111,19 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
   const [high, setHigh] = useState(typeof window === "undefined" ? 900 : window.innerHeight);
   useEffect(() => { const f = () => setHigh(window.innerHeight); addEventListener("resize", f); return () => removeEventListener("resize", f); }, []);
   const box = useRef<HTMLDivElement>(null);
-  useEffect(() => { setPicked(null); setHover(null); setKind(KINDS_ALL); setZoom(null); }, [note?.id]);
+  useEffect(() => { setPicked(null); setOpened(null); setHover(null); setKind(KINDS_ALL); setLayerPick(null); setZoom(null); }, [note?.id]);
+  // Esc lets go of the pinned step; while the details are open, Esc belongs to that dialog and closes only it
+  useEffect(() => {
+    if (picked === null || opened !== null) return;
+    // in the capture phase and marked as taken, or the sheet (whose listener was added before this one) closes the whole Brain on the same key; a list or menu that is open takes the key first
+    const f = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[role="listbox"], [role="menu"]')) return;
+      e.preventDefault();
+      setPicked(null);
+    };
+    addEventListener("keydown", f, true);
+    return () => removeEventListener("keydown", f, true);
+  }, [picked, opened]);
   useEffect(() => {
     const el = box.current;
     if (!el) return;
@@ -115,11 +151,29 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
   const fitAll = width > 0 ? Math.max(0.1, Math.min(1, (width - LANE_W - 8) / layout.width, (Math.max(280, high * 0.62) - 4) / (layout.height + KIND_H))) : 1;
   const scale = zoom ?? fit;
   const atAll = Math.abs(scale - fitAll) < 0.005;
-  const active = hover ?? picked;
+  // a pinned step holds the focus: pointing at other boxes does not move it. Only what is joined to it by a line stays visible.
+  const pin = picked !== null && layout.nodes.has(picked) ? picked : null;
+  const active = pin ?? hover;
+  const near = new Set<string>();
+  if (pin) { near.add(pin); for (const e of layout.edges) { if (e.from === pin) near.add(e.to); else if (e.to === pin) near.add(e.from); } }
   // a menu is pointed at: its lines are fine and have no words, and the steps it opens are marked while the rest is paler, so the many lines read as one fan
   const hubActive = active !== null && (layout.hidden.get(active) ?? 0) > 0;
   const linked = new Set<string>();
   if (hubActive) for (const e of layout.edges) if (e.hub && (e.from === active || e.to === active)) { linked.add(e.from); linked.add(e.to); }
+  // the words on the lines: the lines of the focused step first (their words always show), then the others, each at the first place along its line where no box and
+  // no other words are. A menu's lines carry no words; while a step is pinned, the words of lines that are not joined to it vanish with the lines.
+  const labels: [Edge, Spot][] = [];
+  {
+    const boxes = [...layout.nodes.values()], taken: Rect[] = [];
+    const touching = (e: Edge) => active !== null && (e.from === active || e.to === active);
+    const todo = layout.edges.filter((e) => e.label && !e.hub && !(pin !== null && !touching(e)));
+    for (const e of [...todo.filter(touching), ...todo.filter((x) => !touching(x))]) {
+      const a = layout.nodes.get(e.from), b = layout.nodes.get(e.to);
+      if (!a || !b) continue;
+      const spot = labelSpot(e, a, b, boxes, taken, touching(e));
+      if (spot) labels.push([e, spot]);
+    }
+  }
   // the lanes run the whole width of the box, not only as far as the last step
   const roomW = width > 0 ? Math.max(layout.width, (width - LANE_W) / scale) : layout.width;
   const view = shown ?? journey;
@@ -128,7 +182,13 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
     setScanning(true); setScanError(null);
     journeyMarkers(projectId).then((s) => { scans.set(projectId, s); setScan(s); }).catch((e) => setScanError(String(e))).finally(() => setScanning(false));
   };
-  const pickedStep = picked ? stepOf(picked) ?? null : null;
+  const openedStep = opened ? stepOf(opened) ?? null : null;
+  const openStep = (id: string) => {
+    // the step may be in another layer than the one on show: go there first, so the pinned step is on the map
+    const to = journey.steps.find((x) => x.id === id)?.layer;
+    if (to && layer !== LAYER_ALL && layer !== to) setLayerPick(to);
+    setPicked(id); setOpened(id);
+  };
   const laneActor = (s: Step) => s.actor ?? journey.lanes.find((l) => l.id === s.lane)?.actor ?? null;
 
   return (
@@ -139,23 +199,20 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
           <Help title="Journey">
             <p className="m-0">The path a person takes through the product, drawn from one note. Each row is a lane. Read the Person lane to follow what someone sees and clicks; read all lanes for the screens and the work behind them.</p>
             <p className="m-0">A box says who acts with a mark and a word: Person, System, AI or People (one person talking to another). The mark at its right says if it is built. A dashed line is a branch for an error.</p>
-            <p className="m-0">Click a box for its details. Pick a kind of user to see only what that kind can reach. A menu that links to many steps does not draw all its lines: point at it, or click it, and they appear.</p>
+            <p className="m-0">Point at a box to see its lines. Click it to hold them: everything not joined to it fades, so you can move the pointer and scroll along the path. Click the same box again for its details. Click empty map, or press Esc, to let go.</p>
+            <p className="m-0">Pick a kind of user to see only what that kind can reach; the last line of a box says who can reach it. A product can have more than one way of giving access (a role, a branch duty); the picker names which one each kind belongs to.</p>
+            <p className="m-0">A big product is split into layers (the login, the main part, the admin part), one tab each. A dashed box with a layer name is a doorway: a step of another layer that a line joins to this one. Click it to go there.</p>
+            <p className="m-0">A menu that links to many steps does not draw all its lines: point at it, or click it, and they appear. Checks holds the checker, the markers, the names check and the code scan.</p>
           </Help>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {notes.length > 1 && <div className="w-[220px]"><Select ariaLabel="Journey" value={note.id} onChange={setWhich} search={false} options={notes.map((n) => ({ value: n.id, label: n.title }))} /></div>}
           {journey.users.length > 0 && (
-            <div className="w-[220px]"><Select ariaLabel="Who can see it" value={kind} onChange={setKind} search={false}
-              options={[{ value: KINDS_ALL, label: "All kinds of user" }, ...journey.users.map((u) => ({ value: u.id, label: u.name }))]} /></div>
+            <div className="w-[220px]"><Select ariaLabel="Who can see it" value={kind} onChange={(v) => { setKind(v); setLayerPick(null); setPicked(null); setOpened(null); }} search={false}
+              options={[{ value: KINDS_ALL, label: "All kinds of user" }, ...journey.users.map((u) => ({ value: u.id, label: u.name, hint: u.system || undefined }))]} /></div>
           )}
-          {problems.length > 0 && (
-            <Button variant="quiet" small onClick={() => setShowProblems(true)}><Glyph state={errors.length ? "left" : "waiting"} size={16} />{problems.length} to check</Button>
-          )}
-          {marks && (marks.missing.length > 0 || marks.noPage.length > 0) && (
-            <Button variant="quiet" small onClick={() => setShowMarks(true)}><Glyph state="waiting" size={16} />{marks.missing.length + marks.noPage.length} markers to check</Button>
-          )}
-          <Button variant="quiet" small onClick={() => setAi({ stage: "ask" })} title="Check the names: ask whether the names of the steps fit their mockup pages, and whether two steps are one">Check names</Button>
-          <Button variant="quiet" small onClick={runScan} disabled={scanning} title="Scan the code: look for the kona-step markers in the project's files">{scanning ? "Scanning…" : scan ? "Scan again" : "Scan code"}</Button>
+          <ChecksMenu problems={problems.length} flagged={errors.length > 0} markers={marks ? marks.missing.length + marks.noPage.length : 0} scanned={!!scan} scanning={scanning}
+            onProblems={() => setShowProblems(true)} onMarkers={() => setShowMarks(true)} onNames={() => setAi({ stage: "ask" })} onScan={runScan} />
           <div role="group" aria-label="Zoom" className="flex items-center gap-1.5">
             <IconButton icon="zoomOut" label="Zoom out" onClick={() => setZoom(Math.max(0.1, scale / 1.25))} />
             <IconButton icon="zoomIn" label="Zoom in" onClick={() => setZoom(Math.min(2, scale * 1.25))} />
@@ -164,6 +221,14 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
         </div>
       </div>
 
+      {journey.layers.length > 0 && (
+        <div role="group" aria-label="Layer" className="flex flex-wrap items-center gap-2">
+          {journey.layers.map((l) => (
+            <Button key={l.id} variant="quiet" small on={layer === l.id} aria-pressed={layer === l.id} onClick={() => { setLayerPick(l.id); setPicked(null); setOpened(null); }}>{l.name}<span className="font-normal text-text-secondary">{layerCount.get(l.id) ?? 0}</span></Button>
+          ))}
+          <Button variant="quiet" small on={layer === LAYER_ALL} aria-pressed={layer === LAYER_ALL} onClick={() => { setLayerPick(LAYER_ALL); setPicked(null); setOpened(null); }}>All<span className="font-normal text-text-secondary">{byKind?.steps.length ?? 0}</span></Button>
+        </div>
+      )}
       {scanError && <div className="flex items-start gap-2.5 text-[14px] leading-5 text-state-left"><Glyph state="left" size={16} /> {scanError}</div>}
       {scan && (
         <p className="m-0 text-[13px] leading-5 text-text-secondary">
@@ -173,6 +238,8 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
       )}
       {journey.steps.length === 0 && draftIds.size === 0 ? (
         <p className="m-0 text-text-tertiary">This journey has no steps yet.</p>
+      ) : drawn && drawn.steps.length === 0 ? (
+        <p className="m-0 text-text-secondary" role="status">{kind !== KINDS_ALL ? `${journey.users.find((u) => u.id === kind)?.name ?? "This kind of user"} reaches nothing in this layer.` : "Nothing is in this layer."}{" "}Pick another layer{kind !== KINDS_ALL ? " or another kind of user" : ""}.</p>
       ) : (
         <div ref={box} className="max-h-[62vh] min-h-[280px] overflow-auto border border-line-subtle bg-inset" role="group" aria-label="Journey map">
           <div className="flex" style={{ width: LANE_W + roomW * scale, height: (layout.height + KIND_H) * scale }}>
@@ -184,7 +251,7 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
               ))}
             </div>
             <svg width={roomW * scale} height={(layout.height + KIND_H) * scale} viewBox={`0 0 ${roomW} ${layout.height + KIND_H}`} role="img" aria-label={`Journey map with ${drawn!.steps.length} steps`}
-              onClick={(e) => { if (e.target === e.currentTarget) setPicked(null); }}>
+              onClick={(e) => { if (!(e.target as Element).closest("[data-step]")) setPicked(null); }}>
               <Defs />
               {layout.lanes.map((l, i) => <rect key={l.id || "none"} x={0} y={l.y} width={roomW} height={l.h} fill={i % 2 ? "var(--color-surface-2)" : "var(--color-inset)"} stroke="var(--color-line-subtle)" />)}
               {layout.edges.map((e) => {
@@ -192,25 +259,18 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
                 if (!a || !b) return null;
                 const touches = active !== null && (e.from === active || e.to === active);
                 if (e.hub && !touches) return null; // the lines of a menu show only when it is pointed at
-                return <EdgeLine key={e.from + ">" + e.to} edge={e} from={a} to={b} bright={touches} dim={active !== null && !touches} thin={e.hub && touches} />;
+                return <EdgeLine key={e.from + ">" + e.to} edge={e} from={a} to={b} bright={touches} dim={active !== null && !touches} veil={pin !== null && !touches} thin={e.hub && touches} />;
               })}
               {drawn!.steps.map((s) => (
                 <g key={s.id} onPointerEnter={() => setHover(s.id)} onPointerLeave={() => setHover(null)}>
-                  <StepBox step={s} at={layout.nodes.get(s.id)!} actor={laneActor(s)} on={active === s.id || linked.has(s.id)} dim={false} faint={hubActive && !linked.has(s.id)} flagged={flagged.has(s.id)} draft={draftIds.has(s.id)} onPick={() => setPicked(s.id)} />
+                  <StepBox step={s} at={layout.nodes.get(s.id)!} actor={laneActor(s)} on={active === s.id || linked.has(s.id)} dim={false} faint={hubActive && !linked.has(s.id)} veil={pin !== null && !near.has(s.id)} peek={hover === s.id} who={doorways.has(s.id) ? "" : accessWords(s.access, journey.users)} doorway={doorways.get(s.id) ?? ""} flagged={flagged.has(s.id) && !doorways.has(s.id)} draft={draftIds.has(s.id)}
+                    onPick={() => { if (doorways.has(s.id)) { const to = journey.steps.find((x) => x.id === s.id)?.layer; if (to) setLayerPick(to); setPicked(s.id); setOpened(null); } else if (pin === s.id) setOpened(s.id); else { setPicked(s.id); setOpened(null); } }} />
                   {(layout.hidden.get(s.id) ?? 0) > 0 && active !== s.id && (
                     <text x={layout.nodes.get(s.id)!.x + 4} y={layout.nodes.get(s.id)!.y + layout.nodes.get(s.id)!.h + 14} fontSize={11} fill="var(--color-text-tertiary)" fontFamily="var(--font-sans)">{layout.hidden.get(s.id)} {layout.hidden.get(s.id) === 1 ? "line" : "lines"} hidden</text>
                   )}
                 </g>
               ))}
-              {layout.edges.map((e) => {
-                const a = layout.nodes.get(e.from), b = layout.nodes.get(e.to);
-                if (!a || !b || !e.label) return null;
-                const touches = active !== null && (e.from === active || e.to === active);
-                if (e.hub && !touches) return null;
-                if (e.hub && touches) return null; // a menu's lines carry no words
-                if (!touches && !labelFree(e, a, b, layout.nodes.values())) return null;
-                return <EdgeLabel key={e.from + ">" + e.to} edge={e} from={a} to={b} dim={active !== null && !touches} />;
-              })}
+              {labels.map(([e, spot]) => <EdgeLabel key={e.from + ">" + e.to} edge={e} spot={spot} dim={active !== null && !(e.from === active || e.to === active)} />)}
             </svg>
           </div>
         </div>
@@ -218,7 +278,7 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
 
       <JourneyTable journey={tableOf ?? journey} flags={checks} />
 
-      {pickedStep && <StepDialog journey={view} step={pickedStep} draft={draftIds.has(pickedStep.id)} places={marks?.found.get(pickedStep.id) ?? marks?.missing.find((m) => m.id === pickedStep.id)?.at ?? []} actor={laneActor(pickedStep)} problems={problems.filter((p) => p.step === pickedStep.id)} stale={stale.filter((s) => s.step === pickedStep.id)} noteExists={(id) => brain.notes.has(id)} onOpenNote={(id) => { setPicked(null); onOpen(id); }} onGo={setPicked} onClose={() => setPicked(null)} />}
+      {openedStep && <StepDialog journey={view} step={openedStep} draft={draftIds.has(openedStep.id)} places={marks?.found.get(openedStep.id) ?? marks?.missing.find((m) => m.id === openedStep.id)?.at ?? []} actor={laneActor(openedStep)} problems={problems.filter((p) => p.step === openedStep.id)} stale={stale.filter((s) => s.step === openedStep.id)} noteExists={(id) => brain.notes.has(id)} onOpenNote={(id) => { setOpened(null); setPicked(null); onOpen(id); }} onGo={openStep} onClose={() => setOpened(null)} />}
       {ai && ai.stage !== "done" && (() => {
         const n = pagesToRead(journey).length;
         return (
@@ -228,10 +288,44 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
         );
       })()}
       {ai?.stage === "done" && ai.verdicts && (
-        <NamesDialog journey={journey} verdicts={ai.verdicts} answer={ai.answer ?? ""} pages={ai.pages ?? new Map()} onGo={(id) => { setAi(null); setPicked(id); }} onClose={() => setAi(null)} />
+        <NamesDialog journey={journey} verdicts={ai.verdicts} answer={ai.answer ?? ""} pages={ai.pages ?? new Map()} onGo={(id) => { setAi(null); openStep(id); }} onClose={() => setAi(null)} />
       )}
-      {showMarks && marks && <MarksDialog missing={marks.missing} noPage={marks.noPage.map((id) => ({ id, name: journey.steps.find((s) => s.id === id)?.name ?? id }))} onGo={(id) => { setShowMarks(false); setPicked(id); }} onClose={() => setShowMarks(false)} />}
-      {showProblems && <ProblemsDialog problems={problems} journey={journey} onGo={(id) => { setShowProblems(false); setPicked(id); }} onClose={() => setShowProblems(false)} />}
+      {showMarks && marks && <MarksDialog missing={marks.missing} noPage={marks.noPage.map((id) => ({ id, name: journey.steps.find((s) => s.id === id)?.name ?? id }))} onGo={(id) => { setShowMarks(false); openStep(id); }} onClose={() => setShowMarks(false)} />}
+      {showProblems && <ProblemsDialog problems={problems} journey={journey} onGo={(id) => { setShowProblems(false); openStep(id); }} onClose={() => setShowProblems(false)} />}
+    </div>
+  );
+}
+
+/** The checks of the map behind one button: what the checker found, the markers, the names check and the scan of the code. The count on the button is what needs a look. */
+function ChecksMenu({ problems, flagged, markers, scanned, scanning, onProblems, onMarkers, onNames, onScan }: {
+  problems: number; flagged: boolean; markers: number; scanned: boolean; scanning: boolean; onProblems: () => void; onMarkers: () => void; onNames: () => void; onScan: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(open, wrap, close);
+  const count = problems + markers;
+  const items: { key: string; label: string; hint: string; run: () => void; off?: boolean }[] = [
+    ...(problems > 0 ? [{ key: "problems", label: `${problems} to check`, hint: "What the checker found in the note", run: onProblems }] : []),
+    ...(markers > 0 ? [{ key: "markers", label: `${markers} markers to check`, hint: "Steps and files that do not match", run: onMarkers }] : []),
+    { key: "names", label: "Check names", hint: "Ask whether the names fit their mockup pages, and whether two steps are one", run: onNames },
+    { key: "scan", label: scanning ? "Scanning…" : scanned ? "Scan again" : "Scan code", hint: "Look for the kona-step markers in the project's files", run: onScan, off: scanning },
+  ];
+  return (
+    <div ref={wrap} className="relative" onKeyDown={(e) => { if (e.key === "Escape" && open) { e.stopPropagation(); close(); } }}>
+      <Button variant="quiet" small aria-haspopup="menu" aria-expanded={open} on={open} onClick={() => setOpen((o) => !o)}>
+        {count > 0 && <Glyph state={flagged ? "left" : "waiting"} size={16} />}Checks{count > 0 && <span className="font-normal text-text-secondary">{count}</span>}
+      </Button>
+      {open && (
+        <div role="menu" aria-label="Checks" className="absolute right-0 z-30 mt-2 flex w-72 flex-col border-2 border-line-strong bg-surface-2 p-1.5 px-shadow">
+          {items.map((i) => (
+            <button key={i.key} type="button" role="menuitem" disabled={i.off} onClick={() => { close(); i.run(); }} className="flex cursor-pointer flex-col items-start gap-0.5 px-3 py-2 text-left hover:bg-surface-3 disabled:cursor-not-allowed disabled:opacity-60">
+              <span className="text-[14px] font-bold text-text">{i.label}</span>
+              <span className="font-sans text-[12px] leading-4 font-normal tracking-normal normal-case text-text-secondary">{i.hint}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -248,7 +342,8 @@ function StepDialog({ journey, step, actor, problems, stale, draft, places, note
   const a: Actor = actor ?? "system";
   const nameOf = (id: string) => journey.steps.find((s) => s.id === id)?.name ?? id;
   const lane = journey.lanes.find((l) => l.id === step.lane)?.name ?? step.lane;
-  const kinds = step.access.map((k) => journey.users.find((u) => u.id === k)?.name ?? k);
+  const layerName = journey.layers.find((l) => l.id === step.layer)?.name ?? "";
+  const kinds = step.access.map((k) => { const u = journey.users.find((x) => x.id === k); return u ? (u.system ? `${u.name} (${u.system})` : u.name) : k; });
   const go = (id: string, label?: string) => (
     <Button variant="ghost" tiny onClick={() => onGo(id)}>{label ? `${label}: ` : ""}{nameOf(id)}</Button>
   );
@@ -258,11 +353,12 @@ function StepDialog({ journey, step, actor, problems, stale, draft, places, note
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[14px] leading-5 text-text">
           <span className="inline-flex items-center gap-2"><ActorMark actor={a} />{ACTOR_WORD[a]}</span>
           <span className="inline-flex items-center gap-2"><Glyph state={draft ? "idle" : STATUS_GLYPH[step.status]} size={16} still />{draft ? "Not confirmed" : STATUS_WORD[step.status]}</span>
-          <span className="text-text-secondary">{lane} lane{step.kind === "screen" ? ", a screen" : ""}</span>
+          <span className="text-text-secondary">{lane} lane{layerName ? `, ${layerName} layer` : ""}{step.kind === "screen" ? ", a screen" : ""}</span>
         </div>
         {draft && <p className="m-0 text-[14px] leading-5 text-text-secondary">A file says this page exists, but the journey note does not have it yet. Ask a worker to write it into the note, with where the person goes next.</p>}
         {places.length > 0 && <Row label={draft ? "Found in" : "Page"}><ul className="m-0 flex list-none flex-col gap-0.5 p-0">{places.map((m, i) => <li key={i} className="font-mono text-[13px]">{placeOf(m)}</li>)}</ul></Row>}
         <Row label="Who can see it">{kinds.length ? kinds.join(", ") : "Everyone (no kind of user is named)"}</Row>
+        {step.limits && <Row label="Limits">{step.limits}</Row>}
         {step.ai && <Row label="What the AI does">{step.ai.does || "Not said"}{step.ai.model ? `. Model: ${step.ai.model}` : ""}</Row>}
         {step.fields.length > 0 && <Row label="Fields">{step.fields.join(", ")}</Row>}
         {step.buttons.length > 0 && (

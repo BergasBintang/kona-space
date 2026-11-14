@@ -3,7 +3,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { parseJourney, type Journey } from "./journey.ts";
-import { BOX, MAX_STACK, edgesOf, layoutJourney, stepsFor, visibleTo, wrapWords } from "./journeylayout.ts";
+import { BOX, MAX_GAP, MAX_STACK, edgesOf, layerView, layoutJourney, stepsFor, visibleTo, wrapWords } from "./journeylayout.ts";
+import { journeyTable } from "./journeytable.ts";
 
 const starter = readFileSync(new URL("../../brain/starter/kona-journey.md", import.meta.url), "utf8");
 const example = (): Journey => parseJourney(starter).journey!;
@@ -187,4 +188,49 @@ test("the note under a hub counts its own lines only", () => {
   const l = layoutJourney(make([{ id: "menu", start: true, next: targets }, ...targets.map((id) => ({ id, end: true }))]));
   assert.equal(l.hidden.get("menu"), 12);
   assert.equal(l.hidden.get("t0"), undefined);
+});
+
+test("the room after a column grows with the words on the lines that cross it, up to a limit", () => {
+  const room = (label: string) => {
+    const l = layoutJourney(make([{ id: "a", start: true, next: [{ to: "b", label }] }, { id: "b", end: true }]));
+    return l.nodes.get("b")!.x - (l.nodes.get("a")!.x + BOX.w);
+  };
+  assert.equal(room(""), BOX.gapX, "a line with no words keeps the usual room");
+  assert.ok(room("Forgot password") > BOX.gapX, "words need more room than the usual gap");
+  assert.ok(room("Forgot password") >= 15 * 6.6, "the room is at least as wide as the words");
+  assert.equal(room("x".repeat(60)), MAX_GAP, "a very long text is cut at the limit");
+});
+
+test("layerView: a layer holds its own steps and a doorway for each step of another layer a line joins to it", () => {
+  const j = parseJourney("```journey\n" + JSON.stringify({
+    layers: [{ id: "main", name: "Main" }, { id: "admin", name: "Admin" }],
+    steps: [
+      { id: "home", name: "Home", lane: "app", actor: "system", layer: "main", start: true, buttons: [{ label: "Admin", to: "panel" }, { label: "Report", to: "report" }], kind: "screen" },
+      { id: "report", name: "Report", lane: "app", actor: "system", layer: "main", next: ["data"], kind: "screen" },
+      { id: "panel", name: "Panel", lane: "app", actor: "system", layer: "admin", kind: "screen", buttons: [{ label: "Back", to: "home" }, { label: "People", to: "people" }] },
+      { id: "people", name: "People", lane: "app", actor: "system", layer: "admin", next: ["data"] },
+      { id: "data", name: "Data", lane: "server", actor: "system", end: true },
+    ],
+  }) + "\n```\n").journey!;
+  const main = layerView(j, "main");
+  assert.deepEqual(main.journey.steps.map((s) => s.id).sort(), ["data", "home", "panel", "report"], "own steps, the shared step a line reaches, and the doorway");
+  assert.deepEqual([...main.doorways.entries()], [["panel", "Admin"]], "only a step of another layer is a doorway, named by its layer");
+  const panel = main.journey.steps.find((s) => s.id === "panel")!;
+  assert.deepEqual(panel.buttons.map((b) => b.to), ["home"], "a doorway keeps only its lines into this layer");
+  assert.equal(panel.kind, "step");
+  const admin = layerView(j, "admin");
+  assert.deepEqual(admin.journey.steps.map((s) => s.id).sort(), ["data", "home", "panel", "people"]);
+  assert.deepEqual([...admin.doorways.keys()], ["home"]);
+  const everything = layerView(j, "");
+  assert.equal(everything.journey, j, "no layer picked: the journey as it is");
+  assert.equal(everything.doorways.size, 0);
+  assert.equal(layerView(parseJourney("```journey\n{\"steps\":[]}\n```").journey!, "main").doorways.size, 0, "a journey with no layers is not cut");
+});
+
+test("the table has a Layer column when the journey has layers", () => {
+  const j = parseJourney("```journey\n" + JSON.stringify({ layers: [{ id: "main", name: "Main" }], steps: [{ id: "a", name: "A", lane: "app", actor: "system", layer: "main", start: true, end: true }, { id: "b", name: "B", lane: "app", actor: "system", start: true, end: true }] }) + "\n```\n").journey!;
+  const t = journeyTable(j);
+  assert.deepEqual(t.head.slice(0, 3), ["Step", "Lane", "Layer"]);
+  assert.deepEqual(t.rows.map((r) => r[2]), ["Main", "Shared"]);
+  assert.ok(!journeyTable({ ...j, layers: [] }).head.includes("Layer"));
 });

@@ -55,6 +55,24 @@ const big = {
       ...(i % 3 === 0 ? { tickets: ["T-0001"] } : { notes: ["a-note"] }) };
   }),
 };
+// a product with three parts (login, main, admin) and two ways of giving access (a role and a duty at a branch)
+const layered = {
+  title: "Layered journey",
+  layers: [{ id: "login", name: "Login" }, { id: "main", name: "Main" }, { id: "admin", name: "Admin" }],
+  users: [
+    { id: "guest", name: "Guest", system: "Role" }, { id: "student", name: "Student", system: "Role" }, { id: "teacher", name: "Teacher", system: "Role" },
+    { id: "super-admin", name: "Super Admin", system: "Role" }, { id: "manager", name: "Branch manager", system: "Branch duty" },
+  ],
+  steps: [
+    { id: "open", name: "Open the site", lane: "person", layer: "login", start: true, access: ["guest"], next: [{ to: "login-screen" }], status: "built", notes: ["a-note"] },
+    { id: "login-screen", name: "Login", lane: "app", layer: "login", kind: "screen", access: ["guest"], fields: ["Email"], buttons: [{ label: "Sign in", to: "dashboard" }], status: "built", notes: ["a-note"], mockup: "x/y.html" },
+    { id: "dashboard", name: "Dashboard", lane: "app", layer: "main", kind: "screen", access: ["student", "teacher", "super-admin", "manager"], buttons: [{ label: "Reports", to: "report" }, { label: "Admin panel", to: "admin-home" }], status: "built", notes: ["a-note"], mockup: "x/y.html" },
+    { id: "report", name: "Report", lane: "app", layer: "main", kind: "screen", access: ["teacher", "super-admin", "manager"], buttons: [{ label: "Load", to: "api-report" }], status: "built", notes: ["a-note"], mockup: "x/y.html" },
+    { id: "api-report", name: "The server: report", lane: "server", end: true, access: ["teacher", "super-admin", "manager"], status: "built", notes: ["a-note"] },
+    { id: "admin-home", name: "Admin home", lane: "app", layer: "admin", kind: "screen", access: ["super-admin", "manager"], limits: "A branch manager sees their own branches only", buttons: [{ label: "People", to: "people" }, { label: "Back", to: "dashboard" }], status: "built", notes: ["a-note"], mockup: "x/y.html" },
+    { id: "people", name: "People", lane: "app", layer: "admin", kind: "screen", access: ["super-admin", "manager"], buttons: [{ label: "Load", to: "api-report" }], status: "built", notes: ["a-note"], mockup: "x/y.html" },
+  ],
+};
 const template = fs.readFileSync(new URL("../src-tauri/skills/make-a-mockup/templates/journey.html", import.meta.url), "utf8");
 const probe = `setTimeout(function () {
   var steps = document.querySelectorAll('.step'), screen = document.querySelector('.step[data-step="sign-in"]');
@@ -79,6 +97,7 @@ try {
   if (!account) { note("SKIP no project with an account to borrow, the throwaway project could not be opened"); process.exit(0); }
   note_("A photo albums", "photo-albums", small);
   note_("Big journey", "big-journey", big);
+  note_("Layered journey", "layered-journey", layered);
   put(".kona/brain/c-broken.md", "---\ntitle: C broken\nkind: journey\n---\n```journey\n{ broken\n```\n");
   ticket("T-0001", "review", "**Why.** The sign-in screen changed.\n\n## Done when\n- [ ] The sign-in works");
   ticket("T-0002", "done", "**Why.** Other work.\n\n## Done when\n- [x] Journey: no change");
@@ -121,11 +140,28 @@ try {
   const mouse = (type, x, y) => c.send("Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1 });
   const clickAt = async (x, y) => { await mouse("mouseMoved", x, y); await mouse("mousePressed", x, y); await mouse("mouseReleased", x, y); };
 
-  // a real click on a box opens its details in a dialog
+  // the first click on a box pins the focus (no dialog, what is not joined to it nearly vanishes); the second click on the same box opens its details
   let b = await box("sign-in");
   ok("a box says who acts and its status in its name", /Sign in\. System\. Built\./.test(b?.label ?? ""), b?.label);
+  const key = async (k, code, vk) => { await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: k, code, windowsVirtualKeyCode: vk }); await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: k, code, windowsVirtualKeyCode: vk }); };
+  const veil = () => c.ev(`(() => { const o = (e) => Number(e.getAttribute('opacity') ?? 1); const boxes = [...document.querySelectorAll('svg g[data-step]')].map((e) => [e.getAttribute('data-step'), o(e)]); const lines = [...document.querySelectorAll('svg [data-edge]')].map((e) => o(e)); return { boxes, gone: boxes.filter((x) => x[1] < 0.1).length, shown: boxes.filter((x) => x[1] === 1).map((x) => x[0]), linesGone: lines.filter((x) => x < 0.1).length, lines: lines.length }; })()`);
+  const before = await veil();
+  ok("nothing is veiled before a click", before.gone === 0 && before.linesGone === 0, JSON.stringify(before));
   await clickAt(b.x, b.y);
-  ok("a click on the sign-in screen opens a dialog with its fields, buttons and errors", await c.waitFor(`(() => { const d = document.querySelector('[role="dialog"]'); return !!d && d.getAttribute('aria-label') === 'Sign in' && d.innerText.includes('Email, Password') && d.innerText.includes('Wrong email or password') && d.innerText.includes('Sign in leads to') ; })()`, 3000, 100), (await c.ev(`document.querySelector('[role="dialog"]')?.innerText ?? ''`)).replace(/\s+/g, " ").slice(0, 300));
+  await wait(300);
+  const pinned = await veil();
+  ok("one click pins the focus and opens no dialog", !(await c.ev(`!!document.querySelector('[role="dialog"]')`)), "");
+  ok("pinned: the box and the steps joined to it stay, the rest nearly vanish", pinned.shown.includes("sign-in") && pinned.shown.length >= 2 && pinned.gone >= 1 && pinned.shown.length + pinned.gone === pinned.boxes.length, JSON.stringify(pinned));
+  ok("pinned: the lines not joined to it nearly vanish too", pinned.linesGone >= 1 && pinned.linesGone < pinned.lines, `${pinned.linesGone} of ${pinned.lines}`);
+  await shot("journey-pinned");
+  const other = pinned.boxes.find((x) => x[1] < 0.1)?.[0];
+  const ob = other ? await box(other) : null;
+  if (ob) { await mouse("mouseMoved", ob.x, ob.y); await wait(200); }
+  const moved = await veil();
+  ok("pointing at another box does not move the focus (that box only shows a little)", moved.shown.includes("sign-in") && moved.shown.length === pinned.shown.length, JSON.stringify(moved.shown));
+  b = await box("sign-in");
+  await clickAt(b.x, b.y);
+  ok("a click on the same box opens a dialog with its fields, buttons and errors", await c.waitFor(`(() => { const d = document.querySelector('[role="dialog"]'); return !!d && d.getAttribute('aria-label') === 'Sign in' && d.innerText.includes('Email, Password') && d.innerText.includes('Wrong email or password') && d.innerText.includes('Sign in leads to') ; })()`, 3000, 100), (await c.ev(`document.querySelector('[role="dialog"]')?.innerText ?? ''`)).replace(/\s+/g, " ").slice(0, 300));
   note("page errors so far: " + JSON.stringify(await c.ev(`window.__errs`)).slice(0, 1500));
   const dlg = await c.ev(`document.querySelector('[role="dialog"]')?.innerText ?? ''`);
   ok("the dialog flags the finished ticket that the journey was not saved under", dlg.includes("Ticket T-0001 is finished"), dlg.replace(/\s+/g, " ").slice(-260));
@@ -134,6 +170,18 @@ try {
   await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
   await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
   ok("Esc closes the dialog (and the Brain stays open)", await c.waitFor(`!document.querySelector('[role="dialog"]')`, 2000, 100) && await c.ev(`!!document.querySelector('section[data-sheet]')`));
+  await wait(300);
+  ok("after the dialog closes the step is still pinned", (await veil()).gone >= 1, "");
+  await key("Escape", "Escape", 27);
+  ok("Esc lets go of the pinned step: nothing is veiled, and the Brain stays open", await c.waitFor(`![...document.querySelectorAll('svg g[data-step]')].some((e) => Number(e.getAttribute('opacity') ?? 1) < 0.1)`, 2000, 100) && await c.ev(`!!document.querySelector('section[data-sheet]')`), "");
+  // a click on empty map lets go too (the lane background is not the svg itself)
+  b = await box("sign-in");
+  await clickAt(b.x, b.y);
+  await wait(300);
+  const pinAgain = (await veil()).gone >= 1;
+  const room = await c.ev(`(() => { const r = document.querySelector('svg[role="img"]').getBoundingClientRect(); return { x: r.right - 12, y: r.top + 6 }; })()`);
+  await clickAt(room.x, room.y);
+  ok("a click on empty map lets go of the pinned step", pinAgain && await c.waitFor(`![...document.querySelectorAll('svg g[data-step]')].some((e) => Number(e.getAttribute('opacity') ?? 1) < 0.1)`, 2000, 100), "");
 
   // the AI step and the people step look different (a word each) and a draft is not there yet
   const ai = await box("suggest-title"), pe = await box("share");
@@ -145,18 +193,21 @@ try {
   ok("the table's Check column says why a step may be out of date", !!table && table.head.some((x) => x.startsWith("Check")) && table.text.includes("Ticket T-0001 is finished") && !table.text.includes("Ticket T-0002 is finished"), "");
   ok("the explanation is behind the round question mark, not on the page", await c.ev(`!!document.querySelector('section[data-sheet] button[aria-label="About Journey"]')`));
 
+  const menuItem = async (label) => { await c.ev(`(() => { const b = [...document.querySelectorAll('section[data-sheet] button')].find((e) => /^Checks/.test(e.textContent.trim())); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); return true; })()`); await wait(150); return c.ev(`(() => { const x = [...document.querySelectorAll('[role="menuitem"]')].find((e) => e.innerText.trim().startsWith(${JSON.stringify(label)})); if (!x || x.disabled) return false; x.click(); return true; })()`); };
+  const press = (label) => /^(Check names|Scan code|Scan again)$/.test(label) ? menuItem(label) : c.ev(`(() => { const x = [...document.querySelectorAll('section[data-sheet] button')].find((e) => e.textContent.trim() === ${JSON.stringify(label)}); if (!x) return false; x.click(); return true; })()`);
+
   // the markers
   ok("before a scan nothing is said about markers", !(await c.ev(`document.querySelector('section[data-sheet]').innerText.includes('Scanned')`)));
-  ok("Scan code is pressed", await c.ev(`(() => { const x = [...document.querySelectorAll('section[data-sheet] button')].find((e) => e.textContent.trim() === 'Scan code'); if (!x) return false; x.click(); return true; })()`));
+  ok("Scan code is pressed (it is in the Checks menu)", await press("Scan code"));
   ok("the scan reports what it read", await c.waitFor(`document.querySelector('section[data-sheet]').innerText.includes('Scanned')`, 15000, 200), (await c.ev(`(document.querySelector('section[data-sheet]').innerText.match(/Scanned[^\\n]*/) ?? [''])[0]`)));
   const scanned = await c.ev(`(document.querySelector('section[data-sheet]').innerText.match(/Scanned (\\d+) files[^\\n]*: (\\d+) step markers found/) ?? [])`);
   ok("it read the project's code files (2 or 3, no more) and found 2 markers", scanned.length === 3 && Number(scanned[1]) >= 3 && Number(scanned[1]) <= 6 && Number(scanned[2]) === 2, JSON.stringify(scanned));
   ok("a marker the journey does not know is drawn as a draft step, Not confirmed", await c.waitFor(`!!document.querySelector('svg g[data-step="extra-page"]') && document.querySelector('svg g[data-step="extra-page"]').getAttribute('aria-label').includes('Not confirmed')`, 3000, 100), (await box("extra-page"))?.label);
   const lanes2 = await c.ev(`[...document.querySelectorAll('section[data-sheet] [role="group"][aria-label="Journey map"] .absolute')].map((e) => e.innerText.trim())`);
   ok("the draft is in a lane of its own called Not confirmed", lanes2.includes("Not confirmed"), lanes2.join());
-  ok("a button says how many markers to check", await c.ev(`[...document.querySelectorAll('section[data-sheet] button')].some((x) => /^2 markers to check/.test(x.textContent.trim()))`), "");
+  ok("the Checks button shows a count and its menu says how many markers to check", await c.ev(`/^Checks\\s*\\d+$/.test([...document.querySelectorAll('section[data-sheet] button')].find((x) => /^Checks/.test(x.textContent.trim()))?.textContent.trim() ?? '')`) && await c.ev(`(() => { const b = [...document.querySelectorAll('section[data-sheet] button')].find((e) => /^Checks/.test(e.textContent.trim())); if (b.getAttribute('aria-expanded') !== 'true') b.click(); return true; })()`) && await c.waitFor(`[...document.querySelectorAll('[role="menuitem"]')].some((x) => /^2 markers to check/.test(x.innerText.trim()))`, 2000, 100), "");
   ok("the built screen with no marker is marked, and the table says so", (await c.ev(`document.querySelector('section[data-sheet] table').innerText.includes('No page found: no file says kona-step: home')`)));
-  ok("the markers button opens a list with the file and line", await c.ev(`(() => { const x = [...document.querySelectorAll('section[data-sheet] button')].find((e) => /markers to check/.test(e.textContent)); x.click(); return true; })()`) && await c.waitFor(`(() => { const d = document.querySelector('[role="dialog"]'); return !!d && d.innerText.includes('extra-page') && d.innerText.includes('src/extra.js, line 1') && d.innerText.includes('Your albums'); })()`, 3000, 100));
+  ok("the markers button opens a list with the file and line", await menuItem("2 markers to check") && await c.waitFor(`(() => { const d = document.querySelector('[role="dialog"]'); return !!d && d.innerText.includes('extra-page') && d.innerText.includes('src/extra.js, line 1') && d.innerText.includes('Your albums'); })()`, 3000, 100));
   await shot("journey-markers");
   await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
   await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
@@ -164,7 +215,7 @@ try {
 
 
   // the on-request check of the names: it asks first and says what it costs, Cancel sends nothing, and then two REAL Haiku calls (a few cents): a journey whose names fit, and one page changed so that it does not
-  const press = (label) => c.ev(`(() => { const x = [...document.querySelectorAll('section[data-sheet] button')].find((e) => e.textContent.trim() === ${JSON.stringify(label)}); if (!x) return false; x.click(); return true; })()`);
+  const closeMenus = async () => { if (await c.ev(`!!document.querySelector('[role="menu"]')`)) { await c.ev(`document.querySelector('[role="menu"]').parentElement.querySelector('button').focus(); true`); await key("Escape", "Escape", 27); await wait(200); } };
   const dialogTitle = () => c.ev(`document.querySelector('[role="dialog"]')?.getAttribute('aria-label') ?? ''`);
   ok("Check the names asks first and says it uses a little of the plan", await press("Check names") && await c.waitFor(`(() => { const d = document.querySelector('[role="dialog"]'); return !!d && d.getAttribute('aria-label') === 'Check the names of the steps?' && d.innerText.includes('uses a little of your plan') && d.innerText.includes('2 mockup pages'); })()`, 3000, 100), (await c.ev(`document.querySelector('[role="dialog"]')?.innerText ?? ''`)).replace(/\s+/g, " ").slice(0, 220));
   ok("Cancel closes it and sends nothing", await c.ev(`(() => { const x = [...document.querySelectorAll('[role="dialog"] button')].find((e) => e.textContent.trim() === 'Cancel'); if (!x) return false; x.click(); return true; })()`) && await c.waitFor(`!document.querySelector('[role="dialog"]')`, 2000, 100));
@@ -175,6 +226,7 @@ try {
     return { title: await dialogTitle(), text: (await c.ev(`document.querySelector('[role="dialog"]')?.innerText ?? ''`)).replace(/\s+/g, " ") };
   };
   const closeDialog = async () => { await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 }); await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 }); await c.waitFor(`!document.querySelector('[role="dialog"]')`, 2000, 100); };
+  if (process.env.SKIP_AI) note("SKIP the two real Haiku calls (SKIP_AI is set)"); else {
   const r1 = await runNames();
   note("names check on names that fit: " + r1.title + " | " + r1.text.slice(0, 260));
   ok("a real call on a journey whose names fit finds no problem", r1.title === "No problem found", r1.title);
@@ -185,6 +237,7 @@ try {
   ok("a real call finds the name that no longer fits its page, and names it", r2.title === "These names may not fit" && r2.text.includes("Your albums") && r2.text.includes("The page says:") && r2.text.includes("Contact us"), r2.title);
   await shot("journey-names");
   await closeDialog();
+  }
 
   // a kind of user shows only what it can reach
   const pick = async (label, text) => {
@@ -210,12 +263,85 @@ try {
   await c.ev(`[...document.querySelectorAll('section[data-sheet] button')].find((e) => e.getAttribute('aria-label') === 'Fit all of the map in the window').click(); true`);
   b = await box("s5");
   await clickAt(b.x, b.y);
-  ok("a box of the big map opens too", await c.waitFor(`document.querySelector('[role="dialog"]')?.getAttribute('aria-label')?.startsWith('Step number 5')`, 3000, 100));
+  await wait(250);
+  await clickAt(b.x, b.y);
+  ok("a box of the big map opens too (the first click pins it, the second opens it)", await c.waitFor(`document.querySelector('[role="dialog"]')?.getAttribute('aria-label')?.startsWith('Step number 5')`, 3000, 100));
   await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
   await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
   await c.waitFor(`!document.querySelector('[role="dialog"]')`, 2000, 100);
   const bigTable = await c.ev(`document.querySelectorAll('section[data-sheet] table tbody tr').length`);
   ok("the table of the big journey has all 120 rows", bigTable === 120, String(bigTable));
+  // ---- layers, ways of giving access, who-lines and the Checks menu ----
+  await closeMenus();
+  ok("the layered journey is chosen from the picker", await pick("Journey", "Layered journey") && await c.waitFor(`!!document.querySelector('[role="group"][aria-label="Layer"]')`, 6000, 100));
+  const tab = (name) => c.ev(`(() => { const b = [...document.querySelectorAll('[role="group"][aria-label="Layer"] button')].find((x) => x.textContent.trim().startsWith(${JSON.stringify(name)})); if (!b) return false; b.click(); return true; })()`);
+  const tabs2 = () => c.ev(`[...document.querySelectorAll('[role="group"][aria-label="Layer"] button')].map((b) => b.textContent.trim() + (b.getAttribute('aria-pressed') === 'true' ? '*' : ''))`);
+  const ids = () => c.ev(`[...document.querySelectorAll('svg g[data-step]')].map((e) => e.getAttribute('data-step') + (e.hasAttribute('data-doorway') ? '>' + e.getAttribute('data-doorway') : '')).sort()`);
+  const t0 = await tabs2();
+  ok("there is a tab for each layer and one for all, with the step count; the layer the journey starts in is on show", t0.length === 4 && t0[0] === "Login2*" && t0[1] === "Main2" && t0[2] === "Admin2" && t0[3].startsWith("All"), t0.join(" "));
+  const i0 = await ids();
+  ok("the login layer holds its own two steps and a doorway to the dashboard in the main layer", JSON.stringify(i0) === JSON.stringify(["dashboard>Main", "login-screen", "open"]), i0.join(" "));
+  await shot("journey-layer-login");
+  const door = await box("dashboard");
+  ok("a doorway says it is in another layer", /In Main/.test(door?.label ?? "") && !/Who:/.test(door?.label ?? ""), door?.label);
+  await clickAt(door.x, door.y);
+  await wait(400);
+  const t1 = await tabs2();
+  const i1 = await ids();
+  ok("a click on a doorway goes to that layer and pins the step there", t1[1].endsWith("*") && i1.includes("dashboard") && !i1.some((x) => x.includes(">Main")) && (await veil()).gone >= 1 && !(await c.ev(`!!document.querySelector('[role="dialog"]')`)), t1.join(" ") + " | " + i1.join(" "));
+  await c.ev(`document.querySelector('svg[role="img"]').dispatchEvent(new MouseEvent('click', { bubbles: true })); true`);
+  const dash = await box("dashboard");
+  ok("the bottom line of a box says who can reach the step", /Who: All but Guest\./.test(dash?.label ?? ""), dash?.label);
+  const whoText = await c.ev(`[...document.querySelectorAll('svg g[data-step]')].map((e) => e.getAttribute('data-step') + ':' + [...e.querySelectorAll('text')].map((t) => t.textContent).pop()).join(' | ')`);
+  ok("the line is drawn on the box in words", whoText.includes("dashboard:All but Guest"), whoText);
+  const i2 = await ids();
+  ok("the main layer holds its steps, the shared server step a line reaches, and doorways to the other two layers", JSON.stringify(i2) === JSON.stringify(["admin-home>Admin", "api-report", "dashboard", "login-screen>Login", "report"]), i2.join(" "));
+  const mainTable = await c.ev(`(() => { const t = document.querySelector('section[data-sheet] table'); return { head: [...t.querySelectorAll('th')].map((x) => x.innerText.trim()), rows: t.querySelectorAll('tbody tr').length }; })()`);
+  ok("the table follows the layer (no doorways) and has a Layer column", mainTable.rows === 3 && mainTable.head.some((h) => h.startsWith("Layer")), JSON.stringify(mainTable));
+  ok("the Admin tab opens", await tab("Admin") && await c.waitFor(`!!document.querySelector('svg g[data-step="people"]')`, 3000, 100));
+  b = await box("admin-home");
+  await clickAt(b.x, b.y);
+  await wait(250);
+  await clickAt(b.x, b.y);
+  ok("the details of a step name its layer, its limits and who can see it", await c.waitFor(`(() => { const d = document.querySelector('[role="dialog"]'); return !!d && d.innerText.includes('Admin layer') && d.innerText.includes('Limits') && d.innerText.includes('their own branches only') && d.innerText.includes('Branch manager (Branch duty)'); })()`, 3000, 100), (await c.ev(`document.querySelector('[role="dialog"]')?.innerText ?? ''`)).replace(/\s+/g, " ").slice(0, 300));
+  await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+  await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+  await c.waitFor(`!document.querySelector('[role="dialog"]')`, 2000, 100);
+  await wait(300);
+  await key("Escape", "Escape", 27);
+  ok("All shows every layer", await tab("All") && await c.waitFor(`document.querySelectorAll('svg g[data-step]').length >= 7 && !document.querySelector('svg g[data-doorway]')`, 3000, 100));
+  // the picker names the way each kind is given access, and a kind shows only what it can reach, in every layer
+  await c.ev(`document.querySelector('[role="combobox"][aria-label="Who can see it"]')?.click(); true`);
+  await wait(250);
+  const opts = await c.ev(`[...document.querySelectorAll('[role="listbox"] [role="option"]')].map((x) => x.innerText.replace(/\\s+/g, ' ').trim())`);
+  ok("the picker names the system beside each kind", opts.some((o) => /Branch manager.*Branch duty/.test(o)) && opts.some((o) => /Teacher.*Role/.test(o)), opts.join(" | "));
+  await c.ev(`document.querySelector('[role="combobox"][aria-label="Who can see it"]')?.click(); true`);
+  await wait(200);
+  await pick("Who can see it", "Branch manager");
+  await tab("All");
+  await wait(300);
+  const mgr = await ids();
+  ok("a branch duty can be picked like a role: it shows what a manager reaches and leaves out the login steps", mgr.includes("admin-home") && mgr.includes("dashboard") && !mgr.includes("open") && !mgr.includes("login-screen"), mgr.join(" "));
+  // a kind that cannot reach the layer the journey starts in opens on the first layer it can reach, and an empty layer says so
+  await pick("Who can see it", "Student");
+  await wait(300);
+  const ts = await tabs2();
+  ok("a student cannot reach the login layer of this journey, so the map opens on the main layer", ts[0].startsWith("Login0") && ts[1].startsWith("Main1") && ts[1].endsWith("*") && (await ids()).includes("dashboard"), ts.join(" "));
+  ok("an empty layer says so, in words", await tab("Login") && await c.waitFor(`(document.querySelector('[role="status"]')?.innerText ?? '').includes('reaches nothing in this layer')`, 3000, 100), await c.ev(`document.querySelector('[role="status"]')?.innerText ?? ''`));
+  await pick("Who can see it", "All kinds");
+
+  // the checks are behind one button
+  const checksBtn = await c.ev(`[...document.querySelectorAll('section[data-sheet] button')].filter((x) => /^Checks/.test(x.textContent.trim())).length`);
+  ok("one Checks button holds what used to be four buttons", checksBtn === 1 && !(await c.ev(`[...document.querySelectorAll('section[data-sheet] button')].some((x) => /^(Check names|Scan code|Scan again)$/.test(x.textContent.trim()) || /^\\d+ to check$/.test(x.textContent.trim()))`)), String(checksBtn));
+  await c.ev(`(() => { const b = [...document.querySelectorAll('section[data-sheet] button')].find((e) => /^Checks/.test(e.textContent.trim())); if (b.getAttribute('aria-expanded') !== 'true') b.click(); b.focus(); return true; })()`);
+  await wait(200);
+  const items = await c.ev(`[...document.querySelectorAll('[role="menuitem"]')].map((x) => x.innerText.split('\\n')[0].trim())`);
+  ok("its menu lists the checker, the names check and the scan", items.some((x) => /to check$/.test(x)) && items.includes("Check names") && items.some((x) => /^Scan/.test(x)), items.join(" | "));
+  await shot("journey-checks-menu");
+  await key("Escape", "Escape", 27);
+  ok("Esc closes the menu and leaves the Brain open", await c.waitFor(`!document.querySelector('[role="menu"]')`, 2000, 100) && await c.ev(`!!document.querySelector('section[data-sheet]')`));
+  await closeMenus();
+
   // a journey note with a mistake in it says so, and offers the note
   ok("a journey note with a mistake says it cannot be read", await pick("Journey", "C broken") && await c.waitFor(`document.querySelector('section[data-sheet]').innerText.includes('cannot be read')`, 3000, 100), (await c.ev(`(document.querySelector('section[data-sheet]').innerText.match(/cannot be read[^\\n]*/) ?? [''])[0]`)));
   ok("Open the note goes to the Notes page", await c.ev(`(() => { const x = [...document.querySelectorAll('section[data-sheet] button')].find((e) => e.textContent.trim() === 'Open the note'); if (!x) return false; x.click(); return true; })()`) && await c.waitFor(`document.querySelector('section[data-sheet] [role="tab"][aria-selected="true"]')?.textContent.trim() === 'Notes'`, 3000, 100));

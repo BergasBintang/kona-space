@@ -3,9 +3,10 @@
 // A loop (a wrong password that leads back to the sign-in) is a "back" line and does not push its step to the right.
 import type { Journey, Step } from "./journey.ts";
 
-export const BOX = { w: 184, h: 64, gapX: 72, gapY: 20, padX: 28, padY: 16 };
+export const BOX = { w: 184, h: 78, gapX: 72, gapY: 20, padX: 28, padY: 16 }; // the bottom line of a box says who can reach the step
 /** most steps stacked in one lane and column; the rest go in a column beside it, so a lane never grows as tall as the whole product */
 export const MAX_STACK = 6;
+export const MAX_GAP = 150; // the most room a column may take after it for the words on its lines
 /** a step that links to this many others (or is linked from this many) is a hub, such as a menu: its lines are drawn only when it is pointed at */
 export const hubMin = (steps: number) => Math.max(8, Math.ceil(steps * 0.1));
 
@@ -130,15 +131,53 @@ export function layoutJourney(j: Journey): Layout {
   const nodes = new Map<string, Placed>();
   let cols = 0;
   for (const s of j.steps) cols = Math.max(cols, placed.get(s.id)!.col + 1);
+  // the room after each column: wide enough for the words written on the lines that cross it (about 6.6 px a letter, a little more for an error's bang), so the
+  // words stand between the boxes and not on them. Lines of a menu, loops and lines that jump over a column do not count: their words find a free place along the line.
+  const nCols = Math.max(cols, 1);
+  const gapAfter: number[] = Array.from({ length: nCols }, () => BOX.gapX);
+  for (const e of edges) {
+    if (e.hub || e.back || !e.label) continue;
+    const a = placed.get(e.from), b = placed.get(e.to);
+    if (!a || !b || b.col !== a.col + 1) continue;
+    const need = Math.ceil(Math.min(e.label.length, 26) * 6.6 + 8 + (e.kind === "error" ? 13 : 0) + 24);
+    gapAfter[a.col] = Math.min(MAX_GAP, Math.max(gapAfter[a.col], need));
+  }
   // where each column starts: a column that was split takes the room of every column beside it
   const startX: number[] = [];
   let x = BOX.padX;
-  for (let c = 0; c < Math.max(cols, 1); c++) { startX.push(x); x += (subs.get(c) ?? 1) * (BOX.w + BOX.gapX); }
+  for (let c = 0; c < nCols; c++) { const k = subs.get(c) ?? 1; startX.push(x); x += k * BOX.w + (k - 1) * BOX.gapX + gapAfter[c]; }
   for (const s of j.steps) {
     const p = placed.get(s.id)!;
     nodes.set(s.id, { id: s.id, ...p, x: startX[p.col] + p.sub * (BOX.w + BOX.gapX), y: bands[p.lane].y + BOX.padY + p.slot * (BOX.h + BOX.gapY), w: BOX.w, h: BOX.h });
   }
-  return { cols, lanes: bands, nodes, edges, hidden, width: x - BOX.gapX + BOX.padX, height: y };
+  return { cols, lanes: bands, nodes, edges, hidden, width: x - gapAfter[nCols - 1] + BOX.padX, height: y };
+}
+
+/**
+ * One layer of a journey for drawing. It holds the steps of the layer, and the steps of other layers that a line joins to them: those are doorways, boxes that say
+ * which layer they are in and carry only the lines that touch this layer (a click on one goes to that layer). A step that belongs to no layer (shared work) is drawn
+ * in full wherever a line joins it to the layer, and not otherwise. `layer` empty means no layers: the journey as it is.
+ */
+export function layerView(j: Journey, layer: string): { journey: Journey; doorways: Map<string, string> } {
+  const doorways = new Map<string, string>();
+  if (!layer || j.layers.length === 0) return { journey: j, doorways };
+  const own = new Set(j.steps.filter((s) => s.layer === layer).map((s) => s.id));
+  const touching = new Set<string>(); // outside steps with a line to or from this layer
+  for (const e of edgesOf(j)) {
+    if (own.has(e.from) && !own.has(e.to)) touching.add(e.to);
+    else if (own.has(e.to) && !own.has(e.from)) touching.add(e.from);
+  }
+  const names = new Map(j.layers.map((l) => [l.id, l.name]));
+  const steps: Step[] = [];
+  for (const s of j.steps) {
+    if (own.has(s.id)) { steps.push(s); continue; }
+    if (!touching.has(s.id)) continue;
+    // the outside step keeps only the lines into this layer, so no line of another layer is drawn
+    const cut: Step = { ...s, next: s.next.filter((b) => own.has(b.to)), buttons: s.buttons.filter((b) => own.has(b.to)), errors: s.errors.filter((e) => own.has(e.to)), start: false, end: s.next.length + s.buttons.length + s.errors.length > 0 ? s.end : true };
+    if (s.layer) { doorways.set(s.id, names.get(s.layer) ?? s.layer); cut.kind = "step"; cut.fields = []; }
+    steps.push(cut);
+  }
+  return { journey: { ...j, steps }, doorways };
 }
 
 /** Can this kind of user reach the step? A step that names no user kind is for everyone: nothing was said to hide it. */

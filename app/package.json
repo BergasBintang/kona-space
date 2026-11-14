@@ -2,11 +2,11 @@
   "name": "app",
   "private": true,
   "license": "MIT",
-  "version": "0.39.0",
+  "version": "0.40.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "test": "node --test src/lib/brain/brain.test.ts src/lib/brain/eval.test.ts src/lib/brain/notecheck.test.ts src/lib/brain/labels.test.ts src/lib/brain/graph.test.ts src/lib/brain/table.test.ts src/lib/brain/journey.test.ts src/lib/brain/journeylayout.test.ts src/lib/brain/journeystale.test.ts src/lib/brain/journeymarks.test.ts src/lib/brain/journeycheck.test.ts src/lib/brain/journeyai.test.ts src/lib/brain/chat.test.ts src/lib/brain/outline.test.ts src/lib/brain/sequence.test.ts src/lib/brain/callout.test.ts src/lib/seen.test.ts src/lib/htmlpage.test.ts src/lib/bako.test.ts src/lib/kibby.test.ts src/lib/unsaved.test.ts src/lib/office.test.ts src/lib/skillnote.test.ts src/lib/skilltree.test.ts src/lib/skillfiles.test.ts src/lib/sessions.test.ts src/lib/memory.test.ts src/lib/mapview.test.ts src/lib/mockview.test.ts src/lib/mockpick.test.ts src/lib/mockdraft.test.ts src/lib/blocks.test.ts src/lib/sshconfig.test.ts src/lib/curve.test.ts src/lib/groups.test.ts src/lib/mockdevices.test.ts src/lib/workflowrun.test.ts src/lib/meetingchat.test.ts src/office/office.test.ts",
+    "test": "node --test src/lib/brain/brain.test.ts src/lib/brain/eval.test.ts src/lib/brain/notecheck.test.ts src/lib/brain/labels.test.ts src/lib/brain/graph.test.ts src/lib/brain/chart.test.ts src/lib/brain/table.test.ts src/lib/brain/journey.test.ts src/lib/brain/journeylayout.test.ts src/lib/brain/journeystale.test.ts src/lib/brain/journeymarks.test.ts src/lib/brain/journeycheck.test.ts src/lib/brain/journeyai.test.ts src/lib/brain/chat.test.ts src/lib/brain/outline.test.ts src/lib/brain/sequence.test.ts src/lib/brain/callout.test.ts src/lib/seen.test.ts src/lib/htmlpage.test.ts src/lib/bako.test.ts src/lib/kibby.test.ts src/lib/unsaved.test.ts src/lib/office.test.ts src/lib/skillnote.test.ts src/lib/skilltree.test.ts src/lib/skillfiles.test.ts src/lib/sessions.test.ts src/lib/memory.test.ts src/lib/mapview.test.ts src/lib/mockview.test.ts src/lib/mockpick.test.ts src/lib/mockdraft.test.ts src/lib/blocks.test.ts src/lib/sshconfig.test.ts src/lib/curve.test.ts src/lib/groups.test.ts src/lib/mockdevices.test.ts src/lib/workflowrun.test.ts src/lib/meetingchat.test.ts src/office/office.test.ts",
     "smoke": "node tests/smoke.mjs",
     "contrast": "node tools/contrast.mjs",
     "release": "node tools/release.mjs",

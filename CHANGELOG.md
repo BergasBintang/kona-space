@@ -2,6 +2,16 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.40.0, 2026-11-14
+
+Charts in notes, a Journey page that draws a product's path, and an Ask page in the Brain.
+
+- **Charts in a note.** A code block that starts with the word chart, a few settings and the numbers as a table is drawn as a chart. 18 kinds: column, bar, line, area (each can be stacked), combo, pie, doughnut, scatter, bubble, radar, histogram, box and whisker, waterfall, funnel, pareto, treemap, sunburst and heat map. Hover or Tab to a mark for its numbers, click a name in the legend to hide a series, and **Show the table** puts the same numbers beside it. The drawing is Kona's own (no library, 17 KB), in the paper look with pixel corners, and it is loaded only when a note holds a chart. A chart that cannot be drawn says why and shows its table. A starter note, **Charts in a note**, teaches the workers how to write one.
+- **The Journey page of the Brain.** A product's path is one note of kind journey, drawn as swimlanes (Person, App, Server, or your own lanes) with a status table under it. Point at a box to see its lines, click to hold them (everything not joined to it fades), click again for its details, click empty map or press Esc to let go. A big product is split into **layers** (a login part, a main part, an admin part), one tab each, with a faded doorway to a step of another layer. Kinds of user can belong to more than one way of giving access (a role, a duty at a branch) and a step can say what narrows it. Each box says in words who can reach it. The words on the lines keep clear of the boxes and of each other.
+- **Keeping the journey true.** One **Checks** button holds the checker, the markers and the names check. **Scan code** looks for `kona-step: <id>` comments in the project's files and draws a draft step for a marker the map does not know. A step whose ticket is finished but whose journey was not saved under it is flagged. **Check names** asks Haiku once whether the names fit their mockup pages. A mockup card can show the journey too, and Kiki has a skill, **build-a-journey**, with a checker that finds exactly what the page finds.
+- **The Ask page.** A tab in the Brain with a chat that answers from your notes: it searches them first and sends only the sections that match to one Haiku call, and it says so when the notes do not hold an answer.
+- **Smaller:** the Brain's note list is grouped like the map and each group folds, and the old search block that sat above every Brain page is gone (the Ask page replaces it).
+
 ## 0.39.0, 2026-11-11
 
 Kona has a built-in terminal, and the office and the welcome page tell you more about what is waiting for you.

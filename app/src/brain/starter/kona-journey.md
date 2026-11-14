@@ -74,4 +74,4 @@ These are checked by script, without any model: a step that leads to a step that
 }
 ```
 
-Mockups: [[kona-mockups]]. Saving a note and how notes work: [[how-the-brain-works]]. Writing the ticket that changes the path: [[good-tickets-and-prompts]].
+Mockups: [[kona-mockups]]. Charts in a note: [[kona-charts]]. Saving a note and how notes work: [[how-the-brain-works]]. Writing the ticket that changes the path: [[good-tickets-and-prompts]].

@@ -1,9 +1,9 @@
 // A small reader for the notes and for what Claude writes: headings (each with an id, so a link or the outline can jump to it), paragraphs, lists (nested, and checklists),
-// quotes and callouts (> [!WARNING], > **Note:**), tables (sortable, see MdTable), code blocks with Copy, ```mermaid diagrams drawn as pictures (see GraphView), `code`, **bold**,
+// quotes and callouts (> [!WARNING], > **Note:**), tables (sortable, see MdTable), code blocks with Copy, ```mermaid diagrams drawn as pictures (see GraphView), ```chart blocks drawn as charts (see Chart), `code`, **bold**,
 // *italic*, [text](address) and [[links]]. A link to a note that exists opens it; one that does not is shown struck-through in red with the words "no such note" (a link that
 // goes nowhere is a warning, not a stop). A link to another file or heading ([text](docs/other.md), [text](#part)) is followed when the place gives a `go`; a web address (http, https)
 // opens in the owner's browser. Numbered items keep counting across a blank line between them, and start at the number the first one carries.
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { frontMatter } from "../../lib/brain/parse.ts";
 import { parseTable } from "../../lib/brain/table.ts";
@@ -15,6 +15,8 @@ import { GraphView } from "./GraphView";
 import { MdTable } from "./MdTable";
 
 const DIAGRAM = new Set(["mermaid", "flowchart", "graph"]);
+// a ```chart block is drawn by Chart.tsx (lib/brain/chart.ts has the syntax). It is loaded the first time a note holds one, so a note without a chart pays nothing for it.
+const Chart = lazy(() => import("./Chart"));
 const ITEM = /^(\s*)([-*]|\d+[.)])\s+(.*)$/;
 
 /** A box in front of a checklist item: ticked or empty, with the word for a screen reader. */
@@ -105,7 +107,11 @@ export function Markdown({ text, resolve = () => null, open = () => {}, wiki = t
       while (i < lines.length && !/^\s*```/.test(lines[i])) code.push(lines[i++]);
       const closed = i < lines.length; // a reply still being written has no closing fence yet: it is not drawn until it has one
       i++;
-      blocks.push(DIAGRAM.has(lang) && closed ? <GraphView key={k++} source={code.join("\n")} /> : <CodeBlock key={k++} text={code.join("\n")} />);
+      blocks.push(
+        DIAGRAM.has(lang) && closed ? <GraphView key={k++} source={code.join("\n")} />
+        : lang === "chart" && closed ? <Suspense key={k++} fallback={<div className="my-3 h-48 border border-line-subtle bg-inset" aria-busy="true" />}><Chart source={code.join("\n")} /></Suspense>
+        : <CodeBlock key={k++} text={code.join("\n")} />,
+      );
     } else if (/^#{1,6}\s/.test(l)) {
       const level = l.match(/^#+/)![0].length;
       const body = l.replace(/^#+\s+/, "").replace(/\s+#+\s*$/, "");

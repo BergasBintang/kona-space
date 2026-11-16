@@ -2,6 +2,12 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.40.2, 2026-11-16
+
+A fix for the Mockups viewer: a zoomed page can be scrolled to its end.
+
+- **Zoomed mockups show the end of the page.** When you zoomed a device in past the height of the sheet, the screen was squeezed and the bottom of the page (its footer) was cut off, so no amount of scrolling reached it. The frame, the laptop base and the monitor stand now keep their full height, and the sheet scrolls to the bottom of the device.
+
 ## 0.40.1, 2026-11-14
 
 A fix so the workers know about charts, and a tidier top bar on the Journey page.

@@ -155,6 +155,8 @@ v.play().catch((e) => say('playfailed', { why: String(e) }));`);
   await idle(300);
   ok("zoom stops at 200% of the true size", (await percentNow()) === 200 && await c.ev(`${button("Zoom in (Ctrl and the mouse wheel)")}.disabled`), String(await percentNow()));
   ok("the zoomed device can be moved by scrolling the sheet", await c.ev(`(() => { const e = document.querySelector('section[data-sheet] .overflow-auto'); return e.scrollWidth > e.clientWidth || e.scrollHeight > e.clientHeight; })()`));
+  // zoomed past the sheet's height, the screen must keep its whole height (a squeezed frame cut off the end of the page: the bug of 2026-11-16)
+  ok("a zoomed device is not squeezed: its screen is as tall as the page it shows", await c.ev(`(() => { const f = document.querySelector('section[data-sheet] iframe'), w = f.parentElement; return Math.abs(w.getBoundingClientRect().height - f.getBoundingClientRect().height) < 1.5; })()`));
   await press("Fit the device to the sheet"); await idle(300);
   ok("the fit button goes back to the fit", (await percentNow()) === fitPct);
   // Ctrl and the wheel over the sheet (outside the page) and over the page itself

@@ -291,7 +291,7 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
   const offX = room.w > 0 ? Math.max(0, Math.floor((room.w - total.w - 2 * MARGIN) / 2)) : 0, offY = room.h > 0 ? Math.max(0, Math.floor((room.h - total.h - 2 * MARGIN) / 2)) : 0;
   const canPan = room.w > 0 && (total.w + 2 * MARGIN > room.w + 1 || total.h + 2 * MARGIN > room.h + 1);
   const frameStyle: CSSProperties = {
-    position: "relative", boxSizing: "content-box", width: dw, height: dh, borderStyle: "solid", borderColor: "transparent", borderWidth: lay.bezel.map(px).join(" "),
+    position: "relative", flexShrink: 0, boxSizing: "content-box", width: dw, height: dh, borderStyle: "solid", borderColor: "transparent", borderWidth: lay.bezel.map(px).join(" "),
     borderImage: `url(${picture(lay.frame.image)}) ${lay.frame.slice.join(" ")} / ${lay.bezel.map(px).join(" ")} repeat`, imageRendering: "pixelated", backgroundColor: device.backdrop, backgroundClip: "padding-box",
   };
   const base_ = device.base;
@@ -355,7 +355,8 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
         onPointerUp={() => { drag.current = null; setDragging(false); }}
         onPointerCancel={() => { drag.current = null; setDragging(false); }}
       >
-        <div className="flex shrink-0 flex-col items-center" style={{ padding: MARGIN, margin: `${offY + fix.y}px 0 0 ${offX + fix.x}px` }}>
+        {/* self-start: the sheet is a row, and a row stretches its child to the sheet's height; a column shorter than its content then squeezes the screen (flex-shrink) and crops the page's end. Never let the frame shrink. */}
+        <div className="flex shrink-0 flex-col items-center self-start" style={{ padding: MARGIN, margin: `${offY + fix.y}px 0 0 ${offX + fix.x}px` }}>
           <div ref={dev} style={frameStyle}>
             <div style={{ width: "100%", height: "100%", overflow: "hidden", borderRadius: device.screenRadius * lay.k, background: "#fff" }}>
               {url && (
@@ -375,13 +376,13 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
           </div>
           {base_ && (
             <div style={{
-              position: "relative", boxSizing: "border-box", width: total.w, height: base_.size[1] * lay.k, borderStyle: "solid", borderColor: "transparent", borderWidth: `0 ${base_.capRight * lay.k}px 0 ${base_.capLeft * lay.k}px`,
+              position: "relative", flexShrink: 0, boxSizing: "border-box", width: total.w, height: base_.size[1] * lay.k, borderStyle: "solid", borderColor: "transparent", borderWidth: `0 ${base_.capRight * lay.k}px 0 ${base_.capLeft * lay.k}px`,
               borderImage: `url(${picture(base_.image)}) 0 ${base_.capRight} 0 ${base_.capLeft} fill / 0 ${px(base_.capRight * lay.k)} 0 ${px(base_.capLeft * lay.k)} repeat`, imageRendering: "pixelated",
             }}>
               {base_.notch && <img src={picture(base_.notch.image)} alt="" draggable={false} style={{ position: "absolute", left: "50%", top: lay.k, width: base_.notch.size[0] * lay.k, height: base_.notch.size[1] * lay.k, transform: "translateX(-50%)", imageRendering: "pixelated" }} />}
             </div>
           )}
-          {device.stand && <img src={picture(device.stand.image)} alt="" draggable={false} style={{ width: device.stand.size[0] * lay.k, height: device.stand.size[1] * lay.k, imageRendering: "pixelated" }} />}
+          {device.stand && <img src={picture(device.stand.image)} alt="" draggable={false} style={{ flexShrink: 0, width: device.stand.size[0] * lay.k, height: device.stand.size[1] * lay.k, imageRendering: "pixelated" }} />}
         </div>
       </div>
       {sentLine && !picking && (

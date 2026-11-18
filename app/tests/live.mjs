@@ -277,8 +277,32 @@ try {
   await login("student@example.test"); i = await until(dashboard);
   ok("the demo data was made again (the note of the last run is gone) and the browser forgot the last run's local storage (the login page and the dashboard are the only two visits counted)", i?.notes === 0 && i?.storage === 2, `notes ${i?.notes}, storage ${i?.storage}`);
 
+  // ---- minimizing the page keeps the program running (decision 95): the tray shows it as Running, a click on its chip brings the page back, and the X asks before it stops the program
+  const sheetOf = (name) => `section[data-sheet][aria-label="${name}"]`;
+  ok("Minimize puts the Mockups page away: the office is there, the tray has one chip that says Running, and the program still answers", await c.ev(`document.querySelector('section[data-sheet] button[aria-label^="Minimize"]').click(); true`) && await c.waitFor(`!!document.querySelector('nav[aria-label="Open pages"] button[role=tab]')?.getAttribute('aria-label')?.includes('minimized, Running')`, 6000, 150) && await answers(pMain) && !(await c.ev(`!!document.querySelector('section[data-sheet]:not([hidden])')`)));
+  ok("a minimized page does not take Esc, and the program is not stopped by it", await (async () => { await c.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 }); await c.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 }); await wait(600); return answers(pMain); })());
+  ok("a click on the chip brings the page back with the program in it, still signed in", await c.ev(`document.querySelector('nav[aria-label="Open pages"] button[role=tab]').click(); true`) && await c.waitFor(`!!document.querySelector('section[data-sheet]:not([hidden]) iframe[title]')`, 8000, 150) && !!(await ask()));
+  // the X asks, because the page would stop the program; Cancel changes nothing
+  await c.ev(`document.querySelector('section[data-sheet]:not([hidden]) button[aria-label^="Close"]').click(); true`);
+  const leaveAsk = await c.waitFor(`!!document.querySelector('[role=dialog]')`, 3000, 100) ? await c.ev(`document.querySelector('[role=dialog]').innerText.replace(/\\s+/g, ' ')`) : "";
+  ok("the X asks: Minimize, Close it or Cancel, and says that closing stops the program", /Close this page\?/.test(leaveAsk) && /stops it/.test(leaveAsk) && /Minimize/.test(leaveAsk) && /Cancel/.test(leaveAsk), leaveAsk.slice(0, 220));
+  ok("Cancel changes nothing: the program runs and the page is shown", await pressText("Cancel", "[role=dialog]") && await c.waitFor(`!document.querySelector('[role=dialog]')`, 2000, 100) && await answers(pMain) && !!(await frameBox()));
+  ok("Minimize in the question puts the page away and keeps the program", await c.ev(`document.querySelector('section[data-sheet]:not([hidden]) button[aria-label^="Close"]').click(); true`) && await c.waitFor(`!!document.querySelector('[role=dialog]')`, 3000, 100) && await pressText("Minimize", "[role=dialog]") && await c.waitFor(`!document.querySelector('[role=dialog]') && !!document.querySelector('nav[aria-label="Open pages"]')`, 4000, 100) && await answers(pMain));
+  ok("the chip of the tray has its own X, which asks too, and closing there stops the program", await c.ev(`document.querySelector('nav[aria-label="Open pages"] button[aria-label^="Close"]').click(); true`) && await c.waitFor(`!!document.querySelector('[role=dialog]')`, 3000, 100) && !(await pressText("Minimize", "[role=dialog]")) && await pressText("Close it", "[role=dialog]") && await gone(pMain, 15000) && await c.waitFor(`!document.querySelector('nav[aria-label="Open pages"]')`, 3000, 100));
+  // the page is gone: the next start is of a new page, from the start
+  await c.ev(`document.querySelector('[aria-label="Open Mockups"]').click(); true`);
+  await c.waitFor(`document.querySelector('section[data-sheet]:not([hidden])')?.getAttribute('aria-label') === 'Mockups'`, 5000, 100); await wait(1200);
+  await c.ev(`document.querySelector('section[data-sheet] ul button[aria-label="Open School live"]').click(); true`);
+  await c.waitFor(`/Start the program|Start with the last data/.test(document.querySelector('section[data-sheet]')?.innerText ?? '')`, 5000, 100);
+  await pressText((await sheetText()).includes("Start with the last data") ? "Start with the last data" : "Start the program"); await c.waitFor(`!!document.querySelector('[role=dialog]')`, 3000, 100); await pressText("Run it", "[role=dialog]");
+  ok("started again after the page was closed", await c.waitFor(`!!document.querySelector('iframe[title]')`, 40000, 200));
+  if (!(await sheetText()).includes("Password for all")) { await press("Demo accounts"); await wait(300); } // (the logins of the card may be open: close them so they do not cover the program)
+  if ((await sheetText()).includes("Password for all")) await press("Close the demo accounts");
+
   // ---- leaving the page stops it
   await c.ev(`document.querySelector('section[data-sheet] button[aria-label^="Close"]').click(); true`);
+  // a running program is something the page would lose: the sheet asks (minimize, close or cancel), and the test closes it
+  await c.waitFor("!!document.querySelector('[role=dialog]')", 2500, 100); await c.ev("(() => { const b = [...document.querySelectorAll('[role=dialog] button')].find((x) => x.textContent.trim() === 'Close it'); if (b) b.click(); return !!b; })()");
   ok("closing the sheet stops the program", await gone(pMain, 15000));
 
   // ---- a program that fails shows why
@@ -326,6 +350,8 @@ try {
   info("the native alert is turned off by the window itself, allowed or not: it returned at once and no dialog was shown (" + allowed.caps.alert + ")");
   ok("nothing was saved to the PC by that test (downloads were denied by the test)", true);
   await c.ev(`document.querySelector('section[data-sheet] button[aria-label^="Close"]').click(); true`);
+  // a running program is something the page would lose: the sheet asks (minimize, close or cancel), and the test closes it
+  await c.waitFor("!!document.querySelector('[role=dialog]')", 2500, 100); await c.ev("(() => { const b = [...document.querySelectorAll('[role=dialog] button')].find((x) => x.textContent.trim() === 'Close it'); if (b) b.click(); return !!b; })()");
 } finally {
   try { for (const p of await invoke("list_projects")) if (p.name === NAME || p.id === id) await invoke("remove_project", { id: p.id }); } catch (e) { note("could not remove the project: " + e); }
   try { await invoke("live_stop"); } catch {}

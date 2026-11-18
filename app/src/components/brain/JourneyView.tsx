@@ -4,6 +4,7 @@
 // a second click on the pinned box opens its details in a dialog; a click on empty map or Esc lets go. The table under the map lists the same steps.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDismiss } from "../pick/parts";
+import { usePageActive } from "../../lib/pageactive";
 import type { Brain } from "../../lib/brain/engine.ts";
 import { accessWords, journeyNotes, parseJourney, type Actor, type Journey, type Problem, type Step } from "../../lib/brain/journey.ts";
 import { layerView, layoutJourney, stepsFor, type Edge } from "../../lib/brain/journeylayout.ts";
@@ -36,6 +37,7 @@ const LANE_W = 104; // the column with the names of the lanes
 const GROUP_MIN = 4; // the same warning about this many steps is shown as one line
 
 export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId: string; accountId: string | null; brain: Brain; onOpen: (id: string) => void }) {
+  const pageActive = usePageActive();
   const notes = useMemo(() => journeyNotes(brain.notes.values()).sort((a, b) => a.title.localeCompare(b.title)), [brain]);
   const [which, setWhich] = useState<string | null>(null);
   const [kind, setKind] = useState(KINDS_ALL);
@@ -116,6 +118,7 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
   useEffect(() => {
     if (picked === null || opened !== null) return;
     // in the capture phase and marked as taken, or the sheet (whose listener was added before this one) closes the whole Brain on the same key; a list or menu that is open takes the key first
+    if (!pageActive) return; // a minimized page does not take Esc
     const f = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented || document.querySelector('[role="listbox"], [role="menu"]')) return;
       e.preventDefault();
@@ -123,7 +126,7 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
     };
     addEventListener("keydown", f, true);
     return () => removeEventListener("keydown", f, true);
-  }, [picked, opened]);
+  }, [picked, opened, pageActive]);
   useEffect(() => {
     const el = box.current;
     if (!el) return;

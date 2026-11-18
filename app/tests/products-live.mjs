@@ -171,6 +171,8 @@ try {
   for (const line of execSync("tasklist /FO CSV /NH", { encoding: "utf8" }).split("\n")) { const m = /^"([^"]+)","\d+","[^"]*","\d+","([\d.,\s]+) K"/.exec(line); if (m && ["php.exe", "node.exe", "python.exe", "postgres.exe", "msedgewebview2.exe", "app.exe"].includes(m[1].toLowerCase())) held[m[1]] = (held[m[1]] ?? 0) + Math.round(Number(m[2].replace(/[.,\s]/g, "")) / 1024); }
   info("MB held by the programs (every process of those names on the PC): " + JSON.stringify(held));
   await c.ev(`document.querySelector('section[data-sheet] button[aria-label^="Close"]').click(); true`);
+  // a running program is something the page would lose: the sheet asks (minimize, close or cancel), and the test closes it
+  await c.waitFor("!!document.querySelector('[role=dialog]')", 2500, 100); await c.ev("(() => { const b = [...document.querySelectorAll('[role=dialog] button')].find((x) => x.textContent.trim() === 'Close it'); if (b) b.click(); return !!b; })()");
   ok("closing the sheet stops every part of the program", await gone(PORT) && await gone(PORT + 1000));
 } catch (e) { note("FAIL the test stopped: " + String(e.stack ?? e).slice(0, 600)); failed++; try { await invoke("live_stop"); } catch {} }
 finally {

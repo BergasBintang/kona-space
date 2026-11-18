@@ -57,6 +57,8 @@ try {
   await f2.waitFor(`document.getElementById('msg')?.textContent.includes('hello')`, 20000);
   ok("after Start the page again the changed file is shown", (await f2.ev(`document.getElementById('msg').textContent`)) === "Changed hello from first version");
   await c.ev(`document.querySelector('section[data-sheet] button[aria-label^="Close"]').click(); true`);
+  // a running program is something the page would lose: the sheet asks (minimize, close or cancel), and the test closes it
+  await c.waitFor("!!document.querySelector('[role=dialog]')", 2500, 100); await c.ev("(() => { const b = [...document.querySelectorAll('[role=dialog] button')].find((x) => x.textContent.trim() === 'Close it'); if (b) b.click(); return !!b; })()");
   ok("closing the sheet stops the development server", await (async () => { for (let i = 0; i < 40; i++) { if (!(await answers(PORT))) return true; await wait(500); } return false; })());
 } catch (e) { console.log("FAIL the test stopped: " + String(e.stack ?? e).slice(0, 500)); failed++; try { await invoke("live_stop"); } catch {} }
 finally {

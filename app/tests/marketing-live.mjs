@@ -133,6 +133,8 @@ try {
 
   // ---- Stop, and nothing real was touched
   await c.ev(`document.querySelector('section[data-sheet] button[aria-label^="Close"]').click(); true`);
+  // a running program is something the page would lose: the sheet asks (minimize, close or cancel), and the test closes it
+  await c.waitFor("!!document.querySelector('[role=dialog]')", 2500, 100); await c.ev("(() => { const b = [...document.querySelectorAll('[role=dialog] button')].find((x) => x.textContent.trim() === 'Close it'); if (b) b.click(); return !!b; })()");
   ok("closing the sheet stops both programs", await gone(PORT) && await gone(PORT + 1000));
 } catch (e) { note("FAIL the test stopped: " + String(e.stack ?? e).slice(0, 500)); failed++; try { await invoke("live_stop"); } catch {} }
 finally {

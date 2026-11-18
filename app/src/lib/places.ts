@@ -1,4 +1,4 @@
-// The places of Kona. Each one is a piece of the office that opens a screen (or a person's sheet, for the pages of a person); the top bar lists them too, as a way to jump. Every page has a sheet of its own: no tabs between pages.
+// The places of Kona. Each one is a piece of the office that opens a screen (or a person's sheet, for the pages of a person); the top bar lists them too, as a way to jump. One page is shown at a time, in a sheet; the owner may minimize it, which keeps it alive behind a tray of the pages that are alive (decision 95), or close it.
 export type Place = "office" | "mockups" | "files" | "costs" | "board" | "workflows" | "worktrees" | "leftovers" | "brain" | "servers" | "settings";
 
 export const PLACES: { id: Place; label: string }[] = [

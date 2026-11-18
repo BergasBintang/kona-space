@@ -97,7 +97,7 @@ export function OfficeEditor({ names, map, hasOwn, broken, guard, onSave, onRese
   const leave = (go: () => void) => { if (dirty) { goAfter.current = go; setAsks("close"); } else go(); };
   const latest = useRef({ leave, onClose });
   latest.current = { leave, onClose };
-  useEffect(() => { guard.current = { leave: (go) => latest.current.leave(go) }; return () => { guard.current = null; }; }, [guard]);
+  useEffect(() => { guard.current = { leave: (go) => latest.current.leave(() => go("close")) }; return () => { guard.current = null; }; }, [guard]);
 
   // ---- the plan
   const selObj = sel >= 0 ? draft.objects[sel] : undefined;

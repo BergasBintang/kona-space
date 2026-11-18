@@ -8,6 +8,8 @@ import { createTicket, liveAccounts, liveData, liveDeleteData, liveStart, liveSt
 import { buildPrompt, fallbackDraft, parseDraft, type Draft, type DraftContext } from "../lib/mockdraft";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { LiveAccounts } from "./LiveAccounts";
+import { usePageActive } from "../lib/pageactive";
+import { useBusy } from "../lib/pagebusy";
 import { Confirm } from "./Confirm";
 import { MARGIN, MAX_ZOOM, clampZoom, dataLine, dialogLine, filesSignature, humanBytes, fitScale, frameMessage, layout, ALLOW_WORDS, liveAllow, livePhaseLine, liveSandbox, liveUrl, pageUrl, percent, stepZoom, wheelZoom, type Device } from "../lib/mockview";
 import { NOTE_MAX, addPin, editPin, measureLine, pageFile, partLabel, pickMessage, pinsForPage, placeNote, removePin, scopeLine, toScreen, type Box, type Part, type Pin } from "../lib/mockpick";
@@ -37,14 +39,15 @@ export type MockSend = { designer: string; draft: (prompt: string) => Promise<st
 /** How far the Live program is (decision 94): asked every `ms` milliseconds while the window is visible; 0 asks never. */
 function useLiveStatus(ms: number): LiveStatus | null {
   const [status, setStatus] = useState<LiveStatus | null>(null);
+  const active = usePageActive(); // a minimized page does not ask (decision 95)
   useEffect(() => {
-    if (ms <= 0) return;
+    if (ms <= 0 || !active) return;
     let alive = true;
     const ask = () => { if (visible()) void liveStatus().then((s) => { if (alive) setStatus(s); }).catch(() => { /* the next asking tries again */ }); };
     ask();
     const t = setInterval(ask, ms);
     return () => { alive = false; clearInterval(t); };
-  }, [ms]);
+  }, [ms, active]);
   return status;
 }
 
@@ -56,6 +59,9 @@ export function Mockups({ project, send }: { project: Project | null; send: Mock
     // a Live program runs only while this page is open
     return () => { void liveStop().catch(() => { /* nothing was running */ }); };
   }, []);
+  // a program that runs is something this page would lose if it were closed: the sheet asks first, and offers to minimize the page instead (decision 95)
+  const runStatus = useLiveStatus(project ? 2000 : 0);
+  useBusy("place:mockups", runStatus && project && runStatus.project === project.id && ["setup", "starting", "ready"].includes(runStatus.phase) ? "A mockup's program is running. Closing this page stops it; minimizing keeps it running." : null);
   if (!project || base === null) return null;
   if (card) return <MockupView key={card.id} project={project} card={card} base={base} send={send} onBack={() => setCard(null)} />;
   return <Cards project={project} onOpen={setCard} />;
@@ -333,11 +339,13 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
 
   // Esc goes back to the cards; on the cards it closes the sheet (the sheet's own handler runs when this one does not take it). This listener is in the capture phase, so it comes
   // before the sheet's, which was added earlier; and it leaves Esc alone while a dialog is open (the help closes first).
+  const pageActive = usePageActive();
   useEffect(() => {
+    if (!pageActive) return; // a minimized page does not take Esc
     const key = (e: KeyboardEvent) => { if (e.key === "Escape" && !e.defaultPrevented && !document.querySelector("[role=dialog]")) { e.preventDefault(); escape(); } };
     window.addEventListener("keydown", key, true);
     return () => window.removeEventListener("keydown", key, true);
-  }, [escape]);
+  }, [escape, pageActive]);
 
   // the page loads again by itself when one of its files changes (checked every 3 seconds, and not while the window is hidden)
   const seen = useRef<string | null>(null);

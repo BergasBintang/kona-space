@@ -180,6 +180,7 @@ const ICONS = {
     rect(p, 7, 1, 8, 2); rect(p, 4, 5, 6, 7); rect(p, 8, 5, 11, 6); rect(p, 8, 8, 11, 8); rect(p, 4, 9, 7, 11);
   },
   branch: (p) => { line(p, 8, 14, 8, 8); line(p, 8, 8, 4, 3); line(p, 8, 8, 12, 3); rect(p, 3, 1, 5, 2); rect(p, 11, 1, 13, 2); rect(p, 7, 14, 9, 15); },
+  minimize: (p) => { rect(p, 3, 10, 12, 11); }, // a low bar: put the page away, still alive
   plus: (p) => { rect(p, 7, 3, 8, 12); rect(p, 3, 7, 12, 8); },
   // the buttons of a conversation: end it, start a new one, open an old one again
   stop: (p) => { // a ring with a square in it: stop

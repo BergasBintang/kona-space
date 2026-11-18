@@ -11,6 +11,10 @@ import { OfficeEditor } from "./components/OfficeEditor";
 import { STANDARD, ensurePages, parseMap } from "./office/map";
 import type { OfficeMap } from "./office/engine/types";
 import { Sheet, type Guard } from "./components/Sheet";
+import { PageTray, type TrayItem } from "./components/PageTray";
+import { MAX_KEPT, drawOrder, keepAdd, keepRemove, pageKey, parseKey } from "./lib/pages";
+import { busyOf } from "./lib/pagebusy";
+import { Confirm } from "./components/Confirm";
 import { finishedByProject, officeLooks, looksSignature, waitingByProject } from "./lib/office";
 import { Hello, WelcomeBar } from "./components/Hello";
 import { AddProject } from "./components/AddProject";
@@ -66,7 +70,13 @@ export default function App() {
   const accountOf = (p: Project | null | undefined) => (p?.account && accounts.some((a) => a.id === p.account) ? p.account : null);
   const NO_ACCOUNT = "This project has no account yet. Click the Kona mark and choose one.";
   const [person, setPerson] = useState<string | null>(null); // the person whose sheet is open (a role id): what a click on a cat opens
-  const [tab, setTab] = useState<PersonTab>("chat");
+  const [tabs, setTabs] = useState<Record<string, PersonTab>>({}); // the tab each person's sheet shows (a minimized sheet keeps its own)
+  const tab: PersonTab = (person && tabs[person]) || "chat";
+  const setTab = (t: PersonTab) => { if (person) setTabs((m) => ({ ...m, [person]: t })); };
+  const [kept, setKept] = useState<string[]>([]); // the pages the owner minimized: alive behind the tray (decision 95)
+  useEffect(() => { setKept([]); }, [projectId]); // the minimized pages belong to the project that is open
+  const guards = useRef<Record<string, Guard | null>>({}); // each sheet, shown or minimized, so it can be asked before it is closed
+  const [keptAsk, setKeptAsk] = useState<{ reasons: string[]; go: () => void } | null>(null); // minimized pages that are still going, when the owner goes home
   const [brainTab, setBrainTab] = useState<BrainTab>("map");
   const [serversTab, setServersTab] = useState<ServersTab>("connections");
   const [fileTarget, setFileTarget] = useState<{ path: string; n: number } | null>(null); // a file the terminal asked to see in Files
@@ -181,16 +191,45 @@ export default function App() {
   const looksSig = looksSignature(state, seen);
   const looks = useMemo(() => officeLooks(project, state, seen), [project, looksSig]); // eslint-disable-line react-hooks/exhaustive-deps
   const attention = useMemo(() => state.order.filter((id) => state.sessions[id].run === "waiting" && (!project || samePlace(state.sessions[id].folder, project.folder))).length, [state, project]); // only this project's, like the leftovers
-  const pickProject = useCallback((id: string) => { setProjectId(id); remember("kona.project", id); setPerson(null); }, []);
+  const pickProject = useCallback((id: string) => { setProjectId(id); remember("kona.project", id); setPerson(null); setKept([]); }, []);
   // do a move that leaves the sheet's page (home, another page from the top bar), asking first if the page holds text that was not sent or saved
-  const leave = (go: () => void) => { if (sheetGuard.current) sheetGuard.current.leave(go); else go(); };
-  const closeSheet = () => { setPlace("office"); setPerson(null); };
+  // the page shown, and the moves that put it away: minimize keeps it alive in the tray, close ends it (decision 95)
+  const shownKey = pageKey(place, person);
+  const keepShown = (): boolean => {
+    if (!shownKey) return true;
+    const r = keepAdd(kept, shownKey);
+    if (!r.ok) { setNotice(`${MAX_KEPT} pages are minimized already. Close one in the tray first: each one that stays alive uses memory.`); return false; }
+    setKept(r.kept); setPlace("office"); setPerson(null);
+    return true;
+  };
+  // do a move that leaves the sheet's page (home, another page from the top bar): the sheet asks first if the page would lose something (typed text, a running program) and then the owner minimizes it or closes it
+  const leave = (go: () => void) => {
+    if (!sheetGuard.current) { go(); return; }
+    sheetGuard.current.leave((how) => { if (how === "minimize" && !keepShown()) return; go(); });
+  };
+  const endPage = (key: string) => { setKept((k) => keepRemove(k, key)); if (key === shownKey) { setPlace("office"); setPerson(null); } }; // the page is closed (the sheet itself already asked, if it had to)
+  const closeKept = (key: string) => { // the X of a chip in the tray: the page is asked first, as it would be on its own sheet
+    const g = guards.current[key];
+    if (g) g.leave((how) => { if (how === "close") endPage(key); }, false); else endPage(key);
+  };
+  // show a page by its key (a chip of the tray): the page shown now is left first, with its question
+  const showKey = (key: string) => {
+    const ref = parseKey(key);
+    if (!ref || key === shownKey) return;
+    leave(() => { setKept((k) => keepRemove(k, key)); if (ref.kind === "place") { setPerson(null); setPlace(ref.id as Place); } else { setPlace("office"); setPerson(ref.id); } });
+  };
+  // going home or to another project ends the minimized pages too: asked once when one of them is still going
+  const endKept = (go: () => void) => {
+    const reasons = kept.map((k) => busyOf(k)).filter((r): r is string => !!r);
+    if (reasons.length > 0) { setKeptAsk({ reasons, go: () => { setKept([]); go(); } }); return; }
+    setKept([]); go();
+  };
   // the office's actions keep one identity, so the office does not redraw for a reason it cannot see
-  const openPlace = useCallback((p: Place) => { setPerson(null); setPlace(p); }, []);
+  const openPlace = useCallback((p: Place) => { setPerson(null); setPlace(p); setKept((k) => keepRemove(k, `place:${p}`)); }, []);
   const projectRef = useRef(project);
   projectRef.current = project;
   // a click on a person opens their sheet, on the chat
-  const openPerson = useCallback((roleId: string) => { setPlace("office"); setPerson(roleId); setTab("chat"); setPersonError(null); }, []);
+  const openPerson = useCallback((roleId: string) => { setPlace("office"); setPerson(roleId); setKept((k) => { if (!k.includes(`person:${roleId}`)) setTabs((m) => ({ ...m, [roleId]: "chat" })); return keepRemove(k, `person:${roleId}`); }); setPersonError(null); }, []);
   // a person does one thing at a time in a project (decision 62): why a new conversation with them is refused, or null when they are free (the core refuses too, whatever asks)
   const busyMessage = (roleId: string | null): string | null => {
     const p = projectRef.current, st = live.current.state, r = live.current.roles.find((x) => x.id === roleId);
@@ -202,7 +241,6 @@ export default function App() {
   const names = useMemo(() => Object.fromEntries(roles.map((r) => [r.id, roleLabel(r)])), [roles]);
   // the conversation shown with a person: their latest session in this project that the owner did not put away
   const sessionOf = (roleId: string | null): Session | null => (roleId && project ? state.order.map((id) => state.sessions[id]).filter((s) => s.roleId === roleId && samePlace(s.folder, project.folder) && !dismissed[s.id]).pop() ?? null : null);
-  const personRole = person ? roles.find((r) => r.id === person) ?? null : null;
   const shown = sessionOf(person);
   const current = shown; // (the account of the conversation that is open, for the plan bars)
   useEffect(() => { if (person && tab === "chat" && shown && seen[shown.id] !== shown.turns) setSeen((s) => ({ ...s, [shown.id]: shown.turns })); }, [person, tab, shown?.id, shown?.turns]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -430,6 +468,7 @@ export default function App() {
 
   let content: React.ReactNode;
   let sheet: React.ReactNode = null;
+  let tray: React.ReactNode = null;
   if (!project) {
     content = <div className="flex flex-1 items-center justify-center text-text-tertiary">Opening Kona…</div>; // only for a moment: with no project the welcome page is shown (above)
   } else {
@@ -439,30 +478,56 @@ export default function App() {
           onReset={async () => { await officeMapReset(project.folder); setOfficeMap(STANDARD); setOwnMap(false); setBrokenMap(null); setNotice("This project shows the standard office again."); }}
           onClose={() => setEditing(false)} />
       : <Office map={officeMap} looks={looks} seated={seated} sheetOpen={place !== "office" || person !== null} alerts={leftTotal > 0 ? { leftovers: leftTotal } : undefined} names={names} onOpen={openPlace} onOpenPerson={openPerson} onSay={sayToOffice} onEdit={() => setEditing(true)} />;
-    if (place !== "office") {
-      const info = PLACES.find((x) => x.id === place);
-      const brainTabs = place === "brain" ? { tabs: BRAIN_TABS, active: brainTab, onTab: (id: string) => setBrainTab(id as BrainTab), keepDraftOnTab: true }
-        : place === "servers" ? { tabs: SERVERS_TABS, active: serversTab, onTab: (id: string) => setServersTab(id as ServersTab), keepDraftOnTab: true } : {};
-      sheet = <Sheet key="sheet" title={info?.label ?? place} {...brainTabs} onClose={closeSheet} guard={sheetGuard}>{pageOf(place)}</Sheet>;
-    } else if (person && personRole) {
-      sheet = (
-        <Sheet key={`person-${person}`} title={roleLabel(personRole)} tabs={PERSON_TABS} active={tab} onTab={(id) => setTab(id as PersonTab)} keepDraftOnTab onClose={closeSheet} guard={sheetGuard}>
-          <PersonSheet tab={tab} onTab={setTab} role={personRole} project={project} session={shown} history={history} accountId={accountOf(project)} kit={kits[personRole.id] ?? { skills: [], mcp: [], notes: {} }} error={personError} dispatch={dispatch as (a: unknown) => void}
-            onFirst={(text, images) => void sendFirst(personRole, text, images)} onResume={(e) => void resume(personRole, e)} onNew={() => shown && void newConversation(shown)} onNote={() => shown && void noteSession(shown.id, true)}
-            onSaveAnswer={(text) => shown && void saveAnswer(shown.id, text)} onSaved={(saved) => setRoles((all) => all.map((r) => (r.id === saved.id ? saved : r)))} onKitSaved={(id, kit) => setKits((all) => ({ ...all, [id]: kit }))} />
+    const sheets: React.ReactNode[] = drawOrder(kept, shownKey).map((key) => {
+      const ref = parseKey(key);
+      if (!ref) return null;
+      const hidden = key !== shownKey;
+      if (ref.kind === "place") {
+        const which = ref.id as Place;
+        const info = PLACES.find((x) => x.id === which);
+        const brainTabs = which === "brain" ? { tabs: BRAIN_TABS, active: brainTab, onTab: (id: string) => setBrainTab(id as BrainTab), keepDraftOnTab: true }
+          : which === "servers" ? { tabs: SERVERS_TABS, active: serversTab, onTab: (id: string) => setServersTab(id as ServersTab), keepDraftOnTab: true } : {};
+        return <Sheet key={key} pageKey={key} hidden={hidden} title={info?.label ?? which} {...brainTabs} onClose={() => endPage(key)} onMinimize={() => { if (hidden) return; keepShown(); }} busy={() => busyOf(key)} registry={guards} guard={sheetGuard}>{pageOf(which)}</Sheet>;
+      }
+      const role = roles.find((r) => r.id === ref.id);
+      if (!role) return null;
+      const mine = sessionOf(role.id);
+      const myTab: PersonTab = tabs[role.id] || "chat";
+      return (
+        <Sheet key={key} pageKey={key} hidden={hidden} title={roleLabel(role)} tabs={PERSON_TABS} active={myTab} onTab={(id) => setTabs((m) => ({ ...m, [role.id]: id as PersonTab }))} keepDraftOnTab onClose={() => endPage(key)} onMinimize={() => { if (hidden) return; keepShown(); }} registry={guards} guard={sheetGuard}>
+          <PersonSheet tab={myTab} onTab={(t) => setTabs((m) => ({ ...m, [role.id]: t }))} role={role} project={project} session={mine} history={history} accountId={accountOf(project)} kit={kits[role.id] ?? { skills: [], mcp: [], notes: {} }} error={hidden ? null : personError} dispatch={dispatch as (a: unknown) => void}
+            onFirst={(text, images) => void sendFirst(role, text, images)} onResume={(e) => void resume(role, e)} onNew={() => mine && void newConversation(mine)} onNote={() => mine && void noteSession(mine.id, true)}
+            onSaveAnswer={(text) => mine && void saveAnswer(mine.id, text)} onSaved={(saved) => setRoles((all) => all.map((r) => (r.id === saved.id ? saved : r)))} onKitSaved={(id, kit) => setKits((all) => ({ ...all, [id]: kit }))} />
         </Sheet>
       );
-    }
+    });
+    sheet = sheets;
+    // the tray: the pages that are alive (shown, or minimized by the owner), with their state
+    const stateOf = (key: string): { state: TrayItem["state"]; word: string } => {
+      const ref = parseKey(key);
+      if (ref?.kind === "person") { const run = sessionOf(ref.id)?.run; return run === "waiting" ? { state: "waiting", word: "Waiting on you" } : run === "working" ? { state: "live", word: "Working" } : { state: "idle", word: "Quiet" }; }
+      return busyOf(key) ? { state: "live", word: "Running" } : { state: "idle", word: "Open" };
+    };
+    const labelOf = (key: string): string => { const ref = parseKey(key); return ref?.kind === "person" ? names[ref.id] ?? ref.id : PLACES.find((x) => x.id === ref?.id)?.label ?? key; };
+    if (kept.length > 0) tray = <PageTray items={drawOrder(kept, shownKey).map((key) => ({ key, label: labelOf(key), ...stateOf(key), shown: key === shownKey }))} minimized={kept.length} max={MAX_KEPT} onShow={showKey} onClose={closeKept} />;
   }
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <TopBar project={project} onHome={() => leave(() => { setWelcomeView("home"); setGreeted(false); })} sheetOpen={sheet !== null || editing} place={place}
+      <TopBar project={project} onHome={() => leave(() => endKept(() => { setWelcomeView("home"); setGreeted(false); }))} sheetOpen={shownKey !== null || editing} place={place}
         onPlace={(p) => leave(() => { setPerson(null); setPlace(p); })} onAttention={() => leave(() => { const w = state.order.map((id) => state.sessions[id]).find((s) => s.run === "waiting" && project && samePlace(s.folder, project.folder)); if (w) openPerson(w.roleId ?? "secretary"); })} attention={attention} leftBehind={leftTotal} plan={state.plans[current?.accountId ?? accountOf(project) ?? lastAccount]}
         limitLine={PLAIN_LINES.limit} accountLabel={project ? accounts.find((a) => a.id === (current?.accountId ?? accountOf(project)))?.label ?? null : null} version={version} />
+      {tray}
       <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
         {content}
         {sheet}
+        {keptAsk && (
+          <Confirm title="Close the minimized pages?" confirmLabel="Close them" danger onCancel={() => setKeptAsk(null)} onConfirm={() => { const go = keptAsk.go; setKeptAsk(null); go(); }}>
+            <p className="m-0">Some pages in the tray are still going:</p>
+            <ul className="m-0 pl-5">{keptAsk.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
+            <p className="m-0">Closing them ends what they run.</p>
+          </Confirm>
+        )}
         <UpdateCard running={state.order.filter((id) => state.sessions[id].run !== "ended").length} />
         {notice && (
           <div role="status" className="absolute right-6 bottom-6 z-20 flex max-w-[440px] items-start gap-3 px-card px-shadow p-2">

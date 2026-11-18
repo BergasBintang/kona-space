@@ -641,6 +641,8 @@ try {
   info(`service worker registrations after the second start: ${regs}`);
 
   await c.ev(`document.querySelector('section[data-sheet] button[aria-label^="Close"]').click(); true`);
+  // a running program is something the page would lose: the sheet asks (minimize, close or cancel), and the test closes it
+  await c.waitFor("!!document.querySelector('[role=dialog]')", 2500, 100); await c.ev("(() => { const b = [...document.querySelectorAll('[role=dialog] button')].find((x) => x.textContent.trim() === 'Close it'); if (b) b.click(); return !!b; })()");
   const outside = [...F.hosts].filter((h) => !/^127\.0\.0\.1:/.test(h) && h !== "");
   info("every address the pages asked for besides this PC's own: " + JSON.stringify(outside));
   ok("nothing was asked of the project's cloud storage or any other host of the project: the pages asked only this PC, and at most the fonts and the like", outside.every((h) => /(^|\.)(googleapis|gstatic|openstreetmap)\.(com|org)$/.test(h)), outside.join(", "));

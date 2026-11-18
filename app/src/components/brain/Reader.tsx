@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { outline, slugify, type Heading } from "../../lib/brain/outline.ts";
 import { clearPaint, findIn, paint } from "../find";
+import { usePageActive } from "../../lib/pageactive";
 import { Button } from "../ui";
 import { IconButton } from "../Icon";
 
@@ -15,6 +16,7 @@ export type Anchor = { id: string; n: number };
  * `resetKey` names what is shown (a file's path, a note's id): when it changes, find is closed. `finds` says whether the text can be searched on the screen.
  */
 export function useReader({ text, md, rendered, finds, anchor, resetKey }: { text: string | null; md: boolean; rendered: boolean; finds: boolean; anchor: Anchor | null; resetKey: string | null }) {
+  const pageActive = usePageActive();
   const [active, setActive] = useState<string | null>(null);
   const [finding, setFinding] = useState(false);
   const [query, setQuery] = useState("");
@@ -64,11 +66,11 @@ export function useReader({ text, md, rendered, finds, anchor, resetKey }: { tex
   }, [heads]);
 
   useEffect(() => {
-    if (resetKey === null) return;
+    if (resetKey === null || !pageActive) return; // a minimized page does not take Ctrl+F
     const key = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f" && finds) { e.preventDefault(); setFinding(true); requestAnimationFrame(() => finder.current?.select()); } };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [resetKey, finds]);
+  }, [resetKey, finds, pageActive]);
   useEffect(() => {
     if (!finding || !query || !body.current || !finds) { matches.current = []; setHits({ count: 0, at: 0 }); clearPaint(); return; }
     const found = findIn(body.current, query);

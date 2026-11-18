@@ -1,8 +1,8 @@
 // Minimizing pages (decision 95), tried in the REAL window over the DevTools port (this PC only). Start Kona first with
 //   WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9223   then   node tests/pages.mjs
 // It opens a project that already exists in Kona (the first one), opens pages from the office, types a draft in the Brain's Ask box, and checks: the question when a page with a draft is left
-// (Minimize, Close and lose it, Cancel), the tray under the top bar, that a minimized page is ALIVE (its draft is still there), that a page with nothing to lose closes without asking, the cap of
-// six minimized pages, and that the office has no chip. It starts no session and changes no file. (The mockup that runs is tried in tests/live.mjs.)
+// (Minimize, Close and lose it, Cancel), the tray under the top bar, that a minimized page is ALIVE (its draft is still there), that a click on a chip swaps pages and closes nothing (the count stays), the cap of
+// six open pages, and that the office has no chip. It starts no session and changes no file. (The mockup that runs is tried in tests/live.mjs.)
 import { attach } from "./cdp.mjs";
 
 const c = await attach(Number(process.env.PORT ?? 9223));
@@ -54,22 +54,25 @@ try {
   const withTray = await heights();
   ok("the tray takes no height: the sheet and the top bar are exactly as tall with the tray as without it (the chips are drawn inside the top bar)", JSON.stringify(withTray) === JSON.stringify(before), JSON.stringify({ before, withTray }));
   ok("the tray has two chips: the Brain minimized and Files shown", JSON.stringify(await chips()) === JSON.stringify(["Brain, minimized, Open", "Files, shown, Open"]), JSON.stringify(await chips()));
-  ok("a click on the Brain's chip leaves Files without asking (it has nothing to lose) and shows the Brain with its draft", await c.ev(`document.querySelector('nav[aria-label="Open pages"] button[aria-label^="Brain"]').click(); true`) && await c.waitFor(`document.querySelector('section[data-sheet]:not([hidden])')?.getAttribute('aria-label') === 'Brain'`, 6000, 100) && (await dialog()) === null && await c.ev(`document.querySelector('section[data-sheet]:not([hidden]) input[aria-label="Ask the brain"]').value`) === DRAFT);
-  ok("Files was closed, not kept: the tray is gone (nothing is minimized) and Files is not in the window", await c.ev(`!document.querySelector('nav[aria-label="Open pages"]') && !document.querySelector('section[data-page="place:files"]')`));
+  ok("a click on the Brain's chip leaves Files without asking and shows the Brain with its draft", await c.ev(`document.querySelector('nav[aria-label="Open pages"] button[aria-label^="Brain"]').click(); true`) && await c.waitFor(`document.querySelector('section[data-sheet]:not([hidden])')?.getAttribute('aria-label') === 'Brain'`, 6000, 100) && (await dialog()) === null && await c.ev(`document.querySelector('section[data-sheet]:not([hidden]) input[aria-label="Ask the brain"]').value`) === DRAFT);
+  ok("Files was NOT closed: it is minimized in the tray, the chips keep their order, the count is still 2 and Files is still in the window", JSON.stringify(await chips()) === JSON.stringify(["Brain, shown, Open", "Files, minimized, Open"]) && await c.ev(`document.querySelector('nav[aria-label="Open pages"] [data-count]')?.textContent === '2/6'`) && await c.ev(`document.querySelector('section[data-page="place:files"]')?.hidden === true`), JSON.stringify(await chips()));
+  ok("a click on Files' chip swaps back: the Brain is hidden with its draft, nothing is asked, the count stays 2", await c.ev(`document.querySelector('nav[aria-label="Open pages"] button[aria-label^="Files"]').click(); true`) && await c.waitFor(`document.querySelector('section[data-sheet]:not([hidden])')?.getAttribute('aria-label') === 'Files'`, 6000, 100) && (await dialog()) === null && JSON.stringify(await chips()) === JSON.stringify(["Brain, minimized, Open", "Files, shown, Open"]) && await c.ev(`document.querySelector('section[data-page="place:brain"]')?.querySelector('input[aria-label="Ask the brain"]')?.value`) === DRAFT);
+  await minimize(); await wait(400);
+  ok("with two pages minimized, a click on a chip shows it and the count does not go down: nobody has to minimize again", await c.ev(`document.querySelector('nav[aria-label="Open pages"] button[aria-label^="Files"]').click(); true`) && await c.waitFor(`document.querySelector('section[data-sheet]:not([hidden])')?.getAttribute('aria-label') === 'Files'`, 6000, 100) && await c.ev(`document.querySelector('nav[aria-label="Open pages"] [data-count]')?.textContent === '2/6'`));
+  await c.ev(`document.querySelector('nav[aria-label="Open pages"] button[aria-label^="Brain"]').click(); true`); await c.waitFor(`document.querySelector('section[data-sheet]:not([hidden])')?.getAttribute('aria-label') === 'Brain'`, 6000, 100);
 
   // ---- closing the Brain loses the draft, after asking
   await c.ev(`document.querySelector('section[data-sheet]:not([hidden]) button[aria-label^="Close"]').click(); true`);
   ok("the X on a page with a draft asks, and Close and lose it closes it", await c.waitFor(`!!document.querySelector('[role=dialog]')`, 3000, 100) && await pressIn("Close and lose it", "[role=dialog]") && await c.waitFor(`!document.querySelector('section[data-page="place:brain"]')`, 4000, 100) && (await shown()) === null);
 
   // ---- the cap: six pages may be minimized, a seventh is refused with a plain line
+  await c.ev(`document.querySelectorAll('nav[aria-label="Open pages"] button[aria-label^="Close"]').forEach((b) => b.click()); true`); await wait(500); // Files is still minimized from above
   const six = ["Board", "Meeting", "Worktrees", "Brain", "Files", "Mockups"];
   for (const p of six) { await openPage(p); await minimize(); await wait(300); }
   ok("six pages are minimized, in the order they were put away", (await chips()).length === 6 && (await chips()).every((l) => /minimized/.test(l)), JSON.stringify(await chips()));
   ok("the tray says six of six", await c.ev(`document.querySelector('nav[aria-label="Open pages"] [data-count]')?.textContent === '6/6'`));
-  ok("a seventh page opens", await openPage("Costs"));
-  await minimize(); await wait(500);
-  ok("Minimize of a seventh is refused with a plain line, and the page stays shown", (await shown()) === "Costs" && await c.ev(`document.body.innerText.includes('6 pages are minimized already')`));
-  ok("closing the shown page frees nothing of the six (it was never minimized)", await c.ev(`document.querySelector('section[data-sheet]:not([hidden]) button[aria-label^="Close"]').click(); true`) && await c.waitFor(`!document.querySelector('section[data-page="place:costs"]')`, 4000, 100) && (await chips()).length === 6);
+  await c.ev(`document.querySelector('[aria-label="Open Costs"]')?.click(); true`); await wait(500);
+  ok("a seventh page is refused with a plain line: no page is shown, and still six chips", (await shown()) === null && await c.ev(`document.body.innerText.includes('6 pages are open already')`) && (await chips()).length === 6);
 
   // ---- closing every chip: each closes without asking (none has anything to lose), and the tray goes
   for (let i = 0; i < 6; i++) { await c.ev(`document.querySelector('nav[aria-label="Open pages"] button[aria-label^="Close"]')?.click(); true`); await wait(250); }

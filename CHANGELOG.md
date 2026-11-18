@@ -2,6 +2,14 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.41.1, 2026-11-18
+
+A fix for the tray of pages: it now works like browser tabs, and clicking a page in it no longer closes the one you were on.
+
+- **A click on a chip swaps pages.** In 0.41.0, clicking another page in the tray closed the page you were on if it had nothing to lose, and the count went down, so you had to minimize again to keep a page in the tray. Now every open page keeps its chip, the shown one included; a click on a chip shows that page and puts the one you left into the tray, and nothing is asked and nothing is lost. Only an X (the page's or the chip's) closes a page.
+- **The count is the pages open.** It does not go down when you show a page, and up to six pages can be open at once. A seventh is refused with a plain line.
+- **Minimize only hides.** The page keeps its chip. The Leftovers and waiting buttons in the top bar now keep the page you were on in the tray too.
+
 ## 0.41.0, 2026-11-18
 
 Live mockups: a mockup that is the project's real program, with a fake cloud bucket and data you can keep; and pages you can minimize.

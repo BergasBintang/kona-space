@@ -1,6 +1,7 @@
-// The pages of Kona that can be open at once (decision 95). One page is shown over the office; the owner may MINIMIZE it, which keeps it alive (its draft, its scroll, its running mockup)
-// behind a small tray under the top bar, and CLOSE it, which ends it. Nothing is guessed: a page stays alive only because the owner minimized it, and when a page that would lose something
-// (typed text that was not sent, a program that runs) is left, Kona asks once: minimize, close or cancel. The office is not a page and has no tab.
+// The pages of Kona that can be open at once (decision 95). Every page that is opened stays alive (its draft, its scroll, its running mockup) as a chip in a small tray in the top bar, like a
+// browser tab: one is shown over the office, a click on another chip shows that one instead, MINIMIZE only hides the shown one, and only an X (the page's or the chip's) CLOSES it and ends it.
+// When a page that would lose something (typed text that was not sent, a program that runs) is closed, Kona asks once: minimize, close or cancel. The office is not a page and has no tab.
+/** The most pages alive at once, the shown one included: each one that stays open uses memory */
 export const MAX_KEPT = 6;
 
 /** "place:mockups" for a page of a place, "person:<role>" for the sheet of a person; null for the office (no page) */

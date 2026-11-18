@@ -73,8 +73,10 @@ export default function App() {
   const [tabs, setTabs] = useState<Record<string, PersonTab>>({}); // the tab each person's sheet shows (a minimized sheet keeps its own)
   const tab: PersonTab = (person && tabs[person]) || "chat";
   const setTab = (t: PersonTab) => { if (person) setTabs((m) => ({ ...m, [person]: t })); };
-  const [kept, setKept] = useState<string[]>([]); // the pages the owner minimized: alive behind the tray (decision 95)
-  useEffect(() => { setKept([]); }, [projectId]); // the minimized pages belong to the project that is open
+  const [kept, setKept] = useState<string[]>([]); // every page that is alive, the shown one and the minimized ones, in the order they were opened (decision 95): only an X ends one
+  const keptRef = useRef<string[]>([]);
+  keptRef.current = kept;
+  useEffect(() => { setKept([]); }, [projectId]); // the open pages belong to the project that is open
   const guards = useRef<Record<string, Guard | null>>({}); // each sheet, shown or minimized, so it can be asked before it is closed
   const [keptAsk, setKeptAsk] = useState<{ reasons: string[]; go: () => void } | null>(null); // minimized pages that are still going, when the owner goes home
   const [brainTab, setBrainTab] = useState<BrainTab>("map");
@@ -195,28 +197,31 @@ export default function App() {
   // do a move that leaves the sheet's page (home, another page from the top bar), asking first if the page holds text that was not sent or saved
   // the page shown, and the moves that put it away: minimize keeps it alive in the tray, close ends it (decision 95)
   const shownKey = pageKey(place, person);
-  const keepShown = (): boolean => {
-    if (!shownKey) return true;
-    const r = keepAdd(kept, shownKey);
-    if (!r.ok) { setNotice(`${MAX_KEPT} pages are minimized already. Close one in the tray first: each one that stays alive uses memory.`); return false; }
-    setKept(r.kept); setPlace("office"); setPerson(null);
+  // every shown page is alive (the effect below makes sure of it), so minimizing only hides it: it keeps its chip in the tray
+  const keepShown = () => { setPlace("office"); setPerson(null); };
+  useEffect(() => { if (shownKey && !keptRef.current.includes(shownKey)) { keptRef.current = [...keptRef.current, shownKey]; setKept((k) => (k.includes(shownKey) ? k : [...k, shownKey])); } }, [shownKey]);
+  // a page is made alive when it is opened; refused (with a word) when MAX_KEPT pages are alive already, since each one uses memory
+  const tryOpen = useCallback((key: string): boolean => {
+    const r = keepAdd(keptRef.current, key);
+    if (!r.ok) { setNotice(`${MAX_KEPT} pages are open already. Close one in the tray first: each page that stays open uses memory.`); return false; }
+    keptRef.current = r.kept; setKept(r.kept);
     return true;
-  };
-  // do a move that leaves the sheet's page (home, another page from the top bar): the sheet asks first if the page would lose something (typed text, a running program) and then the owner minimizes it or closes it
+  }, []);
+  // do a move that ends the visit to Kona's pages (home): the sheet asks first if the page would lose something (typed text, a running program) and then the owner minimizes it or closes it
   const leave = (go: () => void) => {
     if (!sheetGuard.current) { go(); return; }
-    sheetGuard.current.leave((how) => { if (how === "minimize" && !keepShown()) return; go(); });
+    sheetGuard.current.leave((how) => { if (how === "minimize") keepShown(); go(); });
   };
   const endPage = (key: string) => { setKept((k) => keepRemove(k, key)); if (key === shownKey) { setPlace("office"); setPerson(null); } }; // the page is closed (the sheet itself already asked, if it had to)
   const closeKept = (key: string) => { // the X of a chip in the tray: the page is asked first, as it would be on its own sheet
     const g = guards.current[key];
     if (g) g.leave((how) => { if (how === "close") endPage(key); }, false); else endPage(key);
   };
-  // show a page by its key (a chip of the tray): the page shown now is left first, with its question
+  // show a page by its key (a chip of the tray): the page shown now stays alive in the tray, so nothing is asked and nothing is lost
   const showKey = (key: string) => {
     const ref = parseKey(key);
     if (!ref || key === shownKey) return;
-    leave(() => { setKept((k) => keepRemove(k, key)); if (ref.kind === "place") { setPerson(null); setPlace(ref.id as Place); } else { setPlace("office"); setPerson(ref.id); } });
+    if (ref.kind === "place") { setPerson(null); setPlace(ref.id as Place); } else { setPlace("office"); setPerson(ref.id); }
   };
   // going home or to another project ends the minimized pages too: asked once when one of them is still going
   const endKept = (go: () => void) => {
@@ -225,11 +230,16 @@ export default function App() {
     setKept([]); go();
   };
   // the office's actions keep one identity, so the office does not redraw for a reason it cannot see
-  const openPlace = useCallback((p: Place) => { setPerson(null); setPlace(p); setKept((k) => keepRemove(k, `place:${p}`)); }, []);
+  const openPlace = useCallback((p: Place) => { if (!tryOpen(`place:${p}`)) return; setPerson(null); setPlace(p); }, [tryOpen]);
   const projectRef = useRef(project);
   projectRef.current = project;
   // a click on a person opens their sheet, on the chat
-  const openPerson = useCallback((roleId: string) => { setPlace("office"); setPerson(roleId); setKept((k) => { if (!k.includes(`person:${roleId}`)) setTabs((m) => ({ ...m, [roleId]: "chat" })); return keepRemove(k, `person:${roleId}`); }); setPersonError(null); }, []);
+  const openPerson = useCallback((roleId: string) => {
+    const key = `person:${roleId}`, had = keptRef.current.includes(key);
+    if (!tryOpen(key)) return;
+    setPlace("office"); setPerson(roleId); setPersonError(null);
+    if (!had) setTabs((m) => ({ ...m, [roleId]: "chat" }));
+  }, [tryOpen]);
   // a person does one thing at a time in a project (decision 62): why a new conversation with them is refused, or null when they are free (the core refuses too, whatever asks)
   const busyMessage = (roleId: string | null): string | null => {
     const p = projectRef.current, st = live.current.state, r = live.current.roles.find((x) => x.id === roleId);
@@ -509,13 +519,14 @@ export default function App() {
       return busyOf(key) ? { state: "live", word: "Running" } : { state: "idle", word: "Open" };
     };
     const labelOf = (key: string): string => { const ref = parseKey(key); return ref?.kind === "person" ? names[ref.id] ?? ref.id : PLACES.find((x) => x.id === ref?.id)?.label ?? key; };
-    if (kept.length > 0) tray = <PageTray items={drawOrder(kept, shownKey).map((key) => ({ key, label: labelOf(key), ...stateOf(key), shown: key === shownKey }))} minimized={kept.length} max={MAX_KEPT} onShow={showKey} onClose={closeKept} />;
+    const alive = drawOrder(kept, shownKey);
+    if (alive.some((key) => key !== shownKey)) tray = <PageTray items={alive.map((key) => ({ key, label: labelOf(key), ...stateOf(key), shown: key === shownKey }))} open={alive.length} max={MAX_KEPT} onShow={showKey} onClose={closeKept} />;
   }
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <TopBar project={project} onHome={() => leave(() => endKept(() => { setWelcomeView("home"); setGreeted(false); }))} sheetOpen={shownKey !== null || editing} place={place}
-        onPlace={(p) => leave(() => { setPerson(null); setPlace(p); })} onAttention={() => leave(() => { const w = state.order.map((id) => state.sessions[id]).find((s) => s.run === "waiting" && project && samePlace(s.folder, project.folder)); if (w) openPerson(w.roleId ?? "secretary"); })} attention={attention} leftBehind={leftTotal} plan={state.plans[current?.accountId ?? accountOf(project) ?? lastAccount]}
+        onPlace={(p) => { if (p === "office") { setPerson(null); setPlace("office"); } else openPlace(p); }} onAttention={() => { const w = state.order.map((id) => state.sessions[id]).find((s) => s.run === "waiting" && project && samePlace(s.folder, project.folder)); if (w) openPerson(w.roleId ?? "secretary"); }} attention={attention} leftBehind={leftTotal} plan={state.plans[current?.accountId ?? accountOf(project) ?? lastAccount]}
         limitLine={PLAIN_LINES.limit} accountLabel={project ? accounts.find((a) => a.id === (current?.accountId ?? accountOf(project)))?.label ?? null : null} version={version} tray={tray} />
       <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
         {content}

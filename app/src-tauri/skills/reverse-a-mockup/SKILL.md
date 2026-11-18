@@ -5,6 +5,8 @@ description: Use when a project is already built and you need a static copy of s
 
 # Reverse a mockup
 
+This skill is for a built project that CANNOT run on this PC (no server, no database, no tools). When it can run, do not copy it by hand: use `make-a-live-mockup`, which runs the real program in the Mockups sheet with a demo database, so nothing can drift.
+
 A built project is hard to look at: it needs its server, its database and an account. Instead, read its source and build a **static twin** of a few pages that runs by itself with made-up data. The owner then clicks through it in the Mockups sheet, which is built into Kona and draws five devices at their true size: Small phone 320 x 568, Phone 390 x 844, Tablet 768 x 1024, Laptop 1024 x 640 and Desktop 1440 x 900. Check the twin at those widths. The format of the twin is the one in the skill `make-a-mockup`; follow that skill for the files, the sandbox and the values.
 
 ## What you may read

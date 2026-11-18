@@ -14,9 +14,15 @@ unsafe impl Send for Job {}
 unsafe impl Sync for Job {}
 
 static JOB: OnceLock<Option<Job>> = OnceLock::new();
+/// The job of the Live mockup programs (decision 94). Not the job above: its members are listed as leftovers of sessions, and a Live program is not one.
+static LIVE_JOB: OnceLock<Option<Job>> = OnceLock::new();
 
 fn job() -> Option<&'static Job> {
-    JOB.get_or_init(|| unsafe {
+    JOB.get_or_init(make).as_ref()
+}
+
+fn make() -> Option<Job> {
+    (|| unsafe {
         let handle = CreateJobObjectW(std::ptr::null(), std::ptr::null());
         if handle.is_null() {
             return None;
@@ -34,8 +40,15 @@ fn job() -> Option<&'static Job> {
             return None;
         }
         Some(Job(handle))
-    })
-    .as_ref()
+    })()
+}
+
+/// Put a Live mockup's program into its own job: when Kona closes or crashes, Windows stops it with everything it started.
+pub fn adopt_live(process: HANDLE) -> bool {
+    match LIVE_JOB.get_or_init(make) {
+        Some(j) => unsafe { AssignProcessToJobObject(j.0, process) != 0 },
+        None => false,
+    }
 }
 
 /// Put a running process into the job. Returns false if Windows refused (the program still runs, but is not covered).

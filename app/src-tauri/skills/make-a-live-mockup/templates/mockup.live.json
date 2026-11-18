@@ -1,0 +1,15 @@
+{
+  "name": "Name of the product, live",
+  "live": {
+    "setup": "one command that makes the throwaway demo database from nothing, and builds the front end if there is one",
+    "start": "one command that starts the program on the port, listening on KONA_LIVE_HOST and KONA_LIVE_PORT only",
+    "cwd": "folder-of-the-project-the-commands-run-in",
+    "port": 8791,
+    "entry": "/login",
+    "ready": "/",
+    "wait": 60,
+    "env": {
+      "APP_URL": "http://localhost:8791"
+    }
+  }
+}

@@ -4,10 +4,11 @@
 // The sums (fit, zoom, the address, what a page may say) are in lib/mockview.ts, with tests.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import devicesJson from "../assets/devices/devices.json";
-import { createTicket, mockBase, mockCards, mockFiles, type MockCard, type Project, type TicketView } from "../lib/api";
+import { createTicket, liveStart, liveStatus, liveStop, mockBase, mockCards, mockFiles, type LiveStatus, type MockCard, type Project, type TicketView } from "../lib/api";
 import { buildPrompt, fallbackDraft, parseDraft, type Draft, type DraftContext } from "../lib/mockdraft";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { Confirm } from "./Confirm";
-import { MARGIN, MAX_ZOOM, clampZoom, filesSignature, fitScale, frameMessage, layout, pageUrl, percent, stepZoom, wheelZoom, type Device } from "../lib/mockview";
+import { MARGIN, MAX_ZOOM, clampZoom, dialogLine, filesSignature, fitScale, frameMessage, layout, ALLOW_WORDS, liveAllow, livePhaseLine, liveSandbox, liveUrl, pageUrl, percent, stepZoom, wheelZoom, type Device } from "../lib/mockview";
 import { NOTE_MAX, addPin, editPin, measureLine, pageFile, partLabel, pickMessage, pinsForPage, placeNote, removePin, scopeLine, toScreen, type Box, type Part, type Pin } from "../lib/mockpick";
 import { Help } from "./Help";
 import { IconButton, type IconName } from "./Icon";
@@ -32,10 +33,28 @@ const visible = () => document.visibilityState === "visible";
 /** What App gives the sheet for Send: the name of the person who changes mockups, the cheap model call (it checks the account), and the start of a session on a ticket. */
 export type MockSend = { designer: string; draft: (prompt: string) => Promise<string>; start: (t: TicketView) => Promise<void> };
 
+/** How far the Live program is (decision 94): asked every `ms` milliseconds while the window is visible; 0 asks never. */
+function useLiveStatus(ms: number): LiveStatus | null {
+  const [status, setStatus] = useState<LiveStatus | null>(null);
+  useEffect(() => {
+    if (ms <= 0) return;
+    let alive = true;
+    const ask = () => { if (visible()) void liveStatus().then((s) => { if (alive) setStatus(s); }).catch(() => { /* the next asking tries again */ }); };
+    ask();
+    const t = setInterval(ask, ms);
+    return () => { alive = false; clearInterval(t); };
+  }, [ms]);
+  return status;
+}
+
 export function Mockups({ project, send }: { project: Project | null; send: MockSend }) {
   const [base, setBase] = useState<string | null>(null);
   const [card, setCard] = useState<MockCard | null>(null);
-  useEffect(() => { void mockBase().then(setBase).catch(() => setBase("")); }, []);
+  useEffect(() => {
+    void mockBase().then(setBase).catch(() => setBase(""));
+    // a Live program runs only while this page is open
+    return () => { void liveStop().catch(() => { /* nothing was running */ }); };
+  }, []);
   if (!project || base === null) return null;
   if (card) return <MockupView key={card.id} project={project} card={card} base={base} send={send} onBack={() => setCard(null)} />;
   return <Cards project={project} onOpen={setCard} />;
@@ -50,6 +69,7 @@ function Cards({ project, onOpen }: { project: Project; onOpen: (c: MockCard) =>
     const t = setInterval(() => { if (visible()) void load(); }, 4000); // a new card shows up by itself
     return () => clearInterval(t);
   }, [load]);
+  const status = useLiveStatus(2000);
   return (
     <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
       <div className="flex w-full flex-col gap-6 px-8 pt-8 pb-10">
@@ -57,7 +77,8 @@ function Cards({ project, onOpen }: { project: Project; onOpen: (c: MockCard) =>
           <h1 className="m-0 text-[30px] leading-[38px] font-bold">Mockups</h1>
           <Help title="Mockups">
             <p className="m-0">A mockup is a page that a person drew in plain web files, so you can click through it before it is built. Each card is one mockup, and its pages link to each other like a real site.</p>
-            <p className="m-0">Each one lives in its own folder inside .kona/mockups of the project. A mockup runs on this PC only: it cannot reach the web or anything of Kona.</p>
+            <p className="m-0">Each one lives in its own folder inside .kona/mockups of the project. A drawn mockup runs on this PC only: it cannot reach the web or anything of Kona.</p>
+            <p className="m-0">A card marked Live is not a drawing: it runs the project's own program, with a throwaway demo database, and shows it in the same devices. You press Start and say yes to the exact commands. Only one runs at a time, and it stops when you leave this page.</p>
           </Help>
         </div>
         {error && <p role="alert" className="m-0 text-[15px] leading-6 text-text-secondary">Could not read the mockups: {error}</p>}
@@ -70,7 +91,10 @@ function Cards({ project, onOpen }: { project: Project; onOpen: (c: MockCard) =>
                   className="px-card flex w-full flex-col items-start gap-1 p-2 text-left enabled:cursor-pointer enabled:hover:bg-surface-3 disabled:opacity-70">
                   <span className="max-w-full truncate text-[18px] leading-6 font-bold">{c.name}</span>
                   <span className="text-[13px] leading-5 text-text-secondary">
-                    {c.entry ? `${c.files} ${c.files === 1 ? "file" : "files"}${c.modified ? ` · changed ${ago(c.modified * 1000)} ago` : ""}` : "No start page: it needs an index.html, or an entry in its mockup.json."}
+                    {c.live
+                      ? `Live · port ${c.live.port}${status?.project === project.id && status.card === c.id && status.phase !== "off" ? ` · ${livePhaseLine(status.phase)}` : ""}`
+                      : c.live_error ? `Live recipe cannot be used: ${c.live_error}`
+                      : c.entry ? `${c.files} ${c.files === 1 ? "file" : "files"}${c.modified ? ` · changed ${ago(c.modified * 1000)} ago` : ""}` : "No start page: it needs an index.html, or an entry in its mockup.json."}
                   </span>
                 </button>
               </li>
@@ -111,6 +135,21 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
   const [, bump] = useState(0); // a new number draws the note box again (the sheet was moved under it)
   const nextId = useRef(pins.reduce((m, p) => Math.max(m, p.id), 0) + 1);
 
+  // a Live card (decision 94) shows the project's running program instead of its own files
+  const live = card.live;
+  const liveState = useLiveStatus(live ? 1000 : 0);
+  const mine = !!live && liveState?.project === project.id && liveState.card === card.id;
+  const phase = mine && liveState ? liveState.phase : "off";
+  const running = !live || phase === "ready";
+  const liveAt = (mine && liveState?.base) || ""; // the address of this run: a new one at every start (see live.rs `proxy`)
+  const [asking, setAsking] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+  const startLive = async () => {
+    if (!live) return;
+    try { setStartError(null); await liveStart(project.id, card.id, live.approval); setAsking(false); }
+    catch (e) { setStartError(String(e).replace(/^Error: /, "")); }
+  };
+
   const device = DEVICES.find((d) => d.id === deviceId) ?? DEVICES[0];
   const isTurned = turned && device.turns;
   const lay = useMemo(() => layout(device, isTurned), [device, isTurned]);
@@ -127,11 +166,12 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
     const watch = new ResizeObserver(() => setRoom({ w: el.clientWidth, h: el.clientHeight }));
     watch.observe(el);
     return () => watch.disconnect();
-  }, []);
+    // a Live card shows its start panel first, which has no sheet to measure: measure again when the device appears
+  }, [live, running]);
 
   // the page starts in the theme that is chosen now; a later change goes to the running page by a message, so it does not start again
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const url = useMemo(() => (card.entry ? pageUrl(base, project.id, card.id, card.entry, now.current.theme) : null), [base, project.id, card.id, card.entry, rev]);
+  const url = useMemo(() => (!card.entry ? null : live ? (running && liveAt ? liveUrl(liveAt, card.entry) : null) : pageUrl(base, project.id, card.id, card.entry, now.current.theme)), [base, liveAt, project.id, card.id, card.entry, rev, live, running]);
   // what the page's helper is told: the theme, whether pick mode is on, and the pins (it draws them inside the page, so they follow it when it scrolls)
   const tell = useCallback(() => {
     const w = frame.current?.contentWindow;
@@ -162,6 +202,7 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
   const [sendError, setSendError] = useState<string | null>(null);
   const [sentLine, setSentLine] = useState<string | null>(null);
   const cancelled = useRef(false);
+  const lastOpen = useRef(0);
   const context = (): DraftContext => {
     // notes made on other devices: the ticket says all the devices they were seen on (and no single width)
     const seen = [...new Set([device.label, ...pins.flatMap((p) => (p.only ? [p.only.label] : []))])];
@@ -218,7 +259,7 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
     const wheel = (e: WheelEvent) => { if (!e.ctrlKey) return; e.preventDefault(); zoomTo(wheelZoom(now.current.scale, e.deltaY, now.current.fit), e.clientX, e.clientY); };
     el.addEventListener("wheel", wheel, { passive: false });
     return () => el.removeEventListener("wheel", wheel);
-  }, [zoomTo]);
+  }, [zoomTo, live, running]);
 
   // what the page's helper says. The page is not trusted: only its own frame is listened to, and only the three things it may say.
   useEffect(() => {
@@ -237,12 +278,19 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
         return;
       }
       if (m.kind === "ready") { setTarget(null); setHover(null); tell(); }
-      else if (m.kind === "escape") escape(); // Esc inside the page, as Esc on the sheet
+      else if (m.kind === "open") {
+        // a Live page's link that wants a new window: opened in the owner's own browser (a drawn page has no such thing, and its message is ignored); at most one in 1.5 seconds
+        if (!live || Date.now() - lastOpen.current < 1500) return;
+        lastOpen.current = Date.now();
+        openUrl(m.url).then(() => setSentLine(`Opened in your browser: ${m.url.length > 80 ? m.url.slice(0, 80) + "…" : m.url}`)).catch(() => setSentLine("Your browser could not be opened for that address."));
+      }
+      else if (m.kind === "dialog") { if (live) setSentLine(dialogLine(m.what, m.text)); } // a Live page called alert, confirm or prompt (it was answered at once: nothing, No, nothing)
+      else if (m.kind === "escape") { if (live && !now.current.picking && !now.current.target) return; escape(); } // Esc inside the page, as Esc on the sheet; a real program keeps its own Esc (it closes its own dialogs)
       else { const r = f.getBoundingClientRect(); zoomTo(wheelZoom(now.current.scale, m.dy, now.current.fit), r.left + m.x * (r.width / f.offsetWidth), r.top + m.y * (r.height / f.offsetHeight)); }
     };
     window.addEventListener("message", on);
     return () => window.removeEventListener("message", on);
-  }, [tell, zoomTo, escape]);
+  }, [tell, zoomTo, escape, live]);
 
   // Esc goes back to the cards; on the cards it closes the sheet (the sheet's own handler runs when this one does not take it). This listener is in the capture phase, so it comes
   // before the sheet's, which was added earlier; and it leaves Esc alone while a dialog is open (the help closes first).
@@ -257,7 +305,7 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
   useEffect(() => {
     let alive = true;
     const check = async () => {
-      if (!visible()) return;
+      if (!visible() || live) return; // a Live card has no files of its own to watch
       try {
         const sig = filesSignature(await mockFiles(project.id, card.id));
         if (!alive) return;
@@ -268,7 +316,7 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
     void check();
     const t = setInterval(check, 3000);
     return () => { alive = false; clearInterval(t); };
-  }, [project.id, card.id]);
+  }, [project.id, card.id, live]);
 
   const pickDevice = (id: string) => { setDeviceId(id); setZoom(null); savePref("device", id); };
   const turn = () => { setTurned(!turned); setZoom(null); savePref("turned", turned ? "0" : "1"); };
@@ -314,6 +362,42 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dw, dh, rev, deviceId, isTurned, room.w, room.h, dpr, theme]);
 
+  if (live && !running) {
+    const busy = phase === "setup" || phase === "starting";
+    return (
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-line-subtle bg-surface-1 px-6 py-2">
+          <IconButton icon="back" label="Back to the mockups (Esc)" onClick={onBack} />
+          <h1 className="m-0 max-w-[420px] truncate text-[20px] leading-7 font-bold">{card.name}</h1>
+          <Help title={card.name}>
+            <p className="m-0">This mockup runs the project's own program, not a drawing. Start runs the commands of its recipe (in mockup.json) on this PC, with a throwaway demo database, and the program then opens here in the device you pick.</p>
+            <p className="m-0">Stop, or leaving the Mockups page, stops the program. Starting again makes the demo data again, so every start is clean.</p>
+          </Help>
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col items-start gap-4 overflow-y-auto px-8 pt-8 pb-10">
+          {busy || phase === "failed" ? <p role="status" className="m-0 text-[16px] leading-6 font-bold">{livePhaseLine(phase)}</p> : null}
+          {phase === "failed" && liveState?.message && <p role="alert" className="m-0 max-w-[720px] text-[15px] leading-6">{liveState.message}</p>}
+          {startError && !asking && <p role="alert" className="m-0 max-w-[720px] text-[15px] leading-6">{startError}</p>}
+          <div className="flex gap-3">
+            {busy
+              ? <Button variant="quiet" onClick={() => void liveStop()}>Stop</Button>
+              : <Button onClick={() => { setStartError(null); setAsking(true); }}>{phase === "failed" ? "Try again" : "Start the program"}</Button>}
+          </div>
+          {mine && liveState && liveState.log.length > 0 && (
+            <pre aria-label="What the program printed" className="m-0 max-h-[50vh] w-full max-w-[960px] overflow-auto border border-line-subtle bg-inset p-3 text-[12px] leading-5 whitespace-pre-wrap">{liveState.log.slice(-40).join("\n")}</pre>
+          )}
+        </div>
+        {asking && (
+          <Confirm title="Run this program on your PC?" confirmLabel="Run it" error={startError} onConfirm={() => void startLive()} onCancel={() => { setAsking(false); setStartError(null); }}>
+            <p className="m-0">Kona will run these commands in {live.cwd ? `the folder ${live.cwd} of the project` : "the project folder"}, exactly as written. Run them only if you trust this project.</p>
+            <pre aria-label="Commands" className="m-0 overflow-auto border border-line-subtle bg-inset p-2 text-[13px] leading-5 whitespace-pre-wrap">{[live.setup, live.start].filter(Boolean).join("\n")}</pre>
+            <p className="m-0 text-[13px] leading-5">It must answer on port {live.port}.{live.env.length > 0 ? ` It also sets ${live.env.join(", ")}.` : ""} Any other Live program that is running is stopped first.{live.allow.length > 0 ? ` Its page may also: ${live.allow.map((w) => ALLOW_WORDS[w] ?? w).join(", ")}.` : ""}</p>
+          </Confirm>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-line-subtle bg-surface-1 px-6 py-2">
@@ -322,7 +406,7 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
           <h1 className="m-0 max-w-[260px] truncate text-[20px] leading-7 font-bold">{card.name}</h1>
           <Help title={card.name}>
             <p className="m-0">The page runs at the true size of the device you pick, and is shown smaller to fit the sheet. Zoom in with the buttons, or with Ctrl and the mouse wheel; drag the sheet around to move.</p>
-            <p className="m-0">Start again puts the page back to its beginning. The page also loads again by itself when one of its files changes. Esc goes back to the mockups.</p>
+            <p className="m-0">Start again puts the page back to its beginning. {live ? "Stop stops the program. " : "The page also loads again by itself when one of its files changes. "}Esc goes back to the mockups.</p>
             <p className="m-0">The arrow turns on picking: the page stops answering clicks, the part under the pointer is outlined with its sizes, and a click opens a box for a note. Each note becomes a numbered pin on the page. Esc closes the box, then picking.</p>
           </Help>
         </div>
@@ -335,7 +419,7 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
         <IconButton icon="rotate" label={!device.turns ? `A ${device.label.toLowerCase()} does not turn on its side` : isTurned ? "Stand the device up again" : "Turn the device on its side"} variant={isTurned ? "primary" : "quiet"} aria-pressed={isTurned} disabled={!device.turns} onClick={turn} />
         <IconButton icon="select" label={picking ? "Stop picking parts (Esc)" : "Pick a part and leave a note"} variant={picking ? "primary" : "quiet"} aria-pressed={picking}
           onClick={() => { if (picking) { setPicking(false); setHover(null); closeNote(); } else { setSentLine(null); setPicking(true); } }} />
-        <IconButton icon={theme === "dark" ? "sun" : "moon"} label={theme === "dark" ? "Show the page light" : "Show the page dark"} onClick={flipTheme} />
+        {!live && <IconButton icon={theme === "dark" ? "sun" : "moon"} label={theme === "dark" ? "Show the page light" : "Show the page dark"} onClick={flipTheme} />}
         <div role="group" aria-label="Zoom" className="flex items-center gap-1.5">
           <IconButton icon="zoomOut" label="Zoom out (Ctrl and the mouse wheel)" disabled={scale <= fit + 1e-6} onClick={() => zoomTo(stepZoom(scale, -1, fit))} />
           <span className="font-pixel w-[52px] text-center text-[14px] leading-5 font-bold" aria-label={`Zoom ${percent(scale)} percent`}>{percent(scale)}%</span>
@@ -343,6 +427,7 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
           <IconButton icon="centre" label="Fit the device to the sheet" disabled={zoom === null} onClick={() => setZoom(null)} />
         </div>
         <IconButton icon="turnRight" label="Start the page again" onClick={() => setRev((n) => n + 1)} />
+        {live && <IconButton icon="stop" label="Stop the program" onClick={() => void liveStop()} />}
       </div>
       <div className="flex min-h-0 min-w-0 flex-1">
       <div ref={wrap} className="relative flex min-h-0 min-w-0 flex-1">
@@ -358,9 +443,11 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
         {/* self-start: the sheet is a row, and a row stretches its child to the sheet's height; a column shorter than its content then squeezes the screen (flex-shrink) and crops the page's end. Never let the frame shrink. */}
         <div className="flex shrink-0 flex-col items-center self-start" style={{ padding: MARGIN, margin: `${offY + fix.y}px 0 0 ${offX + fix.x}px` }}>
           <div ref={dev} style={frameStyle}>
-            <div style={{ width: "100%", height: "100%", overflow: "hidden", borderRadius: device.screenRadius * lay.k, background: "#fff" }}>
+            {/* overflow "clip", never "hidden": a hidden box can still be scrolled by a script, and the page's frame is a little bigger than this box (it is drawn scaled down), so a page that focuses or scrolls
+                to something near its bottom (a Tab, a scrollIntoView, an error shown at the first wrong field) pushed the frame up inside it and left a white band under the page (seen 2026-11-18). A clipped box cannot be scrolled at all. */}
+            <div style={{ width: "100%", height: "100%", overflow: "clip", borderRadius: device.screenRadius * lay.k, background: "#fff" }}>
               {url && (
-                <iframe key={rev} ref={frame} title={card.name} src={url} sandbox="allow-scripts" onLoad={tell}
+                <iframe key={rev} ref={frame} title={card.name} src={url} sandbox={live ? liveSandbox(live.allow) : "allow-scripts"} allow={live ? liveAllow(live.allow) : undefined} onLoad={tell}
                   style={{ width: fw, height: fh, transform: `scale(${dw / fw}, ${dh / fh})`, transformOrigin: "0 0", border: 0, display: "block", background: "#fff", colorScheme: theme, pointerEvents: dragging ? "none" : "auto" }} />
               )}
             </div>

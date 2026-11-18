@@ -73,11 +73,41 @@ export function pageUrl(base: string, projectId: string, card: string, file: str
   return `${base}/${encodeURIComponent(projectId)}/${encodeURIComponent(card)}/${path}?kona-theme=${theme}`;
 }
 
+/** The address of a Live card's page: the program's own path, put after the live address (nothing is added to it: a real program keeps its own addresses) */
+export function liveUrl(liveBase: string, entry: string): string {
+  const path = entry.startsWith("/") && !entry.startsWith("//") ? entry : "/";
+  return `${liveBase}${path}`;
+}
+
+/** The frame's sandbox words for a Live card: the ordinary three, and more for each thing its recipe allows (live.rs `sandbox_header` says the same in the policy header of every answer) */
+export function liveSandbox(allow: readonly string[]): string {
+  const words = ["allow-scripts", "allow-same-origin", "allow-forms"];
+  if (allow.includes("print")) words.push("allow-modals");
+  if (allow.includes("downloads")) words.push("allow-downloads");
+  return words.join(" ");
+}
+
+/** The frame's `allow` attribute (what the page may ask the browser for) for a Live card */
+export function liveAllow(allow: readonly string[]): string | undefined {
+  const words: string[] = [];
+  if (allow.includes("clipboard")) words.push("clipboard-write");
+  if (allow.includes("location")) words.push("geolocation");
+  return words.length ? words.join("; ") : undefined;
+}
+
+/** What each word of a recipe's `allow` list means, for the question the owner answers before the program starts */
+export const ALLOW_WORDS: Record<string, string> = { clipboard: "copy to the clipboard", downloads: "save files", location: "ask for this device's location (the browser asks you)", print: "show the print window" };
+
+/** The words for how far a Live program is, for the card and the start panel */
+export function livePhaseLine(phase: string): string {
+  return phase === "setup" ? "Making the demo data…" : phase === "starting" ? "Starting the program…" : phase === "ready" ? "Running" : phase === "failed" ? "It did not start" : "Not running";
+}
+
 /** One string for the files of a card: when it changes, a file was added, removed or saved, and the page is loaded again. */
 export const filesSignature = (files: { path: string; size: number; modified: number | null }[]): string =>
   [...files].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)).map((f) => `${f.path}:${f.size}:${f.modified ?? ""}`).join("|");
 
-export type FrameMessage = { kind: "ready" } | { kind: "escape" } | { kind: "wheel"; dy: number; x: number; y: number };
+export type FrameMessage = { kind: "ready" } | { kind: "escape" } | { kind: "wheel"; dy: number; x: number; y: number } | { kind: "open"; url: string } | { kind: "dialog"; what: "alert" | "confirm" | "prompt"; text: string };
 
 /** What the page's helper may say to the sheet. The page is not trusted: anything else is ignored, and the numbers are made safe. */
 export function frameMessage(data: unknown): FrameMessage | null {
@@ -90,5 +120,23 @@ export function frameMessage(data: unknown): FrameMessage | null {
     if (typeof dy !== "number" || typeof x !== "number" || typeof y !== "number" || !Number.isFinite(dy) || !Number.isFinite(x) || !Number.isFinite(y)) return null;
     return { kind: "wheel", dy: Math.max(-400, Math.min(400, dy)), x, y };
   }
+  if (d.kona === "open") {
+    // a Live page asks for an address to be opened in the owner's own browser (the sheet only listens to this for a Live card): only web, mail and phone addresses, and not a long one
+    if (typeof d.url !== "string" || d.url.length > 2000) return null;
+    try { const u = new URL(d.url); if (!["http:", "https:", "mailto:", "tel:"].includes(u.protocol)) return null; return { kind: "open", url: u.href }; } catch { return null; }
+  }
+  if (d.kona === "dialog") {
+    // a Live page called alert, confirm or prompt: Kona's window cannot show a native question box inside a frame, so the page was answered at once (nothing, No, nothing) and the sheet says what was asked
+    if ((d.kind !== "alert" && d.kind !== "confirm" && d.kind !== "prompt") || typeof d.text !== "string") return null;
+    return { kind: "dialog", what: d.kind, text: d.text.slice(0, 200) };
+  }
   return null;
 }
+
+/** The line the sheet shows when a Live program called alert, confirm or prompt. */
+export const dialogLine = (what: "alert" | "confirm" | "prompt", text: string): string => {
+  const shown = text.length > 80 ? text.slice(0, 80) + "…" : text;
+  if (what === "alert") return `The program said "${shown}". Kona cannot show an alert box here.`;
+  if (what === "confirm") return `The program asked "${shown}". Kona cannot show a question box here, so it answered No.`;
+  return `The program asked "${shown}" and wanted typing. Kona cannot show a question box here, so it answered nothing.`;
+};

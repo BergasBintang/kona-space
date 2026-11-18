@@ -21,8 +21,8 @@ test("the starter note lists every device of the viewer with its size, and what 
   }
 });
 
-test("the two skills that draw a mockup name the sizes of every device", () => {
-  for (const file of ["make-a-mockup", "reverse-a-mockup"]) {
+test("the skills that make a mockup name the sizes of every device", () => {
+  for (const file of ["make-a-mockup", "make-a-live-mockup", "reverse-a-mockup"]) {
     const text = read(`../../src-tauri/skills/${file}/SKILL.md`);
     for (const d of devices) assert.ok(text.includes(`${names[d.id]} ${d.screen.w} x ${d.screen.h}`), `${file}: ${names[d.id]} ${d.screen.w} x ${d.screen.h}`);
   }

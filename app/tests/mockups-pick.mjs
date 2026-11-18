@@ -116,7 +116,7 @@ try {
   ok("the note box is inside the sheet", place.n[0] >= place.s[0] - 1 && place.n[2] <= place.s[2] + 1 && place.n[1] >= place.s[1] - 1 && place.n[3] <= place.s[3] + 1, JSON.stringify(place.n));
   await shot("pick-note-box.png");
   ok("the note box asks what should change", await c.ev(`!!document.querySelector('textarea[aria-label="What should change here?"]')`));
-  ok("an empty note cannot be added", await c.ev(`document.querySelector('[role=group][aria-label="Note for this part"] button:last-child').disabled`));
+  ok("an empty note cannot be added", await c.ev(`[...document.querySelectorAll('[role=group][aria-label="Note for this part"] button')].find((b) => b.textContent.trim() === 'Add note').disabled`));
   await type("Make the button wider and blue");
   await c.ev(`[...document.querySelectorAll('[role=group][aria-label="Note for this part"] button')].find((b) => b.textContent.trim() === 'Add note').click(); true`); await idle(500);
   ok("the first pin is added", (await dockTitle()) === "Notes (1)", String(await dockTitle()));

@@ -19,6 +19,7 @@
     { "branch": "Making a screen", "when": "something new or a redesign", "skills": [
       ["design-a-screen", "Layout, order and every state"],
       ["make-a-mockup", "A page to click through, with made-up data"],
+      ["make-a-live-mockup", "The real program, run in the Mockups sheet on demo data"],
       ["reverse-a-mockup", "A built page, copied static with made-up data"],
       ["ui-words", "Buttons, errors, empty states"]
     ] },
@@ -32,6 +33,7 @@
       ["build-a-screen", "Any screen, form or component"],
       ["build-from-a-mockup", "A mockup the owner agreed to, built for real"],
       ["make-a-mockup", "A page to click through, with made-up data"],
+      ["make-a-live-mockup", "The real program, run in the Mockups sheet on demo data"],
       ["reverse-a-mockup", "A built page, copied static with made-up data"],
       ["write-tests-first", "Logic that can break"],
       ["accessibility-check", "Forms, dialogs, menus"]

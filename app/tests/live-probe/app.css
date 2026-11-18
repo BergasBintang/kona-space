@@ -1,0 +1,10 @@
+body { margin: 0; font: 16px sans-serif; background: rgb(250, 247, 240); color: #1a1a1a; }
+main { padding: 24px; max-width: 640px; }
+h1 { font-size: 28px; }
+input, button { display: block; margin: 8px 0; padding: 8px 10px; font: inherit; }
+.pulse { width: 40px; height: 40px; margin-top: 12px; background: rgb(15, 118, 110); animation: pulse 1s ease-in-out infinite alternate; }
+@keyframes pulse { from { transform: scale(1); } to { transform: scale(1.5); } }
+@media (max-width: 480px) { h1 { font-size: 40px; } }
+
+/* the capability buttons sit in one row so that every one is on the first screen of the smallest device the test uses */
+p.caps button { display: inline-block; margin: 2px 4px 2px 0; padding: 4px 8px; }

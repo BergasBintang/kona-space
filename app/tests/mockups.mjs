@@ -29,14 +29,14 @@ const info = () => ({ test: 'info', w: innerWidth, h: innerHeight, vh: el('tall'
 const say = () => parent.postMessage(info(), '*');
 addEventListener('load', say); addEventListener('resize', say);
 new MutationObserver(say).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-addEventListener('message', (e) => { if (e.source === parent && e.data && e.data.test === 'ask') say(); });
+addEventListener('message', (e) => { if (e.source === parent && e.data && e.data.test === 'ask') say(); if (e.source === parent && e.data && e.data.test === 'focuslow') { const l = document.getElementById('low'); if (l) { l.focus(); l.scrollIntoView({ block: 'center' }); } } });
 `;
 const css = `body { margin: 0; background: #fff; color: #111; font: 16px sans-serif; } h1 { margin: 12px; }
 @media (prefers-color-scheme: dark) { body { background: #202020; color: #eee; } }
 [data-theme="dark"] body { background: #202020; color: #eee; }
 @media (max-width: 480px) { h1 { font-size: 40px; } }
 #tall { position: absolute; left: -9999px; width: 1px; height: 100vh; } #wide { position: absolute; left: -9999px; height: 1px; width: 100vw; }`;
-const html = (title, body) => `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><link rel="stylesheet" href="style.css"></head><body><div id="tall"></div><div id="wide"></div>${body}<script src="app.js"></script></body></html>`;
+const html = (title, body) => `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><link rel="stylesheet" href="style.css"></head><body><div id="tall"></div><div id="wide"></div><button id="low" style="position:fixed;bottom:0;left:0">low</button>${body}<script src="app.js"></script></body></html>`;
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const frameInfo = async (ask = true) => { if (ask) await c.ev(`(document.querySelector('iframe[title]')?.contentWindow.postMessage({ test: 'ask' }, '*'), 0)`); await wait(250); return c.ev("window.__last || null"); };
@@ -123,6 +123,11 @@ v.play().catch((e) => say('playfailed', { why: String(e) }));`);
     return i;
   };
   await sizeOf("Laptop, 1024 px wide", 1024, 640);
+  // the page focuses or scrolls to something low on its screen: the screen of the device must not move up inside its frame (it did: a white band showed under the page, 2026-11-18)
+  await press("Laptop, 1024 px wide"); await idle(600);
+  await c.ev(`document.querySelector('iframe[title]').contentWindow.postMessage({ test: 'focuslow' }, '*'); true`); await idle(600);
+  const wrapperScroll = await c.ev(`(() => { const f = document.querySelector('iframe[title]'); const p = f.parentElement; const a = f.getBoundingClientRect(), b = p.getBoundingClientRect(); return { top: p.scrollTop, left: p.scrollLeft, gapBottom: Math.round((b.bottom - a.bottom) * 10) / 10, gapTop: Math.round((a.top - b.top) * 10) / 10, scale: f.style.transform }; })()`);
+  ok("a page that focuses or scrolls to something low does not push the device's screen up (no white band under the page)", wrapperScroll.top === 0 && wrapperScroll.left === 0 && Math.abs(wrapperScroll.gapBottom) < 1.5 && Math.abs(wrapperScroll.gapTop) < 1.5, JSON.stringify(wrapperScroll));
   let i2 = await sizeOf("Phone, 390 px wide", 390, 844);
   ok("a media query follows the device (narrow on a phone), and 100vh is the device's height", i2?.narrow === true && i2?.vh >= 844 - 0.02 && i2?.vh < 845, `narrow ${i2?.narrow}, 100vh ${i2?.vh}`);
   await sizeOf("Small phone, 320 px wide", 320, 568);

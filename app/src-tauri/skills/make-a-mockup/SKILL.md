@@ -7,6 +7,10 @@ description: Use when asked to draw or mock up a page, a flow or a few options a
 
 A mockup is a small web page that runs by itself, with made-up data, so the owner can click through it in the Mockups sheet (the big screen in the Lounge), which is built into Kona. The sheet draws five devices and runs the page at the true size of each, so its media queries answer to the device, not to the window: Small phone 320 x 568, Phone 390 x 844, Tablet 768 x 1024, Laptop 1024 x 640 and Desktop 1440 x 900 (the two phones and the tablet also turn on their side). Search the Brain for "kona-mockups" for more. It is not the real code. Say what you will draw before you draw it.
 
+## Draw or live
+
+This skill DRAWS a page: plain files and made-up data, for something that does not exist yet or that must be sent as a folder. When the product already exists and runs on this PC, and the owner wants the real thing (the real screens and animations, a login for every role, a 1:1 copy), use the skill `make-a-live-mockup` instead: its card holds only a recipe, and Kona runs the real program in the same device frames. Do not redraw by hand what can run.
+
 ## Where it goes
 
 1. Save it in `.kona/mockups/<card>/` in the project. One card is one mockup: a whole site, or one draft (three options for one slot are three cards). The card name is lower case with dashes.
@@ -33,7 +37,7 @@ It runs in a sandbox, so some things that work in a browser do not here.
 - No web calls, no web addresses inside the card, no fonts or pictures from a web page. Fonts, pictures and video are files next to the pages. If one must be downloaded, ask the owner first.
 - No saving between runs: no `localStorage`, no cookies. The Refresh button puts the mockup back to its start. To carry who is signed in to the next page, put it in the address: `dashboard.html?as=full`.
 - **A form cannot be sent here, and the browser never fires its "submit" event.** A submit button that relies on it does nothing, with no error. Give the button `type="button"`, run the action on its `click`, and handle Enter in the fields with `keydown`, as `templates/app.js` does.
-- Use ordinary `<script src="app.js"></script>` at the end of the page, not modules, and do not fetch files. Put data in a `.js` file that sets a variable.
+- Use ordinary `<script src="app.js"></script>` at the end of the page, not modules. A page may read a file of its own card with `fetch` (the journey page does), but never the web; keep data in a `.js` file that sets a variable, which is the simplest way.
 - Dark mode: the sheet sets `data-theme="dark"` on the root of the page. Write the dark values for both `[data-theme="dark"]` and `prefers-color-scheme`, as `templates/style.css` does.
 
 ## Sizes are never bare numbers

@@ -2,7 +2,8 @@
 import fs from 'node:fs';
 export async function attach(port = 9223) {
   const list = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
-  const page = list.find((p) => p.type === 'page');
+  // Kona's own window, not a window the browser made for a question of its own (the location, say)
+  const page = list.find((p) => p.type === 'page' && /^https?:\/\/tauri\.localhost/.test(p.url)) ?? list.find((p) => p.type === 'page');
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((r, j) => { ws.onopen = r; ws.onerror = j; });
   let id = 0; const pending = new Map();

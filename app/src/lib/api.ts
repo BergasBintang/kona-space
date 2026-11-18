@@ -177,11 +177,19 @@ export const gitMarks = (folder: string) => invoke<GitMark[]>("git_marks", { fol
 export const readFile = (path: string) => invoke<FileView>("read_file", { path });
 
 // The mockup previewer (decision 75): a mockup is a card, a folder of `.kona/mockups`; its pages are loaded from `${mockBase}/${projectId}/${card}/${file}`.
-export type MockCard = { id: string; name: string; entry: string | null; files: number; modified: number | null };
+/** The recipe of a Live card (decision 94): what is run, shown before the owner says yes; `approval` is sent back with Start */
+export type LiveRecipe = { setup: string | null; start: string; cwd: string; port: number; entry: string; env: string[]; allow: string[]; approval: string };
+export type MockCard = { id: string; name: string; entry: string | null; files: number; modified: number | null; live: LiveRecipe | null; live_error: string | null };
+export type LivePhase = "off" | "setup" | "starting" | "ready" | "failed" | "stopped";
+export type LiveStatus = { project: string | null; card: string | null; phase: LivePhase; message: string | null; log: string[]; base: string | null };
 export type MockFile = { path: string; size: number; modified: number | null };
 export const mockBase = () => invoke<string>("mock_base");
 export const mockCards = (projectId: string) => invoke<MockCard[]>("mock_cards", { projectId });
 export const mockFiles = (projectId: string, card: string) => invoke<MockFile[]>("mock_files", { projectId, card });
+export const liveBase = () => invoke<string>("live_base");
+export const liveStatus = () => invoke<LiveStatus>("live_status");
+export const liveStart = (projectId: string, card: string, approved: string) => invoke<void>("live_start", { projectId, card, approved });
+export const liveStop = () => invoke<void>("live_stop");
 /** The step markers (`kona-step: <id>`) found in the project's code: read only, runs off the window's thread (decision 91) */
 /** On request, one cheap Haiku call: does the journey make sense (decision 91, ticket T-0041). The prompt is built by lib/brain/journeyai.ts. */
 export const journeyCheck = (projectId: string, accountId: string | null, prompt: string) => invoke<string>("journey_check", { projectId, accountId, prompt });

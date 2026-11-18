@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MAX_ZOOM, clampZoom, drawnSize, filesSignature, fitScale, frameMessage, frameOf, layout, pageUrl, percent, stepZoom, wheelZoom, type Device, type Frame } from "./mockview.ts";
+import { MAX_ZOOM, clampZoom, dialogLine, drawnSize, filesSignature, fitScale, frameMessage, frameOf, layout, ALLOW_WORDS, liveAllow, livePhaseLine, liveSandbox, liveUrl, pageUrl, percent, stepZoom, wheelZoom, type Device, type Frame } from "./mockview.ts";
 
 const frame = (screen: [number, number], width: [number, number, number, number]): Frame => ({ image: "f.png", size: [10, 10], slice: [1, 1, 1, 1], widthCss: width, screen: { w: screen[0], h: screen[1] }, details: [] });
 const phone: Device = { id: "phone", label: "Phone", screen: { w: 390, h: 844 }, turns: true, k: 2, material: "dark", backdrop: "#000", screenRadius: 5, frames: { upright: frame([390, 844], [20, 14, 20, 14]), turned: frame([844, 390], [14, 20, 14, 20]) } };
@@ -89,4 +89,47 @@ test("only what the helper of a page may say is taken from a page, and made safe
   for (const bad of [null, undefined, 5, "ready", [], {}, { kona: "other" }, { kona: "wheel", dy: "1", x: 1, y: 1 }, { kona: "wheel", dy: NaN, x: 1, y: 1 }, { kona: "wheel", dy: 1, x: Infinity, y: 1 }, { kona: "wheel" }, { cmd: "add_project" }, { kona: { toString: () => "ready" } }]) {
     assert.equal(frameMessage(bad), null, JSON.stringify(bad));
   }
+});
+
+test("a Live page is loaded from the live address with the program's own path, and nothing is added", () => {
+  assert.equal(liveUrl("http://live.localhost", "/"), "http://live.localhost/");
+  assert.equal(liveUrl("http://live.localhost", "/login?x=1"), "http://live.localhost/login?x=1");
+  assert.equal(liveUrl("http://live.localhost", "//evil.example/"), "http://live.localhost/");
+  assert.equal(liveUrl("http://live.localhost", "login"), "http://live.localhost/");
+});
+
+test("the words for how far a Live program is", () => {
+  assert.equal(livePhaseLine("ready"), "Running");
+  assert.equal(livePhaseLine("setup"), "Making the demo data…");
+  assert.equal(livePhaseLine("failed"), "It did not start");
+  assert.equal(livePhaseLine("off"), "Not running");
+});
+
+test("a Live card's frame allows only what its recipe names", () => {
+  assert.equal(liveSandbox([]), "allow-scripts allow-same-origin allow-forms");
+  assert.equal(liveSandbox(["clipboard", "print", "downloads"]), "allow-scripts allow-same-origin allow-forms allow-modals allow-downloads");
+  assert.equal(liveSandbox(["location"]), "allow-scripts allow-same-origin allow-forms");
+  assert.equal(liveAllow([]), undefined);
+  assert.equal(liveAllow(["clipboard", "location", "downloads"]), "clipboard-write; geolocation");
+  for (const w of ["clipboard", "downloads", "location", "print"]) assert.ok(ALLOW_WORDS[w], w);
+});
+
+test("a Live page may ask for a web, mail or phone address to be opened in the owner's browser, and for nothing else", () => {
+  assert.deepEqual(frameMessage({ kona: "open", url: "https://example.test/a?b=1" }), { kind: "open", url: "https://example.test/a?b=1" });
+  assert.deepEqual(frameMessage({ kona: "open", url: "http://127.0.0.1:8000/file.pdf" }), { kind: "open", url: "http://127.0.0.1:8000/file.pdf" });
+  assert.deepEqual(frameMessage({ kona: "open", url: "mailto:a@example.test" }), { kind: "open", url: "mailto:a@example.test" });
+  for (const bad of ["file:///C:/Windows/win.ini", "javascript:alert(1)", "data:text/html,x", "ms-settings:", "C:\Windows\notepad.exe", "", "not a url", "https://example.test/" + "a".repeat(2100)]) assert.equal(frameMessage({ kona: "open", url: bad }), null, bad.slice(0, 30));
+  assert.equal(frameMessage({ kona: "open" }), null);
+  assert.equal(frameMessage({ kona: "open", url: 5 }), null);
+});
+
+test("a Live page that calls alert, confirm or prompt is answered at once and the sheet says what was asked", () => {
+  assert.deepEqual(frameMessage({ kona: "dialog", kind: "confirm", text: "Delete this class?" }), { kind: "dialog", what: "confirm", text: "Delete this class?" });
+  assert.deepEqual(frameMessage({ kona: "dialog", kind: "alert", text: "x".repeat(500) }), { kind: "dialog", what: "alert", text: "x".repeat(200) });
+  assert.equal(frameMessage({ kona: "dialog", kind: "eval", text: "x" }), null);
+  assert.equal(frameMessage({ kona: "dialog", kind: "alert", text: 5 }), null);
+  assert.match(dialogLine("confirm", "Delete this class?"), /answered No/);
+  assert.match(dialogLine("prompt", "Name?"), /answered nothing/);
+  assert.match(dialogLine("alert", "Saved"), /cannot show an alert/);
+  assert.ok(dialogLine("confirm", "y".repeat(300)).length < 200);
 });

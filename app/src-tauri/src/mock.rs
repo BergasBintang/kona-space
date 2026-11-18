@@ -185,7 +185,12 @@ impl Reply {
 const HELPER: &str = concat!("<script>", include_str!("mock_helper.js"), "</script>");
 
 /// The page with the helper after its `<head>` tag (or `<html>`, or the doctype, or at the very start). Never before the doctype, which would put the page in quirks mode.
-fn inject_helper(html: &[u8]) -> Vec<u8> {
+pub(crate) fn inject_helper(html: &[u8]) -> Vec<u8> {
+    inject_script(html, HELPER)
+}
+
+/// The same place for any other `<script>` of Kona's (a Live page gets one more)
+pub(crate) fn inject_script(html: &[u8], script: &str) -> Vec<u8> {
     let lower = html.to_ascii_lowercase();
     let after_tag = |tag: &[u8]| -> Option<usize> {
         let at = lower.windows(tag.len()).position(|w| w == tag)?;
@@ -197,15 +202,15 @@ fn inject_helper(html: &[u8]) -> Vec<u8> {
         lower[at..].iter().position(|b| *b == b'>').map(|g| at + g + 1)
     };
     let at = after_tag(b"<head").or_else(|| after_tag(b"<html")).or_else(|| after_tag(b"<!doctype")).unwrap_or(0);
-    let mut out = Vec::with_capacity(html.len() + HELPER.len());
+    let mut out = Vec::with_capacity(html.len() + script.len());
     out.extend_from_slice(&html[..at]);
-    out.extend_from_slice(HELPER.as_bytes());
+    out.extend_from_slice(script.as_bytes());
     out.extend_from_slice(&html[at..]);
     out
 }
 
 /// The small file of a card (`mockup.json`), when it is a plain file that reads as JSON
-fn card_info(root: &Path) -> Option<serde_json::Value> {
+pub(crate) fn card_info(root: &Path) -> Option<serde_json::Value> {
     let file = root.join("mockup.json");
     fs::metadata(&file).ok().filter(|m| m.is_file() && m.len() <= INFO_LIMIT).and_then(|_| fs::read_to_string(&file).ok()).and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
 }
@@ -430,6 +435,10 @@ pub struct Card {
     pub files: usize,
     /// the newest change of any file in it, seconds since 1970
     pub modified: Option<u64>,
+    /// a Live card (decision 94): the recipe to show, with the string that says yes to it; the card has no pages of its own, `entry` is the program's first path
+    pub live: Option<crate::live::LiveView>,
+    /// why a `live` part of `mockup.json` cannot be used, in plain words
+    pub live_error: Option<String>,
 }
 
 /// The cards of a project: every plain folder in `<project>/.kona/mockups` with a valid name
@@ -440,11 +449,21 @@ pub fn list_cards(project_folder: &Path) -> Vec<Card> {
     for e in entries.flatten() {
         let id = e.file_name().to_string_lossy().into_owned();
         let Some(root) = card_root(project_folder, &id) else { continue };
-        let files = list_files(project_folder, &id).unwrap_or_default();
         let info = card_info(&root);
+        // a Live card holds a program's build and storage, not pages to count or watch: its files are not walked (the list is asked for every few seconds)
+        let files = if info.as_ref().is_some_and(|i| i.get("live").is_some()) { Vec::new() } else { list_files(project_folder, &id).unwrap_or_default() };
         let text = |k: &str| info.as_ref().and_then(|v| v.get(k)).and_then(|v| v.as_str()).map(|s| s.trim().to_string()).filter(|s| !s.is_empty() && s.len() <= 120);
-        let entry = text("entry").filter(|p| resolve(&root, p).is_ok()).or_else(|| resolve(&root, "index.html").ok().map(|_| "index.html".to_string()));
-        out.push(Card { name: text("name").unwrap_or_else(|| id.clone()), id, entry, files: files.len(), modified: files.iter().filter_map(|f| f.modified).max() });
+        let recipe = info.as_ref().and_then(crate::live::Recipe::from_info);
+        let (live, live_error) = match recipe {
+            Some(Ok(r)) => (Some(r.view()), None),
+            Some(Err(e)) => (None, Some(e)),
+            None => (None, None),
+        };
+        let entry = match &live {
+            Some(l) => Some(l.entry.clone()),
+            None => text("entry").filter(|p| resolve(&root, p).is_ok()).or_else(|| resolve(&root, "index.html").ok().map(|_| "index.html".to_string())),
+        };
+        out.push(Card { name: text("name").unwrap_or_else(|| id.clone()), id, entry, files: files.len(), modified: files.iter().filter_map(|f| f.modified).max(), live, live_error });
     }
     out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     out

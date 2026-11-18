@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MAX_ZOOM, clampZoom, dialogLine, drawnSize, filesSignature, fitScale, frameMessage, frameOf, layout, ALLOW_WORDS, liveAllow, livePhaseLine, liveSandbox, liveUrl, pageUrl, percent, stepZoom, wheelZoom, type Device, type Frame } from "./mockview.ts";
+import { MAX_ZOOM, ageWords, clampZoom, dataLine, dialogLine, drawnSize, humanBytes, filesSignature, fitScale, frameMessage, frameOf, layout, ALLOW_WORDS, liveAllow, livePhaseLine, liveSandbox, liveUrl, pageUrl, percent, stepZoom, wheelZoom, type Device, type Frame } from "./mockview.ts";
 
 const frame = (screen: [number, number], width: [number, number, number, number]): Frame => ({ image: "f.png", size: [10, 10], slice: [1, 1, 1, 1], widthCss: width, screen: { w: screen[0], h: screen[1] }, details: [] });
 const phone: Device = { id: "phone", label: "Phone", screen: { w: 390, h: 844 }, turns: true, k: 2, material: "dark", backdrop: "#000", screenRadius: 5, frames: { upright: frame([390, 844], [20, 14, 20, 14]), turned: frame([844, 390], [14, 20, 14, 20]) } };
@@ -132,4 +132,18 @@ test("a Live page that calls alert, confirm or prompt is answered at once and th
   assert.match(dialogLine("prompt", "Name?"), /answered nothing/);
   assert.match(dialogLine("alert", "Saved"), /cannot show an alert/);
   assert.ok(dialogLine("confirm", "y".repeat(300)).length < 200);
+});
+
+test("the data a Live card kept is described in plain words", () => {
+  assert.equal(humanBytes(0), "0 bytes");
+  assert.equal(humanBytes(1536), "1.5 KB");
+  assert.equal(humanBytes(5 * 1024 * 1024), "5.0 MB");
+  assert.equal(humanBytes(3 * 1024 ** 3), "3.0 GB");
+  assert.equal(ageWords(30), "just now");
+  assert.equal(ageWords(600), "10 minutes ago");
+  assert.equal(ageWords(7200), "2 hours ago");
+  assert.equal(ageWords(3 * 86400), "3 days ago");
+  assert.equal(ageWords(null), "at an unknown time");
+  assert.equal(dataLine({ bytes: 12 * 1024 * 1024, files: 38, age_secs: 2 * 86400, place: ".kona/live-data/lms" }), "Data from the last run: 12.0 MB in 38 files, changed 2 days ago. It is kept in .kona/live-data/lms.");
+  assert.match(dataLine({ bytes: 10, files: 1, age_secs: 5, place: "x" }), /in 1 file,/);
 });

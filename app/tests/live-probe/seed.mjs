@@ -17,3 +17,8 @@ INSERT INTO grades VALUES (3, 1, 88), (3, 2, 93);
 INSERT INTO parents VALUES (4, 3);
 `);
 console.log("demo database made: 4 people");
+// the demo logins, listed for the sheet (the card's data folder is where Kona looks: KONA_LIVE_DATA)
+if (process.env.KONA_LIVE_DATA) {
+  const who = [["Admin", "admin@example.test"], ["Teacher", "teacher@example.test"], ["Student", "student@example.test"], ["Parent", "parent@example.test"]];
+  fs.writeFileSync(process.env.KONA_LIVE_DATA + "/accounts.json", JSON.stringify(who.map(([w, login]) => ({ who: w, login, password: "demo" }))));
+}

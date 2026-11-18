@@ -140,3 +140,19 @@ export const dialogLine = (what: "alert" | "confirm" | "prompt", text: string): 
   if (what === "confirm") return `The program asked "${shown}". Kona cannot show a question box here, so it answered No.`;
   return `The program asked "${shown}" and wanted typing. Kona cannot show a question box here, so it answered nothing.`;
 };
+
+/** A size in words, for the data of a card */
+export const humanBytes = (n: number): string => (n < 1024 ? `${n} bytes` : n < 1024 ** 2 ? `${(n / 1024).toFixed(1)} KB` : n < 1024 ** 3 ? `${(n / 1024 ** 2).toFixed(1)} MB` : `${(n / 1024 ** 3).toFixed(1)} GB`);
+
+/** How long ago, in words */
+export const ageWords = (secs: number | null): string => {
+  if (secs === null) return "at an unknown time";
+  if (secs < 90) return "just now";
+  if (secs < 5400) return `${Math.round(secs / 60)} minutes ago`;
+  if (secs < 129600) return `${Math.round(secs / 3600)} hours ago`;
+  return `${Math.round(secs / 86400)} days ago`;
+};
+
+/** The one line the sheet shows about what a Live card kept from its last runs */
+export const dataLine = (d: { bytes: number; files: number; age_secs: number | null; place: string }): string =>
+  `Data from the last run: ${humanBytes(d.bytes)} in ${d.files} ${d.files === 1 ? "file" : "files"}, changed ${ageWords(d.age_secs)}. It is kept in ${d.place}.`;

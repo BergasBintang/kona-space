@@ -53,6 +53,12 @@ pub struct Recipe {
     pub wait: u64,
     /// what the page may do besides the ordinary: only words of `ALLOWED`, sorted. Shown with the commands, so a yes covers them.
     pub allow: Vec<String>,
+    /// Kona runs a fake cloud bucket (S3 and R2 speak the same protocol) for the program and tells it where it is (decision 94b)
+    pub bucket: bool,
+    /// the data of the card (its demo database file, its bucket, its uploads) is kept when the program stops; `false` deletes it at Stop. Kept by default.
+    pub keep: bool,
+    /// a command that takes away what the card made outside its data folder (a demo database in a database server); run by "Delete data" before the folder is removed
+    pub clean: Option<String>,
 }
 
 /// What a recipe may let its page do, each one word. Everything else the frame refuses: it is not a full window.
@@ -71,6 +77,9 @@ pub struct LiveView {
     pub entry: String,
     pub env: Vec<String>,
     pub allow: Vec<String>,
+    pub bucket: bool,
+    pub keep: bool,
+    pub clean: Option<String>,
     pub approval: String,
 }
 
@@ -153,17 +162,29 @@ impl Recipe {
             }
             allow.sort();
         }
-        Ok(Recipe { setup, start, port: port as u16, cwd, entry, ready, env, wait, allow })
+        let flag = |name: &str, default: bool| -> Result<bool, String> {
+            match o.get(name) {
+                None | Some(serde_json::Value::Null) => Ok(default),
+                Some(v) => v.as_bool().ok_or(format!("{name} must be true or false")),
+            }
+        };
+        let bucket = flag("bucket", false)?;
+        let keep = flag("keep", true)?;
+        let clean = match o.get("clean") {
+            None | Some(serde_json::Value::Null) => None,
+            Some(v) => Some(command_ok(v, "clean")?),
+        };
+        Ok(Recipe { setup, start, port: port as u16, cwd, entry, ready, env, wait, allow, bucket, keep, clean })
     }
 
     /// Everything that is run or set, as one string. The sheet shows it, the owner says yes to it, and a start is only accepted when the recipe still gives exactly this string.
     pub fn approval(&self) -> String {
         let env: Vec<String> = self.env.iter().map(|(k, v)| format!("{k}={v}")).collect();
-        format!("cwd={}\nsetup={}\nstart={}\nport={}\nenv={}\nallow={}", self.cwd, self.setup.clone().unwrap_or_default(), self.start, self.port, env.join(";"), self.allow.join(","))
+        format!("cwd={}\nsetup={}\nstart={}\nport={}\nenv={}\nallow={}\nclean={}\nbucket={}\nkeep={}", self.cwd, self.setup.clone().unwrap_or_default(), self.start, self.port, env.join(";"), self.allow.join(","), self.clean.clone().unwrap_or_default(), self.bucket, self.keep)
     }
 
     pub fn view(&self) -> LiveView {
-        LiveView { setup: self.setup.clone(), start: self.start.clone(), cwd: self.cwd.clone(), port: self.port, entry: self.entry.clone(), env: self.env.iter().map(|(k, _)| k.clone()).collect(), allow: self.allow.clone(), approval: self.approval() }
+        LiveView { setup: self.setup.clone(), start: self.start.clone(), cwd: self.cwd.clone(), port: self.port, entry: self.entry.clone(), env: self.env.iter().map(|(k, _)| k.clone()).collect(), allow: self.allow.clone(), bucket: self.bucket, keep: self.keep, clean: self.clean.clone(), approval: self.approval() }
     }
 }
 
@@ -193,6 +214,9 @@ struct Run {
     port: u16,
     shared: Arc<Mutex<Shared>>,
     child: ChildSlot,
+    /// the data folder of the card, and whether it is kept when the program stops
+    data: PathBuf,
+    keep: bool,
 }
 
 #[derive(Serialize, Debug)]
@@ -218,6 +242,9 @@ pub struct Inner {
     fresh: std::sync::atomic::AtomicBool,
     /// what the running program's recipe lets its page do (the policy header of every answer says the same as the frame)
     allow: Mutex<Vec<String>>,
+    /// the fake bucket of the run: its port and the flag that ends it, and its folder (the page's own address serves `/cloud/<key>` from it)
+    bucket: Mutex<Option<(u16, Arc<std::sync::atomic::AtomicBool>)>>,
+    bucket_root: Mutex<Option<PathBuf>>,
 }
 
 /// What Kona keeps: the state of the one Live program, and the listener that shows it. Cheap to clone; the listener's threads hold a copy.
@@ -421,7 +448,13 @@ impl Inner {
     }
 
     pub fn stop(&self) {
+        self.stop_with(false);
+    }
+
+    /// Stop the program. Its data folder is kept unless the recipe says `keep: false` or `delete_data` is true (the owner pressed "Stop and delete its data").
+    pub fn stop_with(&self, delete_data: bool) {
         self.close_proxy();
+        self.close_bucket();
         self.current.fetch_add(1, Ordering::SeqCst);
         let old = self.run.lock().unwrap_or_else(|e| e.into_inner()).take();
         if let Some(r) = old {
@@ -429,12 +462,22 @@ impl Inner {
                 kill_tree(c);
             }
             set_phase(&r.shared, Phase::Stopped, None);
+            if delete_data || !r.keep {
+                let _ = remove_data(&r.data);
+            }
         }
     }
 
-    /// Start the card's program. `approved` is the string the sheet showed (`LiveView::approval`); a recipe that changed since is refused. Returns at once: the run goes on in a thread and
-    /// `status` tells how far it is. (`Live::start` is the one the app calls: it also makes the address of the run.)
-    fn start_run(&self, project_folder: &Path, project_id: &str, card: &str, approved: &str) -> Result<(), String> {
+    fn close_bucket(&self) {
+        let old = self.bucket.lock().unwrap_or_else(|e| e.into_inner()).take();
+        if let Some((port, stop)) = old {
+            crate::bucket::close(port, &stop);
+        }
+        *self.bucket_root.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    }
+
+    /// Check the recipe and the folders, stop the program that runs, and make the card's data folder ready. `want_fresh` is the owner's choice at Start: take the last data away and begin again.
+    fn prepare(&self, project_folder: &Path, card: &str, approved: &str, want_fresh: bool) -> Result<Prepared, String> {
         let root = mock::card_root(project_folder, card).ok_or("There is no such mockup")?;
         let info = mock::card_info(&root).ok_or("The mockup has no mockup.json")?;
         let recipe = Recipe::from_info(&info).ok_or("This mockup is not a live one")??;
@@ -446,20 +489,202 @@ impl Inner {
         if !dir.starts_with(&project_real) || !dir.is_dir() {
             return Err("The folder to run in must be inside the project".to_string());
         }
+        let data = data_dir(&project_real, card)?;
         self.stop();
         if port_answers(recipe.port) {
             return Err(format!("Something already answers on port {}. Stop it first, or choose another port in the recipe.", recipe.port));
         }
+        let had = data_info(&data).exists;
+        if want_fresh && had {
+            remove_data(&data)?;
+        }
+        std::fs::create_dir_all(&data).map_err(|e| format!("The data folder of the card could not be made: {e}"))?;
+        Ok(Prepared { recipe, dir, data, fresh: want_fresh || !had })
+    }
+
+    /// Run the prepared card at the address `base`: the bucket first (its address goes into the program's environment), then setup and start in a thread of their own
+    fn launch(&self, p: Prepared, project_id: &str, card: &str, base: &str) -> Result<(), String> {
+        let Prepared { mut recipe, dir, data, fresh } = p;
+        let shown = |p: &Path| p.to_string_lossy().trim_start_matches(r"\\?\").to_string();
+        let mut extra: Vec<(String, String)> = vec![
+            ("KONA_LIVE_DATA".to_string(), shown(&data)),
+            ("KONA_LIVE_FRESH".to_string(), if fresh { "1" } else { "0" }.to_string()),
+            ("KONA_LIVE_KEEP".to_string(), if recipe.keep { "1" } else { "0" }.to_string()),
+        ];
+        if recipe.bucket {
+            let root = data.join("bucket");
+            let (port, stop) = crate::bucket::open(root.clone())?;
+            *self.bucket.lock().unwrap_or_else(|e| e.into_inner()) = Some((port, stop));
+            *self.bucket_root.lock().unwrap_or_else(|e| e.into_inner()) = Some(root);
+            extra.push(("KONA_LIVE_BUCKET_ENDPOINT".to_string(), format!("http://127.0.0.1:{port}")));
+            extra.push(("KONA_LIVE_BUCKET_NAME".to_string(), crate::bucket::BUCKET_NAME.to_string()));
+            extra.push(("KONA_LIVE_BUCKET_KEY".to_string(), "kona".to_string()));
+            extra.push(("KONA_LIVE_BUCKET_SECRET".to_string(), "kona-demo-secret".to_string()));
+            extra.push(("KONA_LIVE_BUCKET_REGION".to_string(), "us-east-1".to_string()));
+            extra.push(("KONA_LIVE_BUCKET_URL".to_string(), format!("{base}/cloud")));
+        }
+        recipe.env.extend(extra);
         let id = self.current.fetch_add(1, Ordering::SeqCst) + 1;
         let shared = Arc::new(Mutex::new(Shared { phase: Phase::Setup, message: None, log: VecDeque::new() }));
         let slot: ChildSlot = Arc::new(Mutex::new(None));
-        *self.run.lock().unwrap_or_else(|e| e.into_inner()) = Some(Run { project: project_id.to_string(), card: card.to_string(), port: recipe.port, shared: shared.clone(), child: slot.clone() });
+        *self.run.lock().unwrap_or_else(|e| e.into_inner()) = Some(Run { project: project_id.to_string(), card: card.to_string(), port: recipe.port, shared: shared.clone(), child: slot.clone(), data, keep: recipe.keep });
         let current = self.current.clone();
         self.fresh.store(true, Ordering::SeqCst);
         *self.allow.lock().unwrap_or_else(|e| e.into_inner()) = recipe.allow.clone();
         std::thread::spawn(move || drive(current, id, shared, slot, recipe, dir));
         Ok(())
     }
+}
+
+/// A card whose recipe and folders were checked and whose data folder is ready
+struct Prepared {
+    recipe: Recipe,
+    dir: PathBuf,
+    data: PathBuf,
+    fresh: bool,
+}
+
+// ---------------------------------------------------------------- the data of a card
+
+/// What a card keeps between runs: `<project>/.kona/live-data/<card>/` (its demo database file, its bucket, its uploads: whatever it puts in `KONA_LIVE_DATA`)
+pub fn data_dir(project_real: &Path, card: &str) -> Result<PathBuf, String> {
+    if card.is_empty() || card.contains(['/', '\\', ':']) || card == "." || card == ".." {
+        return Err("There is no such mockup".to_string());
+    }
+    Ok(project_real.join(".kona").join("live-data").join(card))
+}
+
+#[derive(Serialize, Debug, Clone, PartialEq)]
+pub struct DataInfo {
+    pub exists: bool,
+    pub bytes: u64,
+    pub files: u64,
+    /// seconds since the newest file changed
+    pub age_secs: Option<u64>,
+    /// where it is, relative to the project
+    pub place: String,
+}
+
+pub fn data_info(dir: &Path) -> DataInfo {
+    let mut bytes = 0u64;
+    let mut files = 0u64;
+    let mut newest: Option<std::time::SystemTime> = None;
+    let mut stack = vec![dir.to_path_buf()];
+    let mut seen = 0usize;
+    while let Some(d) = stack.pop() {
+        let Ok(rd) = std::fs::read_dir(&d) else { continue };
+        for e in rd.flatten() {
+            seen += 1;
+            if seen > 500_000 {
+                break;
+            }
+            let Ok(md) = e.metadata() else { continue };
+            if md.is_dir() {
+                stack.push(e.path());
+            } else {
+                bytes += md.len();
+                files += 1;
+                if let Ok(t) = md.modified() {
+                    newest = Some(newest.map_or(t, |n| n.max(t)));
+                }
+            }
+        }
+    }
+    let age_secs = newest.and_then(|t| std::time::SystemTime::now().duration_since(t).ok()).map(|d| d.as_secs());
+    let place = dir.components().rev().take(3).collect::<Vec<_>>().into_iter().rev().map(|c| c.as_os_str().to_string_lossy().into_owned()).collect::<Vec<_>>();
+    DataInfo { exists: files > 0, bytes, files, age_secs, place: format!(".kona/{}", place.get(1..).map(|p| p.join("/")).unwrap_or_default()) }
+}
+
+/// A demo login of a card, shown next to its program so that nobody is left at a sign-in page without one
+#[derive(Serialize, Debug, Clone, PartialEq)]
+pub struct DemoAccount {
+    pub who: String,
+    pub login: String,
+    pub password: String,
+    pub note: Option<String>,
+}
+
+/// The demo logins a card lists in `accounts.json` of its data folder (its setup writes the file, from the project's own seeder: `[{ "who": "Teacher", "login": "...", "password": "...", "note": "..." }]`).
+/// A missing, too big or unreadable file gives an empty list; at most 50 entries, each text at most 200 letters. Only demo accounts belong there: they are shown on the screen.
+pub fn accounts_of(data: &Path) -> Vec<DemoAccount> {
+    let file = data.join("accounts.json");
+    let Ok(md) = std::fs::metadata(&file) else { return Vec::new() };
+    if !md.is_file() || md.len() > 64 * 1024 {
+        return Vec::new();
+    }
+    let Some(list) = std::fs::read(&file).ok().and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok()) else { return Vec::new() };
+    let text = |v: &serde_json::Value, k: &str| v.get(k).and_then(|x| x.as_str()).map(|s| s.chars().take(200).collect::<String>());
+    list.as_array().map(|a| {
+        a.iter()
+            .take(50)
+            .filter_map(|v| Some(DemoAccount { who: text(v, "who").unwrap_or_default(), login: text(v, "login").filter(|l| !l.is_empty())?, password: text(v, "password").unwrap_or_default(), note: text(v, "note").filter(|n| !n.is_empty()) }))
+            .collect()
+    }).unwrap_or_default()
+}
+
+/// Take a data folder away. A program that has just been stopped may still hold a file for a moment on Windows, so this tries again a few times.
+pub fn remove_data(dir: &Path) -> Result<(), String> {
+    // only ever a folder of this shape: <project>/.kona/live-data/<card>
+    let parts: Vec<String> = dir.components().rev().take(3).map(|c| c.as_os_str().to_string_lossy().into_owned()).collect();
+    if parts.len() < 3 || parts[1] != "live-data" || parts[2] != ".kona" {
+        return Err("That is not the data folder of a card".to_string());
+    }
+    let mut last = String::new();
+    for _ in 0..10 {
+        match std::fs::remove_dir_all(dir) {
+            Ok(()) => return Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(e) => last = e.to_string(),
+        }
+        std::thread::sleep(Duration::from_millis(300));
+    }
+    Err(format!("The data of the card could not be deleted: {last}"))
+}
+
+/// "Delete data": the card's own `clean` command first (the demo database in a database server, which Kona cannot see), then the data folder. Refused while that card runs.
+/// The command is only run when the string the sheet showed is still what the recipe gives. Returns what was freed, in words.
+pub fn delete_data_now(live: &Inner, project_folder: &Path, card: &str, approved: &str) -> Result<String, String> {
+    let root = mock::card_root(project_folder, card).ok_or("There is no such mockup")?;
+    let info = mock::card_info(&root).ok_or("The mockup has no mockup.json")?;
+    let recipe = Recipe::from_info(&info).ok_or("This mockup is not a live one")??;
+    if recipe.approval() != approved {
+        return Err("The recipe changed after it was shown. Open the mockup again and read it once more.".to_string());
+    }
+    let st = live.status();
+    if st.card.as_deref() == Some(card) && st.phase != "off" && st.phase != "stopped" {
+        return Err("Stop the program first.".to_string());
+    }
+    let project_real = std::fs::canonicalize(project_folder).map_err(|_| "The project folder cannot be read")?;
+    let data = data_dir(&project_real, card)?;
+    let before = data_info(&data);
+    if let Some(clean) = &recipe.clean {
+        let dir = if recipe.cwd.is_empty() { project_real.clone() } else { std::fs::canonicalize(project_real.join(&recipe.cwd)).map_err(|_| format!("The folder {} does not exist", recipe.cwd))? };
+        if !dir.starts_with(&project_real) {
+            return Err("The folder to run in must be inside the project".to_string());
+        }
+        let mut env = recipe.env.clone();
+        env.push(("KONA_LIVE_DATA".to_string(), data.to_string_lossy().trim_start_matches(r"\\?\").to_string()));
+        env.push(("KONA_LIVE_CLEAN".to_string(), "1".to_string()));
+        let shared = Arc::new(Mutex::new(Shared { phase: Phase::Setup, message: None, log: VecDeque::new() }));
+        let mut child = shell(clean, &dir, &env, recipe.port, &shared).map_err(|e| format!("The clean command could not be started: {e}"))?;
+        let t0 = Instant::now();
+        let status = loop {
+            if let Some(st) = child.try_wait().map_err(|e| e.to_string())? {
+                break st;
+            }
+            if t0.elapsed() > Duration::from_secs(120) {
+                kill_tree(&mut child);
+                return Err("The clean command took more than 2 minutes and was stopped. Nothing was deleted.".to_string());
+            }
+            std::thread::sleep(Duration::from_millis(200));
+        };
+        if !status.success() {
+            let tail: Vec<String> = shared.lock().unwrap_or_else(|e| e.into_inner()).log.iter().rev().take(6).cloned().collect::<Vec<_>>().into_iter().rev().collect();
+            return Err(format!("The clean command stopped with {}. Nothing was deleted. It printed: {}", exit_words(status), tail.join(" / ")));
+        }
+    }
+    remove_data(&data)?;
+    Ok(if before.exists { format!("Deleted {} files, {} bytes.", before.files, before.bytes) } else { "There was no data to delete.".to_string() })
 }
 
 // ---------------------------------------------------------------- the small web client
@@ -677,6 +902,20 @@ pub fn serve(live: &Inner, base: &str, request: &ProxyReq) -> ProxyRes {
     if !request.target.starts_with('/') || request.target.contains(['\r', '\n', ' ']) {
         return plain_page(400, "Bad address");
     }
+    // a card with a bucket: what the page loads a picture or a file from (`KONA_LIVE_BUCKET_URL`) is served from the bucket's folder, on the page's own address
+    if (request.method == "GET" || request.method == "HEAD") && request.target.starts_with("/cloud/") {
+        if let Some(root) = live.bucket_root.lock().unwrap_or_else(|e| e.into_inner()).clone() {
+            let Some(key) = crate::bucket::public_key(&request.target) else { return plain_page(404, "No such file") };
+            return match crate::bucket::read_public(&root, &key) {
+                Some((data, ctype)) => ProxyRes {
+                    status: 200,
+                    headers: vec![("Content-Type".to_string(), ctype), ("Content-Length".to_string(), data.len().to_string()), ("Cache-Control".to_string(), "no-store".to_string()), ("X-Content-Type-Options".to_string(), "nosniff".to_string()), ("Content-Security-Policy".to_string(), "sandbox".to_string())],
+                    body: data,
+                },
+                None => plain_page(404, "No such file"),
+            };
+        }
+    }
     let mut headers: Vec<(String, String)> = Vec::new();
     for (name, value) in &request.headers {
         let lower = name.to_ascii_lowercase();
@@ -761,7 +1000,7 @@ fn reason(status: u16) -> &'static str {
 }
 
 /// The request a browser sent on one connection: the head, then the body (a length, or chunks)
-fn read_request(s: &mut TcpStream) -> Result<ProxyReq, String> {
+pub(crate) fn read_request(s: &mut TcpStream) -> Result<ProxyReq, String> {
     let mut buf: Vec<u8> = Vec::new();
     let mut chunk = [0u8; 16 * 1024];
     let head_end = loop {
@@ -787,6 +1026,9 @@ fn read_request(s: &mut TcpStream) -> Result<ProxyReq, String> {
     let headers: Vec<(String, String)> = lines.filter_map(|l| l.split_once(':').map(|(k, v)| (k.trim().to_string(), v.trim().to_string()))).collect();
     let get = |n: &str| headers.iter().find(|(k, _)| k.eq_ignore_ascii_case(n)).map(|(_, v)| v.clone());
     let mut body = buf[head_end + 4..].to_vec();
+    if get("expect").is_some_and(|e| e.eq_ignore_ascii_case("100-continue")) {
+        let _ = s.write_all(b"HTTP/1.1 100 Continue\r\n\r\n"); // a library that sends a big body asks first, and waits for this
+    }
     if get("transfer-encoding").is_some_and(|t| t.to_ascii_lowercase().contains("chunked")) {
         loop {
             if let Some(b) = dechunk(&body) {
@@ -817,7 +1059,7 @@ fn read_request(s: &mut TcpStream) -> Result<ProxyReq, String> {
     Ok(ProxyReq { method, target, headers, body })
 }
 
-fn write_response(s: &mut TcpStream, r: &ProxyRes, head_only: bool) {
+pub(crate) fn write_response(s: &mut TcpStream, r: &ProxyRes, head_only: bool) {
     let mut out = format!("HTTP/1.1 {} {}\r\n", r.status, reason(r.status)).into_bytes();
     for (k, v) in &r.headers {
         if !k.contains(['\r', '\n', ':']) && !v.contains(['\r', '\n']) {
@@ -893,9 +1135,11 @@ impl Live {
     }
 
     /// Start the card's program, at an address of its own (see `proxy`)
-    pub fn start(&self, project_folder: &Path, project_id: &str, card: &str, approved: &str) -> Result<(), String> {
-        self.0.start_run(project_folder, project_id, card, approved)?;
-        self.open_proxy().map(|_| ())
+    /// `fresh` is the owner's choice: begin again (the card's last data is deleted first) or carry on with what the last run left. A card with no data begins again either way.
+    pub fn start(&self, project_folder: &Path, project_id: &str, card: &str, approved: &str, fresh: bool) -> Result<(), String> {
+        let prepared = self.0.prepare(project_folder, card, approved, fresh)?;
+        let base = self.open_proxy()?;
+        self.0.launch(prepared, project_id, card, &base)
     }
 }
 
@@ -1062,7 +1306,7 @@ mod tests {
     fn running(port: u16) -> Live {
         let live = Live::default();
         let shared = Arc::new(Mutex::new(Shared { phase: Phase::Ready, message: None, log: VecDeque::new() }));
-        *live.run.lock().unwrap() = Some(Run { project: "p".into(), card: "c".into(), port, shared, child: Arc::new(Mutex::new(None)) });
+        *live.run.lock().unwrap() = Some(Run { project: "p".into(), card: "c".into(), port, shared, child: Arc::new(Mutex::new(None)), data: PathBuf::new(), keep: true });
         live
     }
 
@@ -1145,10 +1389,10 @@ mod tests {
         std::fs::write(dir.join(".kona").join("mockups").join("app").join("mockup.json"), json!({ "name": "App", "live": { "start": "node server.js", "port": port, "env": { "WHO": "mira" }, "wait": 30 } }).to_string()).unwrap();
         let live = Live::default();
         // a changed or unshown recipe is refused
-        assert!(live.start(&dir, "p", "app", "something else").is_err());
+        assert!(live.start(&dir, "p", "app", "something else", false).is_err());
         let info = mock::card_info(&mock::card_root(&dir, "app").unwrap()).unwrap();
         let approval = Recipe::from_info(&info).unwrap().unwrap().approval();
-        live.start(&dir, "p", "app", &approval).unwrap();
+        live.start(&dir, "p", "app", &approval, false).unwrap();
         let t0 = Instant::now();
         while live.target().is_none() && t0.elapsed() < Duration::from_secs(40) {
             std::thread::sleep(Duration::from_millis(200));
@@ -1166,6 +1410,116 @@ mod tests {
         assert!(!port_answers(port), "the program is still there after Stop");
         assert_eq!(live.status().phase, "off");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+    #[test]
+    fn a_card_keeps_its_data_between_runs_and_gets_a_bucket() {
+        // the program is `node`: it counts its starts in a file of its data folder and tells what Kona put into its environment; skipped where node is not installed
+        if Command::new("node").arg("-v").stdout(Stdio::null()).status().is_err() {
+            return;
+        }
+        let dir = std::env::temp_dir().join(format!("kona-live-data-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let card = dir.join(".kona").join("mockups").join("app");
+        std::fs::create_dir_all(&card).unwrap();
+        std::fs::write(dir.join("server.js"), "const fs=require('fs'),path=require('path');const d=process.env.KONA_LIVE_DATA;const f=path.join(d,'seen.txt');fs.writeFileSync(f,(fs.existsSync(f)?fs.readFileSync(f,'utf8'):'')+'x');require('http').createServer((q,s)=>{s.setHeader('Content-Type','application/json');s.end(JSON.stringify({fresh:process.env.KONA_LIVE_FRESH,keep:process.env.KONA_LIVE_KEEP,ep:process.env.KONA_LIVE_BUCKET_ENDPOINT||null,url:process.env.KONA_LIVE_BUCKET_URL||null,seen:fs.readFileSync(f,'utf8').length}))}).listen(+process.env.KONA_LIVE_PORT,'127.0.0.1')").unwrap();
+        std::fs::write(dir.join("clean.js"), "require('fs').writeFileSync(require('path').join(process.env.KONA_LIVE_DATA,'..','cleaned.txt'),'yes')").unwrap();
+        let probe = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = probe.local_addr().unwrap().port();
+        drop(probe);
+        let write_recipe = |keep: bool| std::fs::write(card.join("mockup.json"), json!({ "name": "App", "live": { "start": "node server.js", "clean": "node clean.js", "port": port, "bucket": true, "keep": keep, "wait": 30 } }).to_string()).unwrap();
+        write_recipe(true);
+        let approval = |dir: &Path| Recipe::from_info(&mock::card_info(&mock::card_root(dir, "app").unwrap()).unwrap()).unwrap().unwrap().approval();
+        let live = Live::default();
+        let ask = |live: &Live| -> serde_json::Value {
+            let t0 = Instant::now();
+            while live.target().is_none() && t0.elapsed() < Duration::from_secs(40) {
+                std::thread::sleep(Duration::from_millis(200));
+            }
+            assert_eq!(live.status().phase, "ready", "{:?}", live.status());
+            serde_json::from_slice(&serve(live, B, &req("GET", "/", &[], b"")).body).unwrap()
+        };
+        let stopped = |live: &Live| {
+            live.stop();
+            let t0 = Instant::now();
+            while port_answers(port) && t0.elapsed() < Duration::from_secs(10) {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+        };
+        let project = std::fs::canonicalize(&dir).unwrap();
+        let data = data_dir(&project, "app").unwrap();
+        assert!(!data_info(&data).exists);
+        // the first start: no data, so it begins fresh; the bucket is there and the page's own address serves its files
+        live.start(&dir, "p", "app", &approval(&dir), false).unwrap();
+        let a = ask(&live);
+        assert_eq!((a["fresh"].as_str(), a["keep"].as_str(), a["seen"].as_u64()), (Some("1"), Some("1"), Some(1)));
+        let endpoint = a["ep"].as_str().unwrap().to_string();
+        assert!(endpoint.starts_with("http://127.0.0.1:") && a["url"].as_str().unwrap().ends_with("/cloud"), "{a}");
+        let bucket_port: u16 = endpoint.rsplit(':').next().unwrap().parse().unwrap();
+        assert_eq!(upstream(bucket_port, "PUT", "/kona/pics/one.png", &[], b"png-bytes").unwrap().status, 200);
+        let shown = serve(&live, B, &req("GET", "/cloud/pics/one.png", &[], b""));
+        assert_eq!((shown.status, shown.body.as_slice(), shown.header("content-type")), (200, b"png-bytes".as_slice(), vec!["image/png".to_string()]));
+        assert_eq!(serve(&live, B, &req("GET", "/cloud/pics/none.png", &[], b"")).status, 404);
+        assert_eq!(serve(&live, B, &req("GET", "/cloud/..%2F..%2Fserver.js", &[], b"")).status, 404);
+        // Stop keeps the data (the default), and the owner can see how much
+        stopped(&live);
+        let info = data_info(&data);
+        assert!(info.exists && info.files >= 2 && info.bytes > 0 && info.place == ".kona/live-data/app", "{info:?}");
+        assert!(!port_answers(bucket_port), "the bucket goes with the program");
+        // the next start carries on with it: not fresh, the file has grown, the picture is still there at the new bucket's address
+        live.start(&dir, "p", "app", &approval(&dir), false).unwrap();
+        let b = ask(&live);
+        assert_eq!((b["fresh"].as_str(), b["seen"].as_u64()), (Some("0"), Some(2)));
+        assert_eq!(serve(&live, B, &req("GET", "/cloud/pics/one.png", &[], b"")).body, b"png-bytes");
+        // Delete data is refused while the card runs
+        assert!(delete_data_now(&live, &dir, "app", &approval(&dir)).unwrap_err().contains("Stop"));
+        stopped(&live);
+        // "Start fresh" takes the old data away first
+        live.start(&dir, "p", "app", &approval(&dir), true).unwrap();
+        let c = ask(&live);
+        assert_eq!((c["fresh"].as_str(), c["seen"].as_u64()), (Some("1"), Some(1)));
+        assert_eq!(serve(&live, B, &req("GET", "/cloud/pics/one.png", &[], b"")).status, 404, "the picture of the old data is gone");
+        // "Stop and delete its data"
+        live.stop_with(true);
+        assert!(!data_info(&data).exists && !data.exists());
+        // Delete data runs the card's clean command (as the sheet showed it) and then takes the folder away; a changed recipe is refused
+        live.start(&dir, "p", "app", &approval(&dir), false).unwrap();
+        ask(&live);
+        stopped(&live);
+        assert!(delete_data_now(&live, &dir, "app", "something else").is_err());
+        let said = delete_data_now(&live, &dir, "app", &approval(&dir)).unwrap();
+        assert!(said.starts_with("Deleted"), "{said}");
+        assert!(!data.exists() && project.join(".kona").join("live-data").join("cleaned.txt").exists(), "the clean command ran, and the folder is gone");
+        // a recipe that says keep: false deletes the data at Stop
+        write_recipe(false);
+        live.start(&dir, "p", "app", &approval(&dir), false).unwrap();
+        let d = ask(&live);
+        assert_eq!(d["keep"].as_str(), Some("0"));
+        assert!(data.exists());
+        stopped(&live);
+        assert!(!data.exists(), "keep: false deletes the data at Stop");
+        // only a folder of the right shape is ever deleted
+        assert!(remove_data(&project).is_err() && remove_data(&project.join(".kona")).is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_demo_logins_of_a_card_are_read_from_its_data_folder() {
+        let d = std::env::temp_dir().join(format!("kona-live-accounts-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        assert!(accounts_of(&d).is_empty(), "no file, no logins");
+        std::fs::write(d.join("accounts.json"), json!([{ "who": "Teacher", "login": "teacher@example.test", "password": "demo-pass", "note": "sees two classes" }, { "who": "Student", "login": "student@example.test", "password": "demo-pass" }, { "who": "No login" }, { "login": "x@example.test", "password": "p" }]).to_string()).unwrap();
+        let a = accounts_of(&d);
+        assert_eq!(a.len(), 3, "an entry without a login is left out");
+        assert_eq!((a[0].who.as_str(), a[0].login.as_str(), a[0].note.as_deref()), ("Teacher", "teacher@example.test", Some("sees two classes")));
+        assert_eq!((a[1].password.as_str(), a[1].note.clone()), ("demo-pass", None));
+        std::fs::write(d.join("accounts.json"), "not json").unwrap();
+        assert!(accounts_of(&d).is_empty());
+        std::fs::write(d.join("accounts.json"), json!({ "who": "x" }).to_string()).unwrap();
+        assert!(accounts_of(&d).is_empty(), "a list is expected");
+        std::fs::write(d.join("accounts.json"), vec![b' '; 70 * 1024]).unwrap();
+        assert!(accounts_of(&d).is_empty(), "a file that is too big is not read");
+        let _ = std::fs::remove_dir_all(&d);
     }
     #[test]
     fn a_live_page_cannot_ask_a_question_that_nothing_can_answer() {

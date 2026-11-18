@@ -66,7 +66,7 @@ try {
   // ---- every file of the build, byte for byte
   const files = walkFiles(path.join(CARD, "dist")); const rels = files.map((p) => "/" + path.relative(path.join(CARD, "dist"), p).replace(/\\/g, "/"));
   const got = await f.ev(`(async () => { const out = {}; for (const p of ${JSON.stringify(rels)}) { const r = await fetch(p, { cache: 'no-store' }); const b = await r.arrayBuffer(); const h = await crypto.subtle.digest('SHA-256', b); out[p] = [r.status, Array.from(new Uint8Array(h)).map((x) => x.toString(16).padStart(2, '0')).join(''), /html/.test(r.headers.get('content-type') || '') ? new TextDecoder().decode(b) : null]; } return out; })()`);
-  const strip = (h) => h.replace(/<script>\(function\(\)\{try\{var d=Object[\s\S]*?<\/script>/, "").replace(/<script>\(function\(\)\{var r=document\.documentElement;[\s\S]*?<\/script>/, "").replace(/<script>\(function\(\)\{var last=0;[\s\S]*?<\/script>/, "");
+  const strip = (h) => h.replace(/<script>\(function\(\)\{try\{var d=Object[\s\S]*?<\/script>/, "").replace(/<script>\(function\(\)\{var r=document\.documentElement;[\s\S]*?<\/script>/, "").replace(/<script>\(function\(\)\{var last=0;[\s\S]*?<\/script>/, "").replace(/<style data-kona>[\s\S]*?<\/style>/, "");
   const bad = rels.filter((r, i) => got[r][0] !== 200 || (got[r][2] !== null ? strip(got[r][2]) !== fs.readFileSync(files[i], "utf8") : got[r][1] !== sha(fs.readFileSync(files[i]))));
   ok(`all ${rels.length} files of the build reach the browser byte for byte (a page: with the two scripts of the sheet taken out)`, bad.length === 0, bad.slice(0, 3).join(" "));
   // ---- how the project's own web server answers

@@ -8,6 +8,8 @@
     "entry": "/login",
     "ready": "/",
     "wait": 60,
+    "bucket": false,
+    "keep": true,
     "env": {
       "APP_URL": "http://localhost:8791"
     }

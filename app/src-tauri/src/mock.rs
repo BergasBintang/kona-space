@@ -186,8 +186,13 @@ const HELPER: &str = concat!("<script>", include_str!("mock_helper.js"), "</scri
 
 /// The page with the helper after its `<head>` tag (or `<html>`, or the doctype, or at the very start). Never before the doctype, which would put the page in quirks mode.
 pub(crate) fn inject_helper(html: &[u8]) -> Vec<u8> {
-    inject_script(html, HELPER)
+    inject_script(&inject_script(html, SCROLLBARS), HELPER)
 }
+
+/// The scroll bar of a page in a device frame. The engine draws a classic one (about 15 px wide, with arrows) inside the frame, and on a phone or a tablet that is wrong twice: a real one
+/// has no such bar, and the bar takes 15 px of the page's width, so the page lays itself out narrower than on the real device. So below 800 px the bars are hidden (the page still scrolls
+/// with the wheel), and on a laptop or a desktop they are thin. `*` has no weight of its own: a program's own styling of its bars wins.
+const SCROLLBARS: &str = "<style data-kona>@media (max-width:800px){*{scrollbar-width:none}}@media (min-width:801px){*{scrollbar-width:thin}}</style>";
 
 /// The same place for any other `<script>` of Kona's (a Live page gets one more)
 pub(crate) fn inject_script(html: &[u8], script: &str) -> Vec<u8> {

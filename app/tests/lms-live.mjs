@@ -16,6 +16,7 @@ import { attachFrames } from "./cdp-frames.mjs";
 
 const LMS = process.env.LMS_ROOT || "C:\\quantum-research-lms";
 const CARD_DIR = path.join(LMS, ".kona", "mockups", "lms-live");
+const DATA = path.join(LMS, ".kona", "live-data", "lms-live"); // what the card keeps between runs (decision 94b): its demo database, its storage, the files of its fake bucket, its list of demo logins
 const CARD_NAME = JSON.parse(fs.readFileSync(path.join(CARD_DIR, "mockup.json"), "utf8")).name;
 const PORT = JSON.parse(fs.readFileSync(path.join(CARD_DIR, "mockup.json"), "utf8")).live.port;
 const PASSWORD = /const PASSWORD = '([^']+)'/.exec(fs.readFileSync(path.join(LMS, "lms", "backend", "database", "seeders", "LocalDemoSeeder.php"), "utf8"))?.[1];
@@ -49,7 +50,7 @@ const pressText = (text, scope = "section[data-sheet]") => c.ev(`(() => { const 
 const frameBox = () => c.ev(`(() => { const f = document.querySelector('iframe[title]'); if (!f) return null; const r = f.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height, cw: f.offsetWidth, ch: f.offsetHeight, sandbox: f.getAttribute('sandbox'), src: f.getAttribute('src') }; })()`);
 const realDbs = ["database.sqlite", "reports.sqlite"].map((f) => path.join(LMS, "lms", "backend", "database", f));
 const fingerprint = () => realDbs.map((f) => { const s = fs.statSync(f); return `${path.basename(f)} ${s.size} ${s.mtimeMs} ${sha(fs.readFileSync(f))}`; });
-const demoDb = () => new DatabaseSync(path.join(CARD_DIR, "demo.sqlite"), { readOnly: true });
+const demoDb = () => new DatabaseSync(path.join(DATA, "demo.sqlite"), { readOnly: true });
 const sql = (q, ...a) => { const db = demoDb(); try { return db.prepare(q).all(...a); } finally { db.close(); } };
 
 const ACCOUNTS = [
@@ -113,10 +114,13 @@ async function openSheet() {
   await wait(1200);
 }
 
-async function startProgram() {
+// `fresh`: begin from nothing (the first start has no data, so the plain button is there; later ones have data, and "Start fresh" is chosen). Otherwise carry on with the data of the last run ("Start with the last data").
+async function startProgram(fresh = true) {
   await c.ev(`document.querySelector('section[data-sheet] ul button[aria-label=${JSON.stringify("Open " + CARD_NAME)}]')?.click(); true`);
-  await c.waitFor(`document.querySelector('section[data-sheet]')?.innerText.includes('Start the program')`, 5000, 100);
-  await pressText("Start the program"); await c.waitFor(`!!document.querySelector('[role=dialog]')`, 3000, 100);
+  await c.waitFor(`/Start the program|Start with the last data/.test(document.querySelector('section[data-sheet]')?.innerText ?? '')`, 5000, 100);
+  const panel = await sheetText();
+  const label = panel.includes("Start with the last data") ? (fresh ? "Start fresh" : "Start with the last data") : "Start the program";
+  await pressText(label); await c.waitFor(`!!document.querySelector('[role=dialog]')`, 3000, 100);
   const dlg = await c.ev(`document.querySelector('[role=dialog]').innerText`);
   const t0 = Date.now();
   await pressText("Run it", "[role=dialog]");
@@ -173,6 +177,16 @@ try {
   frame = await F.frame(base + "/");
   ok("the page of the LMS is a frame of its own that the test can reach", !!frame, (await F.targets()).map((t) => t.type + ":" + t.url.slice(0, 60)).join(" | "));
   if (!frame) throw new Error("no frame");
+  {
+    ok("the question said that Kona gives the program a fake bucket, and that its data is kept", /fake cloud bucket/.test(s.dialog) && /kept when it stops/.test(s.dialog), s.dialog.replace(/\s+/g, " ").slice(-260));
+    const logins = JSON.parse(fs.readFileSync(path.join(DATA, "accounts.json"), "utf8"));
+    // the list is laid over the program (the key button of the toolbar opens and closes it, and it opens by itself the first time a card is up)
+    if (!(await sheetText()).includes("Password for all")) { await press("Demo accounts"); await wait(500); }
+    const shown = await sheetText();
+    ok("the sheet lists the demo logins next to the program, with the one password for all (nobody is left at the sign-in page)", logins.length === 8 && logins.every((a) => shown.includes(a.login)) && shown.includes("Demo accounts (8)") && shown.includes("Password for all: " + PASSWORD) && shown.includes("Copy"), `${logins.length} logins; ${shown.replace(/\s+/g, " ").slice(0, 160)}`);
+    await press("Close the demo accounts"); await wait(300);
+    ok("the data folder of the card exists in the project, with the demo database, the storage and the bucket's folder", ["demo.sqlite", "storage", "bucket"].every((f) => fs.existsSync(path.join(DATA, f))), fs.readdirSync(DATA).join(", "));
+  }
   await frame.waitFor(`document.querySelector('#app') && document.querySelector('#app').children.length > 0`, 20000);
   await settle(frame);
   let st = await appState(frame);
@@ -192,7 +206,7 @@ try {
   const wrongType = rels.filter((r) => { const t = got[r][3] ?? ""; const e = path.extname(r); return (e === ".js" && !t.includes("javascript")) || (e === ".css" && !t.includes("text/css")) || (e === ".svg" && !t.includes("svg")) || ((e === ".woff2") && !t.includes("woff2")); });
   ok("scripts, styles, fonts and pictures have the right content types", wrongType.length === 0, `${[...types].join(" ")} ${wrongType.slice(0, 2).join(" ")}`);
   const html = await frame.ev(`fetch('/app/', { cache: 'no-store' }).then((r) => r.text())`);
-  const strip = (h) => h.replace(/<script>\(function\(\)\{try\{var d=Object[\s\S]*?<\/script>/, "").replace(/<script>\(function\(\)\{var r=document\.documentElement;[\s\S]*?<\/script>/, "").replace(/<script>\(function\(\)\{var last=0;[\s\S]*?<\/script>/, "");
+  const strip = (h) => h.replace(/<script>\(function\(\)\{try\{var d=Object[\s\S]*?<\/script>/, "").replace(/<script>\(function\(\)\{var r=document\.documentElement;[\s\S]*?<\/script>/, "").replace(/<script>\(function\(\)\{var last=0;[\s\S]*?<\/script>/, "").replace(/<style data-kona>[\s\S]*?<\/style>/, "");
   const stripped = strip(html);
   ok("the page the browser got is the build's index.html plus the two scripts of the sheet, nothing else", stripped === fs.readFileSync(path.join(CARD_DIR, "dist", "index.html"), "utf8"), `${html.length - stripped.length} letters added`);
   const pub = path.join(LMS, "lms", "backend", "public"); const pubFiles = [];
@@ -424,7 +438,7 @@ try {
   const picGo = await frame.ev(`(() => { const b = [...document.querySelectorAll('[role=dialog] button, dialog button')].reverse().find((x) => /unggah|upload/i.test(x.innerText) && !x.disabled); if (!b) return 'no button'; b.click(); return 'clicked'; })()`);
   await settle(frame, 800, 20000); await wait(1500);
   const picRow = sql("select path from images order by id desc limit 1")[0];
-  const picFile = picRow ? path.join(CARD_DIR, "cloud", picRow.path) : null;
+  const picFile = picRow ? path.join(DATA, "bucket", "objects", picRow.path) : null;
   const picBytes = picFile && fs.existsSync(picFile) ? fs.readFileSync(picFile) : null;
   ok("a picture chosen in the editor's own file box was sent by the real form (multipart), and the program kept it in the card's cloud stand-in as a compressed JPEG", picSet.error === undefined && picGo === "clicked" && sql("select count(*) c from images")[0].c === imagesBefore + 1 && !!picBytes && picBytes[0] === 0xff && picBytes[1] === 0xd8, `${picGo}; ${picBytes ? picBytes.length + " bytes in cloud/" + picRow.path : "no file"}`);
   const picShown = await frame.ev(`[...document.querySelectorAll('img')].filter((i) => /content-images/.test(i.src)).map((i) => [new URL(i.src).host, i.complete, i.naturalWidth])`);
@@ -463,7 +477,8 @@ try {
     if (!(await frame.waitFor(`!!${find}`, 15000))) throw new Error(`no button "${label}" (${selector}); the page: ` + (await frame.ev(`location.pathname + ' | ' + document.body.innerText.replace(/\\s+/g, ' ').slice(0, 250)`)));
     await frame.ev(`${find}.click(); 1`);
   };
-  const cloudFile = (rel) => { const f = path.join(CARD_DIR, "cloud", rel); return fs.existsSync(f) ? fs.readFileSync(f) : null; };
+  const isJpegFile = (f) => { try { const b = fs.readFileSync(f); return b[0] === 0xff && b[1] === 0xd8; } catch { return false; } };
+  const cloudFile = (rel) => { const f = path.join(DATA, "bucket", "objects", rel); return fs.existsSync(f) ? fs.readFileSync(f) : null; };
   const isJpeg = (b) => !!b && b[0] === 0xff && b[1] === 0xd8;
   const smallPng = path.join(os.tmpdir(), "lms-live-submit.png"); fs.writeFileSync(smallPng, makePng(200, 150));
   const notPicture = path.join(os.tmpdir(), "lms-live-notes.txt"); fs.writeFileSync(notPicture, "not a picture or a pdf\n");
@@ -598,12 +613,29 @@ try {
   ok("opening it again shows the program at once, still signed in", await c.waitFor(`!!document.querySelector('iframe[title]')`, 8000, 200));
   ok("Stop stops the launcher and PHP behind it", await press("Stop the program") && await gone(PORT) && await gone(PORT + 1000));
 
-  // ---- a clean start: new data, the browser's storage forgotten
-  const s2 = await startProgram();
-  ok("started again", s2.up, `${s2.secs} s`);
+  // ---- Stop keeps the data, and the sheet says so, with the choice
+  await wait(1500);
+  const afterStop = await sheetText();
+  ok("after Stop the sheet shows what the card kept (size and age), the choice to carry on, begin again or delete it, and the demo logins", /Data from the last run/.test(afterStop) && afterStop.includes("Start with the last data") && afterStop.includes("Start fresh") && afterStop.includes("Delete the data") && afterStop.includes("Demo accounts (8)"), afterStop.replace(/\s+/g, " ").slice(0, 300));
+  const keptCity = sql("select count(*) c from cities where name = 'Kota Demo'")[0].c;
+  const keptPicture = picRow && isJpegFile(picFile);
+
+  // ---- carrying on with the data of the last run: what the last run made is still there, the browser's storage is still forgotten
+  const sKeep = await startProgram(false);
+  ok("started again with the data of the last run", sKeep.up, `${sKeep.secs} s`);
   frame = await F.frame(new URL((await frameBox()).src).origin + "/"); await frame.waitFor(`document.querySelector('#app')?.children.length > 0`, 20000); await settle(frame);
   st = await appState(frame);
-  ok("the demo data is made again: the city of the last run is gone, the seeded one is back", sql("select count(*) c from cities where name = 'Kota Demo'")[0].c === 0 && sql("select count(*) c from cities where name = 'Jakarta'")[0].c === 1);
+  ok("the data of the last run is still there: the city that was written, and the picture in the fake bucket, and nothing was made again", keptCity === 1 && sql("select count(*) c from cities where name = 'Kota Demo'")[0].c === 1 && keptPicture === true && isJpegFile(picFile), JSON.stringify({ keptCity, keptPicture }));
+  ok("the browser still forgot the last run: nobody is signed in", !st.token && st.path === "/app/login", JSON.stringify({ t: st.token, p: st.path }));
+  ok("Stop stops both programs", await press("Stop the program") && await gone(PORT) && await gone(PORT + 1000));
+
+  // ---- Start fresh: the data of the last run is taken away first, and everything is made again
+  const s2 = await startProgram(true);
+  ok("started again, from nothing", s2.up, `${s2.secs} s`);
+  frame = await F.frame(new URL((await frameBox()).src).origin + "/"); await frame.waitFor(`document.querySelector('#app')?.children.length > 0`, 20000); await settle(frame);
+  st = await appState(frame);
+  ok("the demo data is made again: the city of the last run is gone, the seeded one is back, and so are the demo logins", sql("select count(*) c from cities where name = 'Kota Demo'")[0].c === 0 && sql("select count(*) c from cities where name = 'Jakarta'")[0].c === 1 && fs.existsSync(path.join(DATA, "accounts.json")));
+  ok("the picture of the last run is gone from the fake bucket (Start fresh took the data away)", !isJpegFile(picFile));
   ok("the browser forgot the last run: nobody is signed in, and the old token and language are gone", !st.token && st.path === "/app/login" && (await frame.ev(`localStorage.getItem('lms_locale')`)) !== "en", JSON.stringify({ t: st.token, p: st.path }));
   const regs = await frame.ev(`navigator.serviceWorker.getRegistrations().then((r) => r.length)`);
   info(`service worker registrations after the second start: ${regs}`);
@@ -617,14 +649,20 @@ try {
   // ---- Kona's own window is reloaded while the program runs (a reload does not give the page a chance to stop it)
   await c.ev(`document.querySelector('[aria-label="Open Mockups"]').click(); true`);
   await c.waitFor(`document.querySelector('section[data-sheet]')?.getAttribute('aria-label') === 'Mockups'`, 5000, 100); await wait(1200);
-  const s3 = await startProgram();
-  ok("started a third time", s3.up, `${s3.secs} s`);
+  const s3 = await startProgram(false);
+  ok("started once more, carrying on with the data", s3.up, `${s3.secs} s`);
   await openSheet();
   await wait(1500);
   ok("after the reload the program still runs, and the card says so", await answers(PORT) && (await sheetText()).includes("Running"));
   await c.ev(`document.querySelector('section[data-sheet] ul button[aria-label=${JSON.stringify("Open " + CARD_NAME)}]').click(); true`);
   ok("the card shows the running program again at once", await c.waitFor(`!!document.querySelector('iframe[title]')`, 15000, 300));
-  ok("Stop works after the reload", await press("Stop the program") && await gone(PORT) && await gone(PORT + 1000));
+  // the last act: "Stop the program and delete its data" (the trash button), which leaves the card with nothing kept
+  ok("the data is there while the program runs", fs.existsSync(path.join(DATA, "demo.sqlite")));
+  ok("the trash button asks before it deletes", await press("Stop the program and delete its data") && await c.waitFor(`!!document.querySelector('[role=dialog]')`, 3000, 100) && (await c.ev(`document.querySelector('[role=dialog]').innerText`)).includes("cannot be undone"));
+  await pressText("Stop and delete", "[role=dialog]");
+  ok("Stop and delete stops both programs and takes the card's data away", await gone(PORT) && await gone(PORT + 1000) && await (async () => { for (let i = 0; i < 40; i++) { if (!fs.existsSync(DATA)) return true; await wait(250); } return false; })());
+  await wait(1200);
+  ok("the sheet no longer lists data for the card", !/Data from the last run/.test(await sheetText()));
 } catch (e) {
   note("FAIL the test stopped: " + String(e.stack ?? e).slice(0, 600)); failed++;
   try { await invoke("live_stop"); } catch {}

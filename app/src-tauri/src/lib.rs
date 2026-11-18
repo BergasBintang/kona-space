@@ -4,6 +4,7 @@ mod accounts;
 mod backup;
 mod brain;
 mod brain_search;
+mod bucket;
 mod files;
 mod job;
 mod journey_scan;
@@ -905,14 +906,36 @@ fn live_status(live: State<'_, live::Live>) -> live::Status {
 
 /// Start the program of a Live card. `approved` is the recipe string the sheet showed (`approval` of the card); a recipe that changed since is refused. One program runs at a time.
 #[tauri::command]
-fn live_start(projects: State<'_, Projects>, live: State<'_, live::Live>, project_id: String, card: String, approved: String) -> Result<(), String> {
-    live.start(&folder_of_project(&projects, &project_id)?, &project_id, &card, &approved)
+fn live_start(projects: State<'_, Projects>, live: State<'_, live::Live>, project_id: String, card: String, approved: String, fresh: Option<bool>) -> Result<(), String> {
+    live.start(&folder_of_project(&projects, &project_id)?, &project_id, &card, &approved, fresh.unwrap_or(false))
 }
 
-/// Stop the running Live program and everything it started
+/// Stop the running Live program and everything it started. The card's data is kept (unless its recipe says otherwise) or, with `delete_data`, deleted at once.
 #[tauri::command]
-fn live_stop(live: State<'_, live::Live>) {
-    live.stop();
+fn live_stop(live: State<'_, live::Live>, delete_data: Option<bool>) {
+    live.stop_with(delete_data.unwrap_or(false));
+}
+
+/// What a Live card has kept from its last runs (its data folder): whether there is any, how big, how old
+#[tauri::command]
+fn live_data(projects: State<'_, Projects>, project_id: String, card: String) -> Result<live::DataInfo, String> {
+    let folder = std::fs::canonicalize(folder_of_project(&projects, &project_id)?).map_err(|_| "The project folder cannot be read".to_string())?;
+    Ok(live::data_info(&live::data_dir(&folder, &card)?))
+}
+
+/// The demo logins a Live card lists (`accounts.json` in its data folder), shown next to its program
+#[tauri::command]
+fn live_accounts(projects: State<'_, Projects>, project_id: String, card: String) -> Result<Vec<live::DemoAccount>, String> {
+    let folder = std::fs::canonicalize(folder_of_project(&projects, &project_id)?).map_err(|_| "The project folder cannot be read".to_string())?;
+    Ok(live::accounts_of(&live::data_dir(&folder, &card)?))
+}
+
+/// Delete a Live card's data: its own `clean` command first (when its recipe has one, run only as the sheet showed it), then the data folder. Refused while the card runs.
+#[tauri::command]
+async fn live_delete_data(projects: State<'_, Projects>, live: State<'_, live::Live>, project_id: String, card: String, approved: String) -> Result<String, String> {
+    let folder = folder_of_project(&projects, &project_id)?;
+    let live = live.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || live::delete_data_now(&live, &folder, &card, &approved)).await.map_err(|e| e.to_string())?
 }
 
 /// The cards (mockups) of a project: the folders of `.kona/mockups`
@@ -1015,7 +1038,7 @@ pub fn run() {
             app.manage(backup::SettingsStore::load(&base));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![cost_hours, read_skill_files, save_skill_folder, default_role_kit, apply_default_tree, check_claude, save_tool, delete_tool, read_skill, write_skill, delete_skill, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, set_project_group, set_project_sessions, rename_project, cost_rows, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, office_say, mockup_ticket_draft, note_check, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, workflow_list, workflow_save, workflow_delete, run_list, run_save, run_delete, office_map_load, office_map_save, office_map_reset, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, git_marks, read_file, mock_base, mock_cards, mock_files, live_base, live_status, live_start, live_stop, journey_markers, journey_check, brain_chat, mock_page_text, terminal::term_open, terminal::term_write, terminal::term_resize, terminal::term_close, terminal::term_close_all, terminal::term_buttons_load, terminal::term_buttons_save])
+        .invoke_handler(tauri::generate_handler![cost_hours, read_skill_files, save_skill_folder, default_role_kit, apply_default_tree, check_claude, save_tool, delete_tool, read_skill, write_skill, delete_skill, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, set_project_group, set_project_sessions, rename_project, cost_rows, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, office_say, mockup_ticket_draft, note_check, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, workflow_list, workflow_save, workflow_delete, run_list, run_save, run_delete, office_map_load, office_map_save, office_map_reset, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, git_marks, read_file, mock_base, mock_cards, mock_files, live_base, live_status, live_start, live_stop, live_data, live_delete_data, live_accounts, journey_markers, journey_check, brain_chat, mock_page_text, terminal::term_open, terminal::term_write, terminal::term_resize, terminal::term_close, terminal::term_close_all, terminal::term_buttons_load, terminal::term_buttons_save])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         // a Live mockup's program never outlives Kona

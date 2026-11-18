@@ -40,7 +40,7 @@ A mockup can show the journey note of the project without a copy. Its `mockup.js
 ## Skills for mockups
 
 - `make-a-mockup` draws a new page that runs by itself.
-- `make-a-live-mockup` writes the recipe that runs the project's real program in the sheet, on demo data. Use it before drawing anything by hand when the product can run.
+- `make-a-live-mockup` writes the recipe that runs the project's real program in the sheet, on demo data kept between runs, with a fake S3 bucket if it needs one. Use it before drawing anything by hand when the product can run.
 - `reverse-a-mockup` reads a built project's own source and copies a few pages as a mockup, for a product that cannot run on this PC.
 - `build-from-a-mockup` turns an agreed mockup into the project's own code and compares the two at the five widths.
 

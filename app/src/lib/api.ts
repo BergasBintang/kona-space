@@ -178,7 +178,11 @@ export const readFile = (path: string) => invoke<FileView>("read_file", { path }
 
 // The mockup previewer (decision 75): a mockup is a card, a folder of `.kona/mockups`; its pages are loaded from `${mockBase}/${projectId}/${card}/${file}`.
 /** The recipe of a Live card (decision 94): what is run, shown before the owner says yes; `approval` is sent back with Start */
-export type LiveRecipe = { setup: string | null; start: string; cwd: string; port: number; entry: string; env: string[]; allow: string[]; approval: string };
+export type LiveRecipe = { setup: string | null; start: string; cwd: string; port: number; entry: string; env: string[]; allow: string[]; bucket: boolean; keep: boolean; clean: string | null; approval: string };
+/** What a Live card has kept from its runs (decision 94b): its data folder */
+/** A made-up login of a card's demo data, listed by its setup in `accounts.json` of its data folder */
+export type DemoAccount = { who: string; login: string; password: string; note: string | null };
+export type LiveData = { exists: boolean; bytes: number; files: number; age_secs: number | null; place: string };
 export type MockCard = { id: string; name: string; entry: string | null; files: number; modified: number | null; live: LiveRecipe | null; live_error: string | null };
 export type LivePhase = "off" | "setup" | "starting" | "ready" | "failed" | "stopped";
 export type LiveStatus = { project: string | null; card: string | null; phase: LivePhase; message: string | null; log: string[]; base: string | null };
@@ -188,8 +192,14 @@ export const mockCards = (projectId: string) => invoke<MockCard[]>("mock_cards",
 export const mockFiles = (projectId: string, card: string) => invoke<MockFile[]>("mock_files", { projectId, card });
 export const liveBase = () => invoke<string>("live_base");
 export const liveStatus = () => invoke<LiveStatus>("live_status");
-export const liveStart = (projectId: string, card: string, approved: string) => invoke<void>("live_start", { projectId, card, approved });
-export const liveStop = () => invoke<void>("live_stop");
+/** `fresh`: take the last data away first and begin again (the default carries on with it) */
+export const liveStart = (projectId: string, card: string, approved: string, fresh = false) => invoke<void>("live_start", { projectId, card, approved, fresh });
+/** `deleteData`: also take the card's data away at once (otherwise it is kept, unless the recipe says `keep: false`) */
+export const liveStop = (deleteData = false) => invoke<void>("live_stop", { deleteData });
+export const liveAccounts = (projectId: string, card: string) => invoke<DemoAccount[]>("live_accounts", { projectId, card });
+export const liveData = (projectId: string, card: string) => invoke<LiveData>("live_data", { projectId, card });
+/** Runs the card's `clean` command (as shown), then deletes its data folder; the program must be stopped. Returns what was done, in words. */
+export const liveDeleteData = (projectId: string, card: string, approved: string) => invoke<string>("live_delete_data", { projectId, card, approved });
 /** The step markers (`kona-step: <id>`) found in the project's code: read only, runs off the window's thread (decision 91) */
 /** On request, one cheap Haiku call: does the journey make sense (decision 91, ticket T-0041). The prompt is built by lib/brain/journeyai.ts. */
 export const journeyCheck = (projectId: string, accountId: string | null, prompt: string) => invoke<string>("journey_check", { projectId, accountId, prompt });

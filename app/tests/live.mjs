@@ -253,7 +253,22 @@ try {
   ok("back on the cards the live card says it is running, and the program still answers", (await sheetText()).includes("Running") && await answers(pMain));
   await c.ev(`document.querySelector('section[data-sheet] ul button[aria-label="Open School live"]').click(); true`);
   ok("opening it again shows the program at once", await c.waitFor(`!!document.querySelector('iframe[title]')`, 8000, 200));
-  ok("Stop stops the program and everything it started, and the panel comes back", await press("Stop the program") && await gone(pMain) && await c.waitFor(`document.querySelector('section[data-sheet]')?.innerText.includes('Start the program')`, 8000, 200));
+  // the list opens by itself the first time a card's program is up (the project is new in this test); the key button of the toolbar opens and closes it, and it is laid over the program: the program keeps its room
+  if (!(await sheetText()).includes("Password for all")) { await press("Demo accounts"); await wait(500); }
+  const running = await sheetText();
+  const boxOpen = await frameBox();
+  ok("the sheet lists the demo logins next to the running program, with the one password for all", running.includes("Demo accounts (4)") && running.includes("Password for all: demo") && running.includes("student@example.test"), running.replace(/\s+/g, " ").slice(0, 200));
+  ok("the list of demo logins is laid over the program and closes from its own button: the program keeps the same room whether it is open or shut", await press("Close the demo accounts") && await c.waitFor(`!document.querySelector('section[aria-label="Demo accounts"]')`, 3000, 100) && JSON.stringify(await frameBox().then((b) => [b.w, b.h, b.x, b.y])) === JSON.stringify([boxOpen.w, boxOpen.h, boxOpen.x, boxOpen.y]), JSON.stringify(boxOpen));
+  ok("Stop stops the program and everything it started, and the panel comes back", await press("Stop the program") && await gone(pMain) && await c.waitFor(`/Start the program|Start with the last data/.test(document.querySelector('section[data-sheet]')?.innerText ?? '')`, 8000, 200));
+  await wait(1200);
+  const dataDir = path.join(root, "project", ".kona", "live-data", "school");
+  const afterStop = await sheetText();
+  ok("Stop kept the card's data and the sheet says so, with the choice to carry on, begin again or delete it, and the demo logins", fs.existsSync(path.join(dataDir, "accounts.json")) && /Data from the last run/.test(afterStop) && afterStop.includes("Start with the last data") && afterStop.includes("Start fresh") && afterStop.includes("Delete the data") && afterStop.includes("Demo accounts (4)"), afterStop.replace(/\s+/g, " ").slice(0, 260));
+  await shot("2b-data");
+  ok("Delete the data asks first and says it cannot be undone", await pressText("Delete the data") && await c.waitFor(`!!document.querySelector('[role=dialog]')`, 3000, 100) && (await c.ev(`document.querySelector('[role=dialog]').innerText`)).includes("cannot be undone") && fs.existsSync(dataDir));
+  ok("saying no keeps it", await pressText("Cancel", "[role=dialog]") && await c.waitFor(`!document.querySelector('[role=dialog]')`, 2000, 100) && fs.existsSync(dataDir));
+  await pressText("Delete the data"); await c.waitFor(`!!document.querySelector('[role=dialog]')`, 3000, 100);
+  ok("saying yes deletes the card's data folder, and the sheet stops listing it", await pressText("Delete the data", "[role=dialog]") && await (async () => { for (let k = 0; k < 40; k++) { if (!fs.existsSync(dataDir)) return true; await wait(250); } return false; })() && await c.waitFor(`!/Data from the last run/.test(document.querySelector('section[data-sheet]')?.innerText ?? '')`, 5000, 150));
 
   // ---- every start is clean
   await pressText("Start the program"); await c.waitFor(`!!document.querySelector('[role=dialog]')`, 3000, 100); await pressText("Run it", "[role=dialog]");

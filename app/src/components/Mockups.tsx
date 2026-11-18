@@ -4,11 +4,12 @@
 // The sums (fit, zoom, the address, what a page may say) are in lib/mockview.ts, with tests.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import devicesJson from "../assets/devices/devices.json";
-import { createTicket, liveStart, liveStatus, liveStop, mockBase, mockCards, mockFiles, type LiveStatus, type MockCard, type Project, type TicketView } from "../lib/api";
+import { createTicket, liveAccounts, liveData, liveDeleteData, liveStart, liveStatus, liveStop, mockBase, mockCards, mockFiles, type DemoAccount, type LiveData, type LiveStatus, type MockCard, type Project, type TicketView } from "../lib/api";
 import { buildPrompt, fallbackDraft, parseDraft, type Draft, type DraftContext } from "../lib/mockdraft";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { LiveAccounts } from "./LiveAccounts";
 import { Confirm } from "./Confirm";
-import { MARGIN, MAX_ZOOM, clampZoom, dialogLine, filesSignature, fitScale, frameMessage, layout, ALLOW_WORDS, liveAllow, livePhaseLine, liveSandbox, liveUrl, pageUrl, percent, stepZoom, wheelZoom, type Device } from "../lib/mockview";
+import { MARGIN, MAX_ZOOM, clampZoom, dataLine, dialogLine, filesSignature, humanBytes, fitScale, frameMessage, layout, ALLOW_WORDS, liveAllow, livePhaseLine, liveSandbox, liveUrl, pageUrl, percent, stepZoom, wheelZoom, type Device } from "../lib/mockview";
 import { NOTE_MAX, addPin, editPin, measureLine, pageFile, partLabel, pickMessage, pinsForPage, placeNote, removePin, scopeLine, toScreen, type Box, type Part, type Pin } from "../lib/mockpick";
 import { Help } from "./Help";
 import { IconButton, type IconName } from "./Icon";
@@ -144,10 +145,48 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
   const liveAt = (mine && liveState?.base) || ""; // the address of this run: a new one at every start (see live.rs `proxy`)
   const [asking, setAsking] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  // what the card kept from its last runs (decision 94b): shown while it is not running, with the choice to carry on with it, begin again, or delete it
+  const [data, setData] = useState<LiveData | null>(null);
+  const [fresh, setFresh] = useState(false); // the owner chose "Start fresh"
+  const [dataNote, setDataNote] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<null | "idle" | "stop">(null); // the question "Delete the data?" (idle: the program is not running; stop: it runs and is stopped first)
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!live || phase === "ready") return;
+    let alive = true;
+    void liveData(project.id, card.id).then((d) => { if (alive) setData(d); }).catch(() => { if (alive) setData(null); });
+    return () => { alive = false; };
+  }, [live, phase, project.id, card.id, dataNote]);
+  // the made-up logins of the card's demo data, listed by its setup: shown next to the program so nobody is left at a sign-in page
+  const [accounts, setAccounts] = useState<DemoAccount[]>([]);
+  useEffect(() => {
+    if (!live) return;
+    let alive = true;
+    void liveAccounts(project.id, card.id).then((a) => { if (alive) setAccounts(a); }).catch(() => { if (alive) setAccounts([]); });
+    return () => { alive = false; };
+  }, [live, phase, project.id, card.id, dataNote]);
+  // the list of demo logins is laid over the program (the key button of the toolbar opens and closes it); it opens by itself the first time a card's program is up, so nobody meets a sign-in page without one
+  const [accountsOpen, setAccountsOpen] = useState(false);
+  const seenKey = `accounts-seen.${project.id}.${card.id}`;
+  useEffect(() => {
+    if (!live || phase !== "ready" || accounts.length === 0 || pref(seenKey, "") === "yes") return;
+    savePref(seenKey, "yes"); setAccountsOpen(true);
+  }, [live, phase, accounts.length, seenKey]);
   const startLive = async () => {
     if (!live) return;
-    try { setStartError(null); await liveStart(project.id, card.id, live.approval); setAsking(false); }
+    try { setStartError(null); setDataNote(null); await liveStart(project.id, card.id, live.approval, fresh); setAsking(false); }
     catch (e) { setStartError(String(e).replace(/^Error: /, "")); }
+  };
+  const deleteData = async () => {
+    if (!live) return;
+    setDeleteBusy(true); setDeleteError(null);
+    try {
+      if (deleting === "stop") await liveStop();
+      const said = await liveDeleteData(project.id, card.id, live.approval);
+      setDeleting(null); setDataNote(said);
+    } catch (e) { setDeleteError(String(e).replace(/^Error: /, "")); }
+    finally { setDeleteBusy(false); }
   };
 
   const device = DEVICES.find((d) => d.id === deviceId) ?? DEVICES[0];
@@ -371,17 +410,24 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
           <h1 className="m-0 max-w-[420px] truncate text-[20px] leading-7 font-bold">{card.name}</h1>
           <Help title={card.name}>
             <p className="m-0">This mockup runs the project's own program, not a drawing. Start runs the commands of its recipe (in mockup.json) on this PC, with a throwaway demo database, and the program then opens here in the device you pick.</p>
-            <p className="m-0">Stop, or leaving the Mockups page, stops the program. Starting again makes the demo data again, so every start is clean.</p>
+            <p className="m-0">Stop, or leaving the Mockups page, stops the program. What it made (its demo data, its files) is kept in the project, so the next start carries on with it. Start fresh begins again from nothing, and Delete the data takes it away.</p>
           </Help>
         </div>
         <div className="flex min-h-0 flex-1 flex-col items-start gap-4 overflow-y-auto px-8 pt-8 pb-10">
           {busy || phase === "failed" ? <p role="status" className="m-0 text-[16px] leading-6 font-bold">{livePhaseLine(phase)}</p> : null}
           {phase === "failed" && liveState?.message && <p role="alert" className="m-0 max-w-[720px] text-[15px] leading-6">{liveState.message}</p>}
           {startError && !asking && <p role="alert" className="m-0 max-w-[720px] text-[15px] leading-6">{startError}</p>}
-          <div className="flex gap-3">
+          {!busy && data?.exists && <p className="m-0 max-w-[720px] text-[15px] leading-6">{dataLine(data)}</p>}
+          {!busy && data?.exists && accounts.length > 0 && <div className="w-full max-w-[960px] border border-line-subtle"><LiveAccounts accounts={accounts} always /></div>}
+          {!busy && dataNote && <p role="status" className="m-0 max-w-[720px] text-[15px] leading-6 font-bold">{dataNote}</p>}
+          <div className="flex flex-wrap gap-3">
             {busy
               ? <Button variant="quiet" onClick={() => void liveStop()}>Stop</Button>
-              : <Button onClick={() => { setStartError(null); setAsking(true); }}>{phase === "failed" ? "Try again" : "Start the program"}</Button>}
+              : <>
+                <Button onClick={() => { setFresh(false); setStartError(null); setAsking(true); }}>{phase === "failed" ? "Try again" : data?.exists ? "Start with the last data" : "Start the program"}</Button>
+                {data?.exists && <Button variant="quiet" onClick={() => { setFresh(true); setStartError(null); setAsking(true); }}>Start fresh</Button>}
+                {data?.exists && <Button variant="quiet" onClick={() => { setDeleteError(null); setDeleting("idle"); }}>Delete the data</Button>}
+              </>}
           </div>
           {mine && liveState && liveState.log.length > 0 && (
             <pre aria-label="What the program printed" className="m-0 max-h-[50vh] w-full max-w-[960px] overflow-auto border border-line-subtle bg-inset p-3 text-[12px] leading-5 whitespace-pre-wrap">{liveState.log.slice(-40).join("\n")}</pre>
@@ -392,8 +438,10 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
             <p className="m-0">Kona will run these commands in {live.cwd ? `the folder ${live.cwd} of the project` : "the project folder"}, exactly as written. Run them only if you trust this project.</p>
             <pre aria-label="Commands" className="m-0 overflow-auto border border-line-subtle bg-inset p-2 text-[13px] leading-5 whitespace-pre-wrap">{[live.setup, live.start].filter(Boolean).join("\n")}</pre>
             <p className="m-0 text-[13px] leading-5">It must answer on port {live.port}.{live.env.length > 0 ? ` It also sets ${live.env.join(", ")}.` : ""} Any other Live program that is running is stopped first.{live.allow.length > 0 ? ` Its page may also: ${live.allow.map((w) => ALLOW_WORDS[w] ?? w).join(", ")}.` : ""}</p>
+            <p className="m-0 text-[13px] leading-5">{dataAsk(live, data, fresh)}</p>
           </Confirm>
         )}
+        {deleting && <DeleteDataAsk live={live} data={data} stopFirst={deleting === "stop"} busy={deleteBusy} error={deleteError} onConfirm={() => void deleteData()} onCancel={() => { setDeleting(null); setDeleteError(null); }} />}
       </div>
     );
   }
@@ -428,9 +476,12 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
         </div>
         <IconButton icon="turnRight" label="Start the page again" onClick={() => setRev((n) => n + 1)} />
         {live && <IconButton icon="stop" label="Stop the program" onClick={() => void liveStop()} />}
+        {live && accounts.length > 0 && <IconButton icon="key" label="Demo accounts" variant={accountsOpen ? "primary" : "quiet"} aria-pressed={accountsOpen} onClick={() => setAccountsOpen((o) => !o)} />}
+        {live && <IconButton icon="trash" label="Stop the program and delete its data" onClick={() => { setDeleteError(null); setDeleting("stop"); }} />}
       </div>
       <div className="flex min-h-0 min-w-0 flex-1">
       <div ref={wrap} className="relative flex min-h-0 min-w-0 flex-1">
+      {live && accounts.length > 0 && accountsOpen && <LiveAccounts accounts={accounts} onClose={() => setAccountsOpen(false)} />}
       <div
         ref={box}
         onScroll={() => { if (now.current.target) bump((n) => n + 1); }}
@@ -532,6 +583,33 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
           )}
         </Confirm>
       )}
+      {live && deleting === "stop" && <DeleteDataAsk live={live} data={data} stopFirst busy={deleteBusy} error={deleteError} onConfirm={() => void deleteData()} onCancel={() => { setDeleting(null); setDeleteError(null); }} />}
     </div>
+  );
+}
+
+/** The sentence of the Start question about the card's data, its bucket and the command that deletes its data (all of it is part of what the owner says yes to) */
+function dataAsk(live: NonNullable<MockCard["live"]>, data: LiveData | null, fresh: boolean): string {
+  const parts: string[] = [];
+  if (fresh && data?.exists) parts.push("The data of the last run is deleted first, and the program begins again from nothing.");
+  else if (data?.exists) parts.push("It carries on with the data of the last run.");
+  if (live.bucket) parts.push("Kona gives it a fake cloud bucket on this PC (the files stay in the project; nothing leaves the PC).");
+  parts.push(live.keep ? "What it makes is kept when it stops, until you delete it." : "What it makes is deleted when it stops.");
+  if (live.clean) parts.push(`To delete its data later Kona also runs: ${live.clean}`);
+  return parts.join(" ");
+}
+
+/** The question before a card's data is deleted (also asked by the stop-and-delete button of a running card, which stops it first) */
+function DeleteDataAsk({ live, data, stopFirst, busy, error, onConfirm, onCancel }: { live: NonNullable<MockCard["live"]>; data: LiveData | null; stopFirst: boolean; busy: boolean; error: string | null; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <Confirm title="Delete the data of this mockup?" confirmLabel={stopFirst ? "Stop and delete" : "Delete the data"} danger busy={busy} error={error} onConfirm={onConfirm} onCancel={onCancel}>
+      <p className="m-0">{stopFirst ? "The program is stopped first. " : ""}This deletes what the mockup made on this PC: its demo data and its files{data?.exists ? ` (${humanBytes(data.bytes)} in ${data.files} ${data.files === 1 ? "file" : "files"}, in ${data.place})` : ""}. It cannot be undone, and nothing of the project itself is touched.</p>
+      {live.clean && (
+        <>
+          <p className="m-0">First Kona runs this command of the recipe, exactly as written:</p>
+          <pre aria-label="Command" className="m-0 overflow-auto border border-line-subtle bg-inset p-2 text-[13px] leading-5 whitespace-pre-wrap">{live.clean}</pre>
+        </>
+      )}
+    </Confirm>
   );
 }

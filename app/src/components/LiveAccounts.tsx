@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { DemoAccount } from "../lib/api";
 import { Button } from "./ui";
+import { IconButton } from "./Icon";
 
 const kept = (): boolean => { try { return localStorage.getItem("kona.mockups.accounts") !== "closed"; } catch { return true; } };
 const keep = (open: boolean) => { try { localStorage.setItem("kona.mockups.accounts", open ? "open" : "closed"); } catch { /* not kept */ } };
@@ -19,39 +20,27 @@ export function LiveAccounts({ accounts, always = false, onClose }: { accounts: 
   const toggle = floating ? (
     <span className="flex items-center justify-between gap-3">
       <span className="text-[14px] leading-5 font-bold text-text-primary">Demo accounts ({accounts.length})</span>
-      <Button variant="quiet" small aria-label="Close the demo accounts" onClick={onClose}>Close</Button>
+      <IconButton icon="close" label="Close the demo accounts" variant="quiet" onClick={onClose} />
     </span>
   ) : (
     <button type="button" aria-expanded={open} onClick={() => { setOpen(!open); keep(!open); }} className="m-0 cursor-pointer border-0 bg-transparent p-0 text-left text-[14px] leading-5 font-bold text-text-primary">
       {open ? "▾" : "▸"} Demo accounts ({accounts.length})
     </button>
   );
-  const sharedLine = open && shared && (
-    <span className="flex items-center gap-2">
-      <span>Password for all: <span className="font-mono">{shared}</span></span>
-      <Button variant="quiet" small onClick={() => void copy("all", shared)}>{said === "all" ? "Copied" : "Copy"}</Button>
+  // one line: the text on the left, its Copy button always at the right edge
+  const line = (text: string, button: React.ReactNode, mono = true) => (
+    <span className="flex min-w-0 items-center justify-between gap-3">
+      <span className={`min-w-0 truncate ${mono ? "font-mono text-[13px]" : ""}`} title={text}>{text}</span>
+      <span className="shrink-0">{button}</span>
     </span>
   );
+  const sharedLine = open && shared && line(`Password for all: ${shared}`, <Button variant="quiet" small onClick={() => void copy("all", shared)}>{said === "all" ? "Copied" : "Copy"}</Button>, false);
   const failed = said === "failed" && <span role="alert" className="text-state-left">The clipboard could not be used.</span>;
   const rows = accounts.map((a, i) => (
-    <li key={`${a.login}-${i}`} className={floating ? "flex min-w-0 flex-col gap-0.5 border-t border-line-subtle pt-1.5" : "flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5"}>
-      <span className="flex min-w-0 flex-wrap items-center gap-x-2">
-        {a.who && <span className="font-bold">{a.who}</span>}
-        {!floating && <span className="min-w-0 truncate font-mono text-[13px]" title={a.login}>{a.login}</span>}
-        {!floating && <Button variant="quiet" small aria-label={`Copy the login of ${a.who || a.login}`} onClick={() => void copy(`l${i}`, a.login)}>{said === `l${i}` ? "Copied" : "Copy"}</Button>}
-      </span>
-      {floating && (
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="min-w-0 truncate font-mono text-[13px]" title={a.login}>{a.login}</span>
-          <Button variant="quiet" small aria-label={`Copy the login of ${a.who || a.login}`} onClick={() => void copy(`l${i}`, a.login)}>{said === `l${i}` ? "Copied" : "Copy"}</Button>
-        </span>
-      )}
-      {!shared && a.password && (
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="font-mono text-[13px]">{a.password}</span>
-          <Button variant="quiet" small aria-label={`Copy the password of ${a.who || a.login}`} onClick={() => void copy(`p${i}`, a.password)}>{said === `p${i}` ? "Copied" : "Copy"}</Button>
-        </span>
-      )}
+    <li key={`${a.login}-${i}`} className="flex min-w-0 flex-col gap-0.5 border-t border-line-subtle pt-1.5">
+      {a.who && <span className="font-bold">{a.who}</span>}
+      {line(a.login, <Button variant="quiet" small aria-label={`Copy the login of ${a.who || a.login}`} onClick={() => void copy(`l${i}`, a.login)}>{said === `l${i}` ? "Copied" : "Copy"}</Button>)}
+      {!shared && a.password && line(a.password, <Button variant="quiet" small aria-label={`Copy the password of ${a.who || a.login}`} onClick={() => void copy(`p${i}`, a.password)}>{said === `p${i}` ? "Copied" : "Copy"}</Button>)}
       {a.note && <span className="text-[13px] leading-4 text-text-secondary">{a.note}</span>}
     </li>
   ));

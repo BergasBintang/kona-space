@@ -31,6 +31,8 @@ try {
 
   // ---- a page with a draft, left: the question, with its three answers
   ok("the Brain opens", await openPage("Brain"));
+  const heights = () => c.ev(`({ sheet: Math.round(document.querySelector('section[data-sheet]:not([hidden])').getBoundingClientRect().height), bar: Math.round(document.querySelector('header').getBoundingClientRect().height) })`);
+  const before = await heights(); // with no tray
   await c.ev(`[...document.querySelectorAll('section[data-sheet] [role=tab]')].find((b) => b.textContent.trim() === 'Ask')?.click(); true`);
   await c.waitFor(`!!document.querySelector('section[data-sheet]:not([hidden]) input[aria-label="Ask the brain"]')`, 6000, 100);
   await c.ev(`document.querySelector('section[data-sheet]:not([hidden]) input[aria-label="Ask the brain"]').focus(); true`);
@@ -43,12 +45,14 @@ try {
   // ---- minimized: out of sight, alive, in the tray
   await minimize(); await wait(500);
   ok("Minimize puts the page away: the office is there, no page is shown, and the tray has one chip for the Brain", (await shown()) === null && JSON.stringify(await chips()) === JSON.stringify(["Brain, minimized, Open"]), JSON.stringify(await chips()));
-  ok("the tray says how many are minimized", await c.ev(`document.querySelector('nav[aria-label="Open pages"]').innerText.includes('1 of 6 minimized')`));
+  ok("the tray says how many are minimized (one of six)", await c.ev(`document.querySelector('nav[aria-label="Open pages"] [data-count]')?.textContent === '1/6'`));
   ok("the minimized page is still in the window, out of sight, with its draft (it is alive, not drawn again)", await c.ev(`(() => { const s = document.querySelector('section[data-page="place:brain"]'); return !!s && s.hidden && s.querySelector('input[aria-label="Ask the brain"]')?.value === ${JSON.stringify(DRAFT)}; })()`));
   ok("a page that is out of sight does not take Esc: nothing happens", await (async () => { await key("Escape", "Escape", 27); await wait(400); return (await dialog()) === null && JSON.stringify(await chips()) === JSON.stringify(["Brain, minimized, Open"]); })());
 
   // ---- another page next to it, then back by the chip
   ok("Files opens from the office while the Brain is minimized", await openPage("Files"));
+  const withTray = await heights();
+  ok("the tray takes no height: the sheet and the top bar are exactly as tall with the tray as without it (the chips are drawn inside the top bar)", JSON.stringify(withTray) === JSON.stringify(before), JSON.stringify({ before, withTray }));
   ok("the tray has two chips: the Brain minimized and Files shown", JSON.stringify(await chips()) === JSON.stringify(["Brain, minimized, Open", "Files, shown, Open"]), JSON.stringify(await chips()));
   ok("a click on the Brain's chip leaves Files without asking (it has nothing to lose) and shows the Brain with its draft", await c.ev(`document.querySelector('nav[aria-label="Open pages"] button[aria-label^="Brain"]').click(); true`) && await c.waitFor(`document.querySelector('section[data-sheet]:not([hidden])')?.getAttribute('aria-label') === 'Brain'`, 6000, 100) && (await dialog()) === null && await c.ev(`document.querySelector('section[data-sheet]:not([hidden]) input[aria-label="Ask the brain"]').value`) === DRAFT);
   ok("Files was closed, not kept: the tray is gone (nothing is minimized) and Files is not in the window", await c.ev(`!document.querySelector('nav[aria-label="Open pages"]') && !document.querySelector('section[data-page="place:files"]')`));
@@ -61,7 +65,7 @@ try {
   const six = ["Board", "Meeting", "Worktrees", "Brain", "Files", "Mockups"];
   for (const p of six) { await openPage(p); await minimize(); await wait(300); }
   ok("six pages are minimized, in the order they were put away", (await chips()).length === 6 && (await chips()).every((l) => /minimized/.test(l)), JSON.stringify(await chips()));
-  ok("the tray says six of six", await c.ev(`document.querySelector('nav[aria-label="Open pages"]').innerText.includes('6 of 6 minimized')`));
+  ok("the tray says six of six", await c.ev(`document.querySelector('nav[aria-label="Open pages"] [data-count]')?.textContent === '6/6'`));
   ok("a seventh page opens", await openPage("Costs"));
   await minimize(); await wait(500);
   ok("Minimize of a seventh is refused with a plain line, and the page stays shown", (await shown()) === "Costs" && await c.ev(`document.body.innerText.includes('6 pages are minimized already')`));

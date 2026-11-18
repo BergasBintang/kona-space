@@ -1,13 +1,15 @@
 // The top bar, always in view: the Kona mark with a chevron (back to the welcome page, the only way to another project; dimmed and off while a sheet is open, so one slip of the
 // pointer cannot leave the page the owner is working in; the sheet's own X closes it), the name of the open project,
 // what is waiting on you, the account of the project and the two plan bars. It replaces the sidebar (decision 44).
+import type { ReactNode } from "react";
 import { Button, Glyph, PlanBar } from "./ui";
 import { KonaMark } from "./KonaMark";
 import type { Place } from "../lib/places";
 import type { Project } from "../lib/api";
 import type { Plan } from "../lib/sessions";
 
-export function TopBar({ project, onHome, sheetOpen, place, onPlace, onAttention, attention, leftBehind, plan, accountLabel, limitLine, version }: {
+export function TopBar({ project, onHome, sheetOpen, place, onPlace, onAttention, attention, leftBehind, plan, accountLabel, limitLine, version, tray }: {
+  /** the tray of minimized pages (decision 95): drawn in the empty stretch of this bar, so the page below keeps all its height */ tray?: ReactNode;
   project: Project | null; onHome: () => void; sheetOpen: boolean; place: Place; onPlace: (p: Place) => void; onAttention: () => void;
   attention: number; leftBehind: number; plan: Plan | undefined; accountLabel: string | null; limitLine: string; version: string;
 }) {
@@ -24,7 +26,7 @@ export function TopBar({ project, onHome, sheetOpen, place, onPlace, onAttention
       {!project && place !== "office" && <Button variant="quiet" small onClick={() => onPlace("office")}>← Back</Button>}
       {project && <span className="max-w-[220px] truncate text-[18px] leading-6 font-bold" title={project.folder}>{project.name}</span>}
 
-      <div className="flex-1" />
+      <div className="flex min-w-0 flex-1 items-center">{tray}</div>
 
       {attention > 0 && (
         <Button variant="quiet" small onClick={onAttention} aria-label={`${attention} waiting on you`}><Glyph state="waiting" size={16} />{attention} waiting on you</Button>

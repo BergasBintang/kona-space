@@ -2,6 +2,16 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.41.0, 2026-11-18
+
+Live mockups: a mockup that is the project's real program, with a fake cloud bucket and data you can keep; and pages you can minimize.
+
+- **Live mockups (decision 94).** A mockup card can run the project's own program instead of a drawing: the Mockups sheet shows the real screens, the real animations and a sign-in for every role, in the same five device frames, on a throwaway demo database. Start shows the exact commands and asks; one program runs at a time; it stops on Stop, when you close the page and when Kona closes. A card's `allow` list says what its page may also do (copy to the clipboard, save files, show the print window, ask for the device's location), and the question lists it in words. Alert, confirm and prompt are answered at once (nothing, No, nothing) and the sheet says what was asked; a page that asks "leave this page?" no longer freezes its frame; a link that wants a new window opens your own browser. Tried on a real school product (the Quantum Research LMS: seven sign-ins, every page, file uploads, print, devices) and on four more products.
+- **Data you keep, and a fake bucket (decision 94b).** What a card makes (its demo database, its files) lives in `.kona/live-data/<card>` and is kept when it stops. Next to Start you see what is kept and choose **Start with the last data**, **Start fresh** or **Delete the data**; a running card has **Stop and delete its data**. A card can ask Kona for a fake S3 bucket (R2 speaks the same protocol): it keeps files on this PC, and the program never touches a real one. A card lists its demo logins, and the sheet shows them over the program with a copy button for each.
+- **Minimize pages (decision 95).** The low bar next to the X puts a page away but keeps it alive (its draft, its scroll, a running mockup) in a tray inside the top bar; a click on its chip brings it back. The X closes it, as before. Up to six pages can be minimized. When you leave a page that would lose something (text you typed, a running program), Kona asks once: Minimize, Close or Cancel. A minimized page does not poll and does not take keys.
+- **Smaller:** the scroll bars of a phone or tablet frame are hidden and those of a laptop or desktop frame are thin, as on the real device; the Kona workers have a new skill, `make-a-live-mockup`.
+- **Not done:** the tray is not restored after a restart, and closing Kona with minimized pages does not ask.
+
 ## 0.40.2, 2026-11-16
 
 A fix for the Mockups viewer: a zoomed page can be scrolled to its end.

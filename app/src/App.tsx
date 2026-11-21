@@ -43,7 +43,7 @@ import { loadZoom, stepZoom } from "./lib/zoom";
 import { checkForUpdate } from "./lib/update";
 import { useSyncTick } from "./lib/sync";
 import { UpdateCard } from "./components/UpdateCard";
-import { getSettings, earlierSessions, HISTORY_PAGE, saveNote, wantedRemove, officeSay, officeMapLoad, officeMapSave, officeMapReset, mockupTicketDraft, type Earlier } from "./lib/api";
+import { getSettings, earlierSessions, HISTORY_PAGE, projectClaim, projectRelease, projectsTaken, saveNote, wantedRemove, officeSay, officeMapLoad, officeMapSave, officeMapReset, mockupTicketDraft, type Earlier } from "./lib/api";
 
 const remembered = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const remember = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* the choice is just not kept */ } };
@@ -62,6 +62,7 @@ export default function App() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountsReady, setAccountsReady] = useState(false); // the welcome page needs the accounts, or every project looks accountless
   const [helloNote, setHelloNote] = useState<string | null>(null); // why the welcome page came back
+  const [taken, setTaken] = useState<string[]>([]); // the projects another Kona window has open (they cannot be opened here)
   const [lastAccount, setLastAccount] = useState(remembered("kona.account") ?? ""); // the account used last
   const [place, setPlace] = useState<Place>("office"); // the page open in the sheet over the office; "office" means no page
   const sheetGuard = useRef<Guard | null>(null); // the open sheet, which asks before anything that would throw away unsaved text
@@ -202,6 +203,19 @@ export default function App() {
   const looksSig = looksSignature(state, seen);
   const looks = useMemo(() => officeLooks(project, state, seen), [project, looksSig]); // eslint-disable-line react-hooks/exhaustive-deps
   const attention = useMemo(() => state.order.filter((id) => state.sessions[id].run === "waiting" && (!project || samePlace(state.sessions[id].folder, project.folder))).length, [state, project]); // only this project's, like the leftovers
+  // one project is open in one window at a time: the welcome page asks which are taken (every 2 seconds, only while it is shown), and a window that is back on it lets go of its project
+  useEffect(() => {
+    if (greeted) return;
+    let live = true;
+    const look = () => projectsTaken().then((t) => { if (live) setTaken((cur) => (cur.join("|") === t.join("|") ? cur : t)); }).catch(() => {});
+    void projectRelease().catch(() => {}).then(look);
+    const t = setInterval(look, 2000);
+    return () => { live = false; clearInterval(t); };
+  }, [greeted]);
+  const openProject = async (id: string) => {
+    try { await projectClaim(id); } catch (e) { setHelloNote(String(e)); projectsTaken().then(setTaken).catch(() => {}); return; }
+    pickProject(id); setHelloNote(null); setGreeted(true); setPlace("office");
+  };
   const pickProject = useCallback((id: string) => { setProjectId(id); remember("kona.project", id); setPerson(null); setKept([]); }, []);
   // do a move that leaves the sheet's page (home, another page from the top bar), asking first if the page holds text that was not sent or saved
   // the page shown, and the moves that put it away: minimize keeps it alive in the tray, close ends it (decision 95)
@@ -266,6 +280,7 @@ export default function App() {
 
   const added = (r: AddResult) => {
     setProjects((cur) => [...(cur ?? []), r.project]);
+    void projectClaim(r.project.id).catch(() => {}); // a project that was just added is open in this window
     pickProject(r.project.id);
     setGreeted(true);
     setWelcomeView("home");
@@ -463,7 +478,7 @@ export default function App() {
             : welcomeView === "settings"
               ? <GeneralSettings accounts={accounts} onAccounts={setAccounts} version={version} />
               : <Hello projects={projects} accounts={accounts} version={version} note={helloNote} waiting={waitingByProject(projects, state)} finished={finishedByProject(projects, state, seen)}
-                  onOpen={(id) => { pickProject(id); setHelloNote(null); setGreeted(true); setPlace("office"); }}
+                  taken={taken} onOpen={(id) => void openProject(id)}
                   onAdd={() => setWelcomeView("add")} onOpenSettings={() => setWelcomeView("settings")} onProjects={setProjects} />}
         </div>
         <UpdateCard running={state.order.filter((id) => state.sessions[id].run !== "ended").length} />

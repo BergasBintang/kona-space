@@ -118,6 +118,10 @@ export const deleteBackup = (name: string) => invoke<void>("delete_backup", { na
 /** One page of a person's earlier conversations: the newest `limit` of them, and how many there are in all. */
 export type EarlierPage = { items: Earlier[]; total: number };
 export const HISTORY_PAGE = 30;
+/** A project is open in one Kona window at a time (lock.rs): claim it for this window (refused with a plain line when another window has it), let it go, and ask which ones another window has. */
+export const projectClaim = (projectId: string) => invoke<void>("project_claim", { projectId });
+export const projectRelease = () => invoke<void>("project_release");
+export const projectsTaken = () => invoke<string[]>("projects_taken");
 export const earlierSessions = (projectId: string, roleId: string, limit: number) => invoke<EarlierPage>("earlier_sessions", { projectId, roleId, limit });
 export const costRows = (sinceDay: string | null) => invoke<CostRow[]>("cost_rows", { sinceDay });
 /** what a folder spent in one local hour (`hour` reads YYYY-MM-DD HH): the points of today's chart */

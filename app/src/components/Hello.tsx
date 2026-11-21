@@ -13,8 +13,8 @@ import { KonaMark } from "./KonaMark";
 
 type Status = AccountStatus | "asking";
 
-export function Hello({ projects, accounts, version, note = null, waiting = {}, finished = {}, onOpen, onAdd, onOpenSettings, onProjects }: {
-  /** how many sessions of each project (by its id) are waiting for the owner */ waiting?: Record<string, number>; /** how many have finished a turn the owner has not seen yet */ finished?: Record<string, number>; version: string; note?: string | null; projects: Project[]; accounts: Account[]; onOpen: (id: string) => void; onAdd: () => void; onOpenSettings: () => void; onProjects: (next: Project[]) => void;
+export function Hello({ projects, accounts, version, note = null, waiting = {}, finished = {}, taken = [], onOpen, onAdd, onOpenSettings, onProjects }: {
+  /** the projects (by id) that another Kona window has open */ taken?: string[]; /** how many sessions of each project (by its id) are waiting for the owner */ waiting?: Record<string, number>; /** how many have finished a turn the owner has not seen yet */ finished?: Record<string, number>; version: string; note?: string | null; projects: Project[]; accounts: Account[]; onOpen: (id: string) => void; onAdd: () => void; onOpenSettings: () => void; onProjects: (next: Project[]) => void;
 }) {
   const [status, setStatus] = useState<Record<string, Status>>({});
   const [swapping, setSwapping] = useState<string | null>(null); // the project whose account is being changed
@@ -105,7 +105,9 @@ export function Hello({ projects, accounts, version, note = null, waiting = {}, 
           </div>
           {acc && !checking && !ok
             ? <Button small disabled={busy === acc.id} onClick={() => void signIn(acc)}>{busy === acc.id ? "Waiting…" : "Sign in"}</Button>
-            : <Button small disabled={!ok} onClick={() => onOpen(p.id)} title={ok ? undefined : "Choose an account that is signed in first"}>Open</Button>}
+            : taken.includes(p.id)
+              ? <Button small disabled title="This project is open in another Kona window. Go back to the welcome page there, or close it, to open it here.">Open in another window</Button>
+              : <Button small disabled={!ok} onClick={() => onOpen(p.id)} title={ok ? undefined : "Choose an account that is signed in first"}>Open</Button>}
         </div>
       </div>
     );

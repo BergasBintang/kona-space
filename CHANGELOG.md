@@ -2,6 +2,12 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.43.0, 2026-11-22
+
+A project opens in one Kona window at a time.
+
+- **A project is open in one Kona window at a time.** A second window that tries to open it is told it is open in another window, and on the welcome page its button says "Open in another window". This also means the same person cannot be started twice in one project from two windows. Going back to the welcome page or closing the window frees it, and a window that was killed does not lock the project.
+
 ## 0.42.0, 2026-11-22
 
 Kona can be snapped beside another window, two Kona windows stay in step, History is complete and shows more, and the top bar is calmer.

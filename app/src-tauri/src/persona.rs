@@ -123,13 +123,23 @@ impl Persona {
 pub struct Voice {
     file: PathBuf,
     cur: Mutex<Persona>,
+    stamp: crate::sync::Stamp,
 }
 
 impl Voice {
     pub fn load(base: &std::path::Path) -> Self {
         let file = base.join("persona.json");
         let cur = fs::read_to_string(&file).ok().and_then(|t| serde_json::from_str::<Persona>(&t).ok()).unwrap_or_else(default_persona);
-        Self { file, cur: Mutex::new(cur) }
+        let stamp = crate::sync::Stamp::new(&file);
+        Self { file, cur: Mutex::new(cur), stamp }
+    }
+
+    /// Another Kona window changed the file: read it again. True when it was read (the screen is then told).
+    pub fn reload(&self) -> bool {
+        if !self.stamp.changed() { return false; }
+        if let Some(p) = fs::read_to_string(&self.file).ok().and_then(|t| serde_json::from_str::<Persona>(&t).ok()) { *self.cur.lock().unwrap() = p; }
+        self.stamp.mark();
+        true
     }
 
     pub fn get(&self) -> Persona {
@@ -157,6 +167,7 @@ impl Voice {
             fs::create_dir_all(dir).map_err(|e| e.to_string())?;
         }
         fs::write(&self.file, serde_json::to_string_pretty(&p).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        self.stamp.mark();
         *self.cur.lock().unwrap() = p.clone();
         Ok(p)
     }

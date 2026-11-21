@@ -42,6 +42,7 @@ struct FileData {
 pub struct Projects {
     file: PathBuf,
     list: Mutex<Vec<Project>>,
+    stamp: crate::sync::Stamp,
 }
 
 /// Lower-case, forward-slash form of a path, so `D:\Repo` and `d:/repo` count as the same place (CloudCLI listed one project twice for this).
@@ -58,14 +59,24 @@ fn clean_group(g: Option<String>) -> Option<String> {
 }
 
 impl Projects {
+    fn read(file: &Path) -> Vec<Project> {
+        fs::read_to_string(file).ok().and_then(|t| serde_json::from_str::<FileData>(&t).ok()).map(|d| d.projects).unwrap_or_default()
+    }
+
     pub fn load(base: &Path) -> Self {
         let file = base.join("projects.json");
-        let list = fs::read_to_string(&file)
-            .ok()
-            .and_then(|t| serde_json::from_str::<FileData>(&t).ok())
-            .map(|d| d.projects)
-            .unwrap_or_default();
-        Self { file, list: Mutex::new(list) }
+        let stamp = crate::sync::Stamp::new(&file);
+        let list = Self::read(&file);
+        Self { file, list: Mutex::new(list), stamp }
+    }
+
+    /// Another Kona window changed the file: read the list again. True when it was read (the screen is then told).
+    pub fn reload(&self) -> bool {
+        if !self.stamp.changed() { return false; }
+        let list = Self::read(&self.file);
+        *self.list.lock().unwrap() = list;
+        self.stamp.mark();
+        true
     }
 
     fn save(&self, list: &[Project]) -> Result<(), String> {
@@ -73,7 +84,9 @@ impl Projects {
             fs::create_dir_all(dir).map_err(|e| e.to_string())?;
         }
         let data = FileData { version: 1, projects: list.to_vec() };
-        fs::write(&self.file, serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?).map_err(|e| e.to_string())
+        let done = fs::write(&self.file, serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?).map_err(|e| e.to_string());
+        self.stamp.mark();
+        done
     }
 
     pub fn all(&self) -> Vec<Project> {

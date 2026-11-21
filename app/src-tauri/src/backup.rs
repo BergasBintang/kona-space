@@ -30,13 +30,22 @@ impl Default for Settings {
 pub struct SettingsStore {
     file: PathBuf,
     cur: Mutex<Settings>,
+    stamp: crate::sync::Stamp,
 }
 
 impl SettingsStore {
     pub fn load(base: &Path) -> Self {
         let file = base.join("settings.json");
         let cur = fs::read_to_string(&file).ok().and_then(|t| serde_json::from_str::<Settings>(&t).ok()).unwrap_or_default();
-        Self { file, cur: Mutex::new(cur) }
+        let stamp = crate::sync::Stamp::new(&file);
+        Self { file, cur: Mutex::new(cur), stamp }
+    }
+    /// Another Kona window changed the file: read it again. True when it was read (the screen is then told).
+    pub fn reload(&self) -> bool {
+        if !self.stamp.changed() { return false; }
+        if let Some(s) = fs::read_to_string(&self.file).ok().and_then(|t| serde_json::from_str::<Settings>(&t).ok()) { *self.cur.lock().unwrap() = s; }
+        self.stamp.mark();
+        true
     }
     pub fn get(&self) -> Settings {
         self.cur.lock().unwrap().clone()
@@ -45,6 +54,7 @@ impl SettingsStore {
         if s.max_sessions == 0 || s.max_sessions > 3 { return Err("The number of sessions must be between 1 and 3 (the plan's hard cap for this PC)".into()); }
         if let Some(d) = self.file.parent() { fs::create_dir_all(d).map_err(|e| e.to_string())?; }
         fs::write(&self.file, serde_json::to_string_pretty(&s).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        self.stamp.mark();
         *self.cur.lock().unwrap() = s.clone();
         Ok(s)
     }

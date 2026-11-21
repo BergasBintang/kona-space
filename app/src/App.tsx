@@ -41,8 +41,9 @@ import { autoNoteOn, buildDigest, writeSessionNote } from "./lib/brain/summary.t
 import { localDate, redact } from "./lib/brain/text.ts";
 import { loadZoom, stepZoom } from "./lib/zoom";
 import { checkForUpdate } from "./lib/update";
+import { useSyncTick } from "./lib/sync";
 import { UpdateCard } from "./components/UpdateCard";
-import { getSettings, earlierSessions, costRows, saveNote, wantedRemove, officeSay, officeMapLoad, officeMapSave, officeMapReset, mockupTicketDraft, type Earlier } from "./lib/api";
+import { getSettings, earlierSessions, HISTORY_PAGE, saveNote, wantedRemove, officeSay, officeMapLoad, officeMapSave, officeMapReset, mockupTicketDraft, type Earlier } from "./lib/api";
 
 const remembered = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const remember = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* the choice is just not kept */ } };
@@ -97,7 +98,8 @@ export default function App() {
   live.current = { state, projects, roles };
   const noting = useRef(new Set<string>());
   const [earlier, setEarlier] = useState<Earlier[]>([]); // sessions Claude Code saved earlier, for History
-  const [roleBy, setRoleBy] = useState<Record<string, string | null>>({}); // which role each session of the cost ledger ran as
+  const [earlierTotal, setEarlierTotal] = useState(0); // how many conversations this person has in this project in all (History shows the newest ones, 30 at a time)
+  const [historyAsk, setHistoryAsk] = useState<{ key: string; limit: number }>({ key: "", limit: HISTORY_PAGE }); // how many History asked for, for one project and person
 
   // the window size (100, 90, 80 percent) and the keys for it; the window itself never scrolls
   useEffect(() => {
@@ -123,6 +125,13 @@ export default function App() {
 
   // a notice goes away by itself after a few seconds
   useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(null), 9000); return () => clearTimeout(t); }, [notice]);
+
+  // a second Kona window changed one of the shared lists: read it again (see lib/sync.ts)
+  const syncProjects = useSyncTick("projects"), syncRoles = useSyncTick("roles"), syncAccounts = useSyncTick("accounts"), syncVoice = useSyncTick("voice");
+  useEffect(() => { if (syncProjects) listProjects().then(setProjects).catch(() => {}); }, [syncProjects]);
+  useEffect(() => { if (syncRoles) listRoles().then(setRoles).catch(() => {}); }, [syncRoles]);
+  useEffect(() => { if (syncAccounts) listAccounts().then(setAccounts).catch(() => {}); }, [syncAccounts]);
+  useEffect(() => { if (syncVoice) getPersona().then(setPersona).catch(() => {}); }, [syncVoice]);
 
   useEffect(() => {
     getVersion().then(setVersion).catch(() => {});
@@ -279,15 +288,21 @@ export default function App() {
   }, [lo, state.sessions, project]);
   const leftTotal = loHere.items.filter((i) => i.left_behind && !i.ignored).length;
 
-  // the earlier conversations of the open person: Claude Code's own transcript files of this project, filed by the role the cost ledger says each one ran as; a conversation with no role on record is
-  // filed under the Secretary (the front desk), because the role of an old session was not recorded
+  // the earlier conversations of the open person: Claude Code's own transcript files of this project (and of its tickets' own copies), filed by the role the cost ledger says each one ran as (the core does
+  // that); a conversation with no role on record is filed under the Secretary (the front desk), because the role of an old session was not recorded. The newest 30 are read; "Show more" asks for 30 more.
+  const historyKey = `${project?.id ?? ""}/${person ?? ""}`;
+  const historyLimit = historyAsk.key === historyKey ? historyAsk.limit : HISTORY_PAGE;
+  // read again whenever a conversation ends or is put away (a stopped session, New conversation), not only when one starts: its file is complete only then
+  const settledCount = state.order.filter((id) => state.sessions[id]?.run === "ended").length + Object.keys(dismissed).length;
   useEffect(() => {
     if (!project || !person) return;
     let live = true;
-    Promise.all([earlierSessions(project.id), costRows(null)]).then(([l, rows]) => { if (live) { setEarlier(l); setRoleBy(Object.fromEntries(rows.map((r) => [r.session_id, r.role_id]))); } }).catch(() => { if (live) { setEarlier([]); setRoleBy({}); } });
+    earlierSessions(project.id, person, historyLimit).then((p) => { if (live) { setEarlier(p.items); setEarlierTotal(p.total); } }).catch(() => { if (live) { setEarlier([]); setEarlierTotal(0); } });
     return () => { live = false; };
-  }, [project?.id, person, state.order.length]); // eslint-disable-line react-hooks/exhaustive-deps
-  const history = useMemo(() => earlier.filter((e) => (!state.sessions[e.id] || dismissed[e.id]) && (roleBy[e.id] ?? (person === "secretary" ? "secretary" : null)) === person), [earlier, state.sessions, dismissed, roleBy, person]);
+  }, [project?.id, person, state.order.length, settledCount, historyLimit]); // eslint-disable-line react-hooks/exhaustive-deps
+  const history = useMemo(() => earlier.filter((e) => !state.sessions[e.id] || dismissed[e.id]), [earlier, state.sessions, dismissed]);
+  const historyMore = Math.max(0, earlierTotal - earlier.length); // conversations older than the ones read so far
+  const showMoreHistory = () => setHistoryAsk({ key: historyKey, limit: historyLimit + HISTORY_PAGE });
 
   // Resume an earlier conversation of this person: the same session id, in the same folder. It keeps the account it was saved under: its transcript lives in that account's folder.
   const resume = async (role: Role, e: Earlier) => {
@@ -297,7 +312,7 @@ export default function App() {
     try {
       const status = await accountStatus(e.account_id);
       if (!status.logged_in) throw new Error("The account of that conversation is not signed in. Sign in from the welcome page, under Settings.");
-      await invoke<string>("start_session", { folder: project.folder, roleId: role.id, accountId: e.account_id, useVoice: persona.enabled, ticketId: null, brainDigest: null, model: role.model, mode: role.mode, resume: e.id });
+      await invoke<string>("start_session", { folder: project.folder, roleId: role.id, accountId: e.account_id, useVoice: persona.enabled, ticketId: e.ticket_id, brainDigest: null, model: role.model, mode: role.mode, resume: e.id }); // a conversation that ran in a ticket's own copy is resumed in that copy: Claude Code finds it only from the folder it ran in
       setDismissed((d) => { const { [e.id]: _gone, ...rest } = d; return rest; });
       setTab("chat");
     } catch (err) { setNotice(`Could not resume it: ${String(err)}`); }
@@ -505,7 +520,7 @@ export default function App() {
       const myTab: PersonTab = tabs[role.id] || "chat";
       return (
         <Sheet key={key} pageKey={key} hidden={hidden} title={roleLabel(role)} tabs={PERSON_TABS} active={myTab} onTab={(id) => setTabs((m) => ({ ...m, [role.id]: id as PersonTab }))} keepDraftOnTab onClose={() => endPage(key)} onMinimize={() => { if (hidden) return; keepShown(); }} registry={guards} guard={sheetGuard}>
-          <PersonSheet tab={myTab} onTab={(t) => setTabs((m) => ({ ...m, [role.id]: t }))} role={role} project={project} session={mine} history={history} accountId={accountOf(project)} kit={kits[role.id] ?? { skills: [], mcp: [], notes: {} }} error={hidden ? null : personError} dispatch={dispatch as (a: unknown) => void}
+          <PersonSheet tab={myTab} onTab={(t) => setTabs((m) => ({ ...m, [role.id]: t }))} role={role} project={project} session={mine} history={history} historyMore={historyMore} onHistoryMore={showMoreHistory} accountId={accountOf(project)} kit={kits[role.id] ?? { skills: [], mcp: [], notes: {} }} error={hidden ? null : personError} dispatch={dispatch as (a: unknown) => void}
             onFirst={(text, images) => void sendFirst(role, text, images)} onResume={(e) => void resume(role, e)} onNew={() => mine && void newConversation(mine)} onNote={() => mine && void noteSession(mine.id, true)}
             onSaveAnswer={(text) => mine && void saveAnswer(mine.id, text)} onSaved={(saved) => setRoles((all) => all.map((r) => (r.id === saved.id ? saved : r)))} onKitSaved={(id, kit) => setKits((all) => ({ ...all, [id]: kit }))} />
         </Sheet>

@@ -147,6 +147,11 @@ pub struct Earlier {
     pub bytes: u64,
     /// which of Kona's accounts' folders it was found in ("main" for the PC's usual one)
     pub account_id: String,
+    /// the ticket whose own copy of the project this conversation ran in (its transcript sits next to that copy, not next to the project), or None
+    pub ticket_id: Option<String>,
+    /// the transcript file, for reading its first words
+    #[serde(skip)]
+    path: PathBuf,
 }
 
 fn first_words(path: &std::path::Path) -> String {
@@ -168,35 +173,77 @@ fn first_words(path: &std::path::Path) -> String {
     String::new()
 }
 
-/// The sessions Claude Code has saved for a working folder, newest first. `roots` pairs each account id with its login folder (None for Main).
-pub fn earlier(folder: &str, roots: &[(String, Option<String>)]) -> Vec<Earlier> {
-    let want = slug(folder).to_lowercase();
+/// The sessions Claude Code has saved for a project, newest first. Claude Code files a conversation under the folder it ran in, so `places` lists every folder a conversation of this
+/// project may have run in: the project's own (with None) and the own copy of each ticket (with the ticket's number). `roots` pairs each account id with its login folder (None for Main).
+pub fn earlier(places: &[(String, Option<String>)], roots: &[(String, Option<String>)], keep: &dyn Fn(&Earlier) -> bool, limit: usize) -> EarlierPage {
     let mut out: Vec<Earlier> = vec![];
     for (account_id, dir) in roots {
         let Some(root) = config_root(dir.as_deref()) else { continue };
         let Ok(rd) = std::fs::read_dir(root.join("projects")) else { continue };
-        for e in rd.filter_map(Result::ok) {
-            if e.file_name().to_string_lossy().to_lowercase() != want { continue; }
-            for f in std::fs::read_dir(e.path()).into_iter().flatten().filter_map(Result::ok) {
-                let p = f.path();
-                if p.extension().and_then(|x| x.to_str()) != Some("jsonl") { continue; }
-                let id = p.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
-                if id.len() != 36 || !id.chars().all(|c| c.is_ascii_hexdigit() || c == '-') { continue; }
-                let Ok(m) = f.metadata() else { continue };
-                let modified = m.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as u64).unwrap_or(0);
-                out.push(Earlier { id, title: String::new(), modified, bytes: m.len(), account_id: account_id.clone() });
+        let folders: Vec<(String, PathBuf)> = rd.filter_map(Result::ok).map(|e| (e.file_name().to_string_lossy().to_lowercase(), e.path())).collect();
+        for (place, ticket_id) in places {
+            let want = slug(place).to_lowercase();
+            for (_, folder_path) in folders.iter().filter(|(name, _)| *name == want) {
+                for f in std::fs::read_dir(folder_path).into_iter().flatten().filter_map(Result::ok) {
+                    let p = f.path();
+                    if p.extension().and_then(|x| x.to_str()) != Some("jsonl") { continue; }
+                    let id = p.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+                    if id.len() != 36 || !id.chars().all(|c| c.is_ascii_hexdigit() || c == '-') { continue; }
+                    let Ok(m) = f.metadata() else { continue };
+                    let modified = m.modified().ok().and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as u64).unwrap_or(0);
+                    out.push(Earlier { id, title: String::new(), modified, bytes: m.len(), account_id: account_id.clone(), ticket_id: ticket_id.clone(), path: p });
+                }
             }
         }
     }
+    // the same file found twice (two places that file under the same name) is listed once
+    let mut seen = std::collections::HashSet::new();
+    out.retain(|e| seen.insert((e.account_id.clone(), e.id.clone())));
     out.sort_by(|a, b| b.modified.cmp(&a.modified));
-    out.truncate(30);
+    out.retain(|e| e.bytes > 600 && keep(e)); // an empty session (opened and closed) is not worth listing; the caller keeps only what it wants (one person's)
+    let total = out.len();
+    out.truncate(limit);
     // read the first words of only the ones that are shown
     for e in out.iter_mut() {
-        if let Some(root) = roots.iter().find(|r| r.0 == e.account_id).and_then(|r| config_root(r.1.as_deref()))
-            && let Some(dir) = std::fs::read_dir(root.join("projects")).ok().and_then(|rd| rd.filter_map(Result::ok).find(|d| d.file_name().to_string_lossy().to_lowercase() == want)) {
-                e.title = first_words(&dir.path().join(format!("{}.jsonl", e.id)));
-            }
+        e.title = first_words(&e.path);
     }
-    out.retain(|e| e.bytes > 600); // an empty session (opened and closed) is not worth listing
-    out
+    EarlierPage { items: out, total }
+}
+
+/// One page of the list: the newest `limit` conversations, and how many there are in all (so the screen can offer "Show more").
+#[derive(serde::Serialize)]
+pub struct EarlierPage {
+    pub items: Vec<Earlier>,
+    pub total: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn line(text: &str) -> String {
+        format!("{{\"type\":\"user\",\"message\":{{\"content\":\"{text}\"}}}}\n").repeat(30)
+    }
+
+    #[test]
+    fn a_conversation_in_a_tickets_own_copy_is_listed_with_its_ticket() {
+        let base = std::env::temp_dir().join(format!("kona-earlier-test-{}", std::process::id()));
+        let projects = base.join("projects");
+        // Claude Code files a conversation under the folder it ran in, written with dashes
+        let main = projects.join(slug("C:/work/app"));
+        let copy = projects.join(slug("C:/work/app/.kona/worktrees/T-0002"));
+        std::fs::create_dir_all(&main).unwrap();
+        std::fs::create_dir_all(&copy).unwrap();
+        std::fs::write(main.join("11111111-1111-4111-8111-111111111111.jsonl"), line("in the main folder")).unwrap();
+        std::fs::write(copy.join("22222222-2222-4222-8222-222222222222.jsonl"), line("in the copy")).unwrap();
+        let places = vec![("C:/work/app".to_string(), None), ("C:/work/app/.kona/worktrees/T-0002".to_string(), Some("T-0002".to_string()))];
+        let roots = vec![("main".to_string(), Some(base.to_string_lossy().to_string()))];
+        let got = earlier(&places, &roots, &|_| true, 30).items;
+        let _ = std::fs::remove_dir_all(&base);
+        assert_eq!(got.len(), 2);
+        let copy_one = got.iter().find(|e| e.id.starts_with("2222")).unwrap();
+        assert_eq!(copy_one.ticket_id.as_deref(), Some("T-0002"));
+        assert_eq!(copy_one.title, "in the copy");
+        assert_eq!(got.iter().find(|e| e.id.starts_with("1111")).unwrap().ticket_id, None);
+    }
 }

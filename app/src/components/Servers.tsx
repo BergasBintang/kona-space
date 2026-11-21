@@ -7,6 +7,7 @@
 // (a note: Kona never sees it). It is a server entry underneath, so the same checks apply to its nickname.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { roleLabel, saveServer, listServers, removeServer, readFingerprints, keyState, pickFile, type Fingerprint, type KeyState, type Project, type Pull, type Role, type Server } from "../lib/api";
+import { useSyncTick } from "../lib/sync";
 import { Button, Glyph, RoleMark } from "./ui";
 import { Confirm } from "./Confirm";
 import { MultiSelect, Select } from "./pick";
@@ -97,6 +98,8 @@ export function Servers({ project, roles }: { project: Project; roles: Role[] })
 
   const load = useCallback(() => { listServers(project.id).then(setList).catch((e) => { setList([]); setError(String(e)); }); }, [project.id]);
   useEffect(() => { setList(null); setDraft(null); load(); }, [load]);
+  const syncServers = useSyncTick("servers"); // another Kona window changed the servers: read them again, and leave an open form alone
+  useEffect(() => { if (syncServers) load(); }, [syncServers]); // eslint-disable-line react-hooks/exhaustive-deps
   // opening the dialog puts the cursor in its first box
   const formOpen = draft ? draft.id || "new" : "";
   useEffect(() => { if (formOpen) document.querySelector<HTMLElement>('[role="dialog"][aria-modal] input')?.focus(); }, [formOpen]);

@@ -11,8 +11,8 @@ import type { Session } from "../lib/sessions";
 export type PersonTab = "chat" | "history" | "skills" | "tools" | "setup";
 export const PERSON_TABS: { id: PersonTab; label: string }[] = [{ id: "chat", label: "Chat" }, { id: "history", label: "History" }, { id: "skills", label: "Skills" }, { id: "tools", label: "Tools" }, { id: "setup", label: "Set up" }];
 
-export function PersonSheet({ tab, role, project, session, history, accountId, kit, error, dispatch, onTab, onFirst, onResume, onNew, onNote, onSaveAnswer, onSaved, onKitSaved }: {
-  tab: PersonTab; role: Role; project: Project; session: Session | null; history: Earlier[]; accountId: string | null; kit: RoleKit; error: string | null; dispatch: (a: unknown) => void; onTab: (t: PersonTab) => void;
+export function PersonSheet({ tab, role, project, session, history, historyMore, onHistoryMore, accountId, kit, error, dispatch, onTab, onFirst, onResume, onNew, onNote, onSaveAnswer, onSaved, onKitSaved }: {
+  tab: PersonTab; role: Role; project: Project; session: Session | null; history: Earlier[]; historyMore: number; onHistoryMore: () => void; accountId: string | null; kit: RoleKit; error: string | null; dispatch: (a: unknown) => void; onTab: (t: PersonTab) => void;
   onFirst: (text: string, images: Attached[]) => void; onResume: (e: Earlier) => void; onNew: () => void; onNote: () => void; onSaveAnswer: (text: string) => void;
   onSaved: (r: Role) => void; onKitSaved: (roleId: string, kit: RoleKit) => void;
 }) {
@@ -24,7 +24,7 @@ export function PersonSheet({ tab, role, project, session, history, accountId, k
           : <EmptyChat role={role} project={project} kit={kit} onTools={() => onTab("tools")} onFirst={onFirst} error={error} />}
       </div>
       <div className={tab === "history" ? "flex min-h-0 min-w-0 flex-1" : "hidden"}>
-        <HistoryList role={role} items={history} onResume={onResume} busy={!!session && session.run !== "ended"} />
+        <HistoryList role={role} items={history} more={historyMore} onMore={onHistoryMore} onResume={onResume} busy={!!session && session.run !== "ended"} />
       </div>
       {tab === "skills" && <SkillsTab key={`${project.id}-${role.id}`} role={role} project={project} accountId={accountId} kit={kit} onKitSaved={onKitSaved} />}
       {tab === "tools" && <ToolsTab key={`${project.id}-${role.id}`} role={role} project={project} kit={kit} onKit={(k) => onKitSaved(role.id, k)} />}

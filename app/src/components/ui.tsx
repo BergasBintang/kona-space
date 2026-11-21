@@ -96,9 +96,8 @@ export function PlanBar({ label, window: w0, readAt, warnLine = "Close to the li
   );
   if (compact) {
     return (
-      <div className="flex w-[150px] flex-col gap-1" title={[label, pct === null ? "not read yet" : `${pct}%`, resetLine, warn ? warnLine : null].filter(Boolean).join(" · ")}>
-        <div className="flex items-baseline justify-between"><span className="font-pixel text-[13px] leading-4 text-text-secondary">{label}</span><span className="font-pixel text-[13px] leading-4 font-bold" style={{ color: warn ? color : undefined }}>{pct === null ? "—" : `${pct}%`}{warn ? " !" : ""}</span></div>
-        {bar}
+      <div className="flex flex-col gap-1" title={[label, pct === null ? "not read yet" : `${pct}%`, resetLine, warn ? warnLine : null].filter(Boolean).join(" · ")}>
+        <div className="flex items-baseline gap-2"><span className="font-pixel text-[13px] leading-4 text-text-secondary">{label}</span><span className="font-pixel text-[13px] leading-4 font-bold" style={{ color: warn ? color : undefined }}>{pct === null ? "—" : `${pct}%`}{warn ? " !" : ""}</span></div>
       </div>
     );
   }

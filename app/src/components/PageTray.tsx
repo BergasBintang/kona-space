@@ -8,7 +8,7 @@ export type TrayItem = { key: string; label: string; state: GlyphState; word: st
 
 export function PageTray({ items, open, max, onShow, onClose }: { items: TrayItem[]; open: number; max: number; onShow: (key: string) => void; onClose: (key: string) => void }) {
   return (
-    <nav aria-label="Open pages" className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto py-1">
+    <nav aria-label="Open pages" className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto py-1 no-scrollbar">
       <ul role="tablist" aria-label="Open pages" className="m-0 flex list-none items-center gap-1.5 p-0">
         {items.map((it) => (
           <li key={it.key} title={`${it.label}: ${it.word}${it.shown ? " (shown)" : " (minimized)"}`} className={`flex shrink-0 items-center border ${it.shown ? "border-line-strong bg-surface-2" : "border-line-subtle"}`}>

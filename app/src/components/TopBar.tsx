@@ -20,11 +20,11 @@ export function TopBar({ project, onHome, sheetOpen, place, onPlace, onAttention
           <path d="M10 3 L5 8 L10 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter" />
         </svg>
         <KonaMark size={32} />
-        <span className="ml-1 text-[22px] leading-[30px] font-bold">Kona</span>
+        <span className="ml-1 text-[22px] leading-[30px] font-bold max-[1100px]:hidden">Kona</span>
       </button>
 
       {!project && place !== "office" && <Button variant="quiet" small onClick={() => onPlace("office")}>← Back</Button>}
-      {project && <span className="max-w-[220px] truncate text-[18px] leading-6 font-bold" title={project.folder}>{project.name}</span>}
+      {project && <span className="max-w-[220px] truncate text-[18px] leading-6 font-bold max-[1100px]:max-w-[110px]" title={project.folder}>{project.name}</span>}
 
       <div className="flex min-w-0 flex-1 items-center">{tray}</div>
 
@@ -37,11 +37,11 @@ export function TopBar({ project, onHome, sheetOpen, place, onPlace, onAttention
       {project && (
         <div className="flex items-center gap-4">
           {accountLabel && <span className="font-pixel text-[14px] leading-5 font-bold text-text-secondary">{accountLabel}</span>}
-          <PlanBar compact label="Session" window={plan?.fiveHour} readAt={plan?.at} warnLine={limitLine} />
+          <PlanBar compact label="5 hours" window={plan?.fiveHour} readAt={plan?.at} warnLine={limitLine} />
           <PlanBar compact label="Week" window={plan?.sevenDay} readAt={plan?.at} warnLine={limitLine} />
         </div>
       )}
-      <span className="font-mono text-[12px] text-text-tertiary">{version ? `v${version}` : ""}</span>
+      <span className="font-mono text-[12px] text-text-tertiary max-[1100px]:hidden">{version ? `v${version}` : ""}</span>
     </header>
   );
 }

@@ -56,7 +56,7 @@ export type Fingerprint = { kind: string; fingerprint: string };
 export type KeyState = { exists: boolean; is_file: boolean; inside_a_project: boolean; synced_folder: boolean };
 export type Settings = { max_sessions: number; check_updates: boolean };
 export type BackupInfo = { name: string; path: string; files: number; bytes: number };
-export type Earlier = { id: string; title: string; modified: number; bytes: number; account_id: string };
+export type Earlier = { id: string; title: string; modified: number; bytes: number; account_id: string; ticket_id: string | null };
 export type Entry = { name: string; path: string; is_dir: boolean; size: number; modified: number | null };
 export type FileView =
   | { kind: "text"; text: string; size: number; truncated: boolean }
@@ -115,7 +115,10 @@ export const setSettings = (value: Settings) => invoke<Settings>("set_settings",
 export const backupNow = () => invoke<BackupInfo>("backup_now");
 export const listBackups = () => invoke<BackupInfo[]>("list_backups");
 export const deleteBackup = (name: string) => invoke<void>("delete_backup", { name });
-export const earlierSessions = (projectId: string) => invoke<Earlier[]>("earlier_sessions", { projectId });
+/** One page of a person's earlier conversations: the newest `limit` of them, and how many there are in all. */
+export type EarlierPage = { items: Earlier[]; total: number };
+export const HISTORY_PAGE = 30;
+export const earlierSessions = (projectId: string, roleId: string, limit: number) => invoke<EarlierPage>("earlier_sessions", { projectId, roleId, limit });
 export const costRows = (sinceDay: string | null) => invoke<CostRow[]>("cost_rows", { sinceDay });
 /** what a folder spent in one local hour (`hour` reads YYYY-MM-DD HH): the points of today's chart */
 export type HourRow = { folder: string | null; hour: string; cost: number };

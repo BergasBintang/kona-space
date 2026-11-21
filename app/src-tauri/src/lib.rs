@@ -25,6 +25,7 @@ mod workflows;
 mod session;
 mod ssh;
 mod summary;
+mod sync;
 mod terminal;
 mod tickets;
 mod winproc;
@@ -650,10 +651,26 @@ fn delete_backup(app: AppHandle, name: String) -> Result<(), String> {
 
 /// The sessions Claude Code saved earlier for a project, newest first, so one can be resumed.
 #[tauri::command]
-async fn earlier_sessions(projects: State<'_, Projects>, accounts: State<'_, Accounts>, project_id: String) -> Result<Vec<summary::Earlier>, String> {
-    let folder = project_path(&projects, &project_id)?.to_string_lossy().to_string();
+async fn earlier_sessions(projects: State<'_, Projects>, accounts: State<'_, Accounts>, sessions: State<'_, Sessions>, project_id: String, role_id: Option<String>, limit: Option<usize>) -> Result<summary::EarlierPage, String> {
+    let project = project_path(&projects, &project_id)?;
+    // the role each conversation ran as, from the cost ledger; one with no role on record is filed under the Secretary (the front desk), because the role of an old session was not recorded
+    let roles_by: std::collections::HashMap<String, String> = sessions.ledger.cost_rows(None).into_iter().filter_map(|r| r.role_id.map(|id| (r.session_id, id))).collect();
+    let limit = limit.unwrap_or(30).clamp(30, 3000);
     let roots: Vec<(String, Option<String>)> = accounts.all().into_iter().map(|a| (a.id, a.config_dir)).collect();
-    tauri::async_runtime::spawn_blocking(move || summary::earlier(&folder, &roots)).await.map_err(|e| e.to_string())
+    tauri::async_runtime::spawn_blocking(move || {
+        // a ticket that works in its own copy of the project has its conversations filed next to that copy, so the copy's folder is looked in too
+        let mut places: Vec<(String, Option<String>)> = vec![(project.to_string_lossy().to_string(), None)];
+        for t in tickets::list(&tickets::dir(&project)) {
+            let standard = worktrees::dir_for(&project, &t.id).to_string_lossy().to_string();
+            if !t.worktree.is_empty() && worktrees::norm(&t.worktree) != worktrees::norm(&standard) { places.push((t.worktree.clone(), Some(t.id.clone()))); }
+            places.push((standard, Some(t.id)));
+        }
+        let keep = |e: &summary::Earlier| match &role_id {
+            None => true,
+            Some(r) => roles_by.get(&e.id).map(String::as_str).unwrap_or("secretary") == r,
+        };
+        summary::earlier(&places, &roots, &keep, limit)
+    }).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -979,28 +996,7 @@ pub fn run() {
                 responder.respond(mock::serve(&lookup, request.method().as_str(), request.uri().path(), range).into_response());
             });
         })
-        // the window opens full screen (tauri.conf.json); the middle button of the title bar then brings it back at half the width and half the height of the screen, in the middle
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::Resized(_) = event {
-                use std::sync::atomic::{AtomicBool, Ordering};
-                static WAS_FULL: AtomicBool = AtomicBool::new(true);
-                if window.is_minimized().unwrap_or(false) {
-                    return; // minimising also reports a new size; wait for the real change
-                }
-                let full = window.is_maximized().unwrap_or(false) || window.is_fullscreen().unwrap_or(false);
-                if WAS_FULL.swap(full, Ordering::SeqCst) && !full {
-                    if let Ok(Some(m)) = window.current_monitor() {
-                        let area = m.work_area();
-                        let (w, h) = (area.size.width / 2, area.size.height / 2);
-                        let _ = window.set_size(tauri::PhysicalSize::new(w, h));
-                        let _ = window.set_position(tauri::PhysicalPosition::new(
-                            area.position.x + (area.size.width - w) as i32 / 2,
-                            area.position.y + (area.size.height - h) as i32 / 2,
-                        ));
-                    }
-                }
-            }
-        })
+        // the window opens full screen (placed in `setup` below); after that Windows decides its size, so snapping to a side or a corner works
         .setup(|app| {
             // %APPDATA%\Kona\kona.db (the plan's place for the app's own data)
             let base = app.path().app_data_dir().ok().and_then(|p| p.parent().map(|d| d.join("Kona"))).ok_or("no app data folder")?;
@@ -1036,6 +1032,35 @@ pub fn run() {
             app.manage(ssh::Servers::load(&base));
             app.manage(terminal::Terms::default());
             app.manage(backup::SettingsStore::load(&base));
+            // a second Kona window may change these lists (projects, roles, accounts, settings, servers, the voice): once a second each one asks whether its file is newer than what this window read,
+            // reads it again if so, and tells the screen (the event "kona-sync" says which list). See sync.rs; one stat call per file, nothing else.
+            let watcher = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                use tauri::Emitter;
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                    let mut changed: Vec<&str> = vec![];
+                    if watcher.state::<Projects>().reload() { changed.push("projects"); }
+                    if watcher.state::<Roles>().reload() { changed.push("roles"); }
+                    if watcher.state::<Accounts>().reload() { changed.push("accounts"); }
+                    if watcher.state::<Voice>().reload() { changed.push("voice"); }
+                    if watcher.state::<ssh::Servers>().reload() { changed.push("servers"); }
+                    if watcher.state::<backup::SettingsStore>().reload() { changed.push("settings"); }
+                    for what in changed { let _ = watcher.emit("kona-sync", what); }
+                }
+            });
+            // The window opens full screen, but what Windows remembers as its "restored" size is set first: half the width and half the height of the usable screen, in the middle. So the middle button of
+            // the title bar brings it back to a clearly smaller window, and snapping (which Windows works out itself) is left alone. The window starts hidden (tauri.conf.json) and is shown once it is placed.
+            if let Some(w) = app.get_webview_window("main") {
+                if let Some(m) = w.current_monitor().ok().flatten().or_else(|| w.primary_monitor().ok().flatten()) {
+                    let area = m.work_area();
+                    let (ww, hh) = (area.size.width / 2, area.size.height / 2);
+                    let _ = w.set_size(tauri::PhysicalSize::new(ww, hh));
+                    let _ = w.set_position(tauri::PhysicalPosition::new(area.position.x + (area.size.width - ww) as i32 / 2, area.position.y + (area.size.height - hh) as i32 / 2));
+                }
+                let _ = w.maximize();
+                let _ = w.show();
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![cost_hours, read_skill_files, save_skill_folder, default_role_kit, apply_default_tree, check_claude, save_tool, delete_tool, read_skill, write_skill, delete_skill, start_session, send_message, answer_permission, stop_session, list_projects, add_project, remove_project, set_project_group, set_project_sessions, rename_project, cost_rows, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, office_say, mockup_ticket_draft, note_check, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, workflow_list, workflow_save, workflow_delete, run_list, run_save, run_delete, office_map_load, office_map_save, office_map_reset, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, git_marks, read_file, mock_base, mock_cards, mock_files, live_base, live_status, live_start, live_stop, live_data, live_delete_data, live_accounts, journey_markers, journey_check, brain_chat, mock_page_text, terminal::term_open, terminal::term_write, terminal::term_resize, terminal::term_close, terminal::term_close_all, terminal::term_buttons_load, terminal::term_buttons_save])

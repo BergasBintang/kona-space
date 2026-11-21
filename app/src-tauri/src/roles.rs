@@ -120,6 +120,7 @@ struct Inner {
 pub struct Roles {
     file: PathBuf,
     inner: Mutex<Inner>,
+    stamp: crate::sync::Stamp,
 }
 
 fn starting(id: &str, person: &str, name: &str, group: &str, mode: &str, needs: &[&str], brief: &str) -> Role {
@@ -168,11 +169,26 @@ pub fn starting_roles() -> Vec<Role> {
 }
 
 impl Roles {
+    fn read(file: &Path) -> Inner {
+        let saved: HashMap<String, Profile> = fs::read_to_string(file).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+        let list = starting_roles().into_iter().map(|mut r| { if let Some(p) = saved.get(&r.id) { apply(&mut r, p); } r }).collect();
+        Inner { list, saved }
+    }
+
     pub fn load(base: &Path) -> Self {
         let file = base.join("role-profiles.json");
-        let saved: HashMap<String, Profile> = fs::read_to_string(&file).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
-        let list = starting_roles().into_iter().map(|mut r| { if let Some(p) = saved.get(&r.id) { apply(&mut r, p); } r }).collect();
-        Self { file, inner: Mutex::new(Inner { list, saved }) }
+        let stamp = crate::sync::Stamp::new(&file);
+        let inner = Self::read(&file);
+        Self { file, inner: Mutex::new(inner), stamp }
+    }
+
+    /// Another Kona window changed the file: read the roles again. True when it was read (the screen is then told).
+    pub fn reload(&self) -> bool {
+        if !self.stamp.changed() { return false; }
+        let inner = Self::read(&self.file);
+        *self.inner.lock().unwrap() = inner;
+        self.stamp.mark();
+        true
     }
 
     pub fn all(&self) -> Vec<Role> {
@@ -187,7 +203,9 @@ impl Roles {
         if let Some(d) = self.file.parent() { fs::create_dir_all(d).map_err(|e| e.to_string())?; }
         let tmp = self.file.with_extension("json.tmp");
         fs::write(&tmp, serde_json::to_string_pretty(saved).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
-        fs::rename(&tmp, &self.file).map_err(|e| e.to_string())
+        let done = fs::rename(&tmp, &self.file).map_err(|e| e.to_string());
+        self.stamp.mark();
+        done
     }
 
     /// Keep the owner's setup for one role.

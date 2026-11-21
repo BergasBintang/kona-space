@@ -74,6 +74,9 @@ body {
 
 /* Thin quiet scrollbars */
 * { scrollbar-width: thin; scrollbar-color: var(--color-surface-3) transparent; }
+/* A row that scrolls with no bar drawn (the tray of pages in the top bar: the bar made the top bar taller). Plain CSS, not a Tailwind class: the rule above is not in a layer, so it would win over one. */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

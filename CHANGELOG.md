@@ -2,6 +2,17 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.42.0, 2026-11-22
+
+Kona can be snapped beside another window, two Kona windows stay in step, History is complete and shows more, and the top bar is calmer.
+
+- **Kona can be snapped beside another window.** The rule that brought the window back at half the width and height of the screen also fired when Windows snapped the window, and cancelled the snap. Kona still opens full screen, and the middle title-bar button still brings it back at half the width and half the height of the screen, in the middle.
+- **Two Kona windows stay in step.** Each window is its own program, so a project added, renamed or removed in one was never seen by the other, and the other could save its old list over it. Every second each window now checks whether the shared files (projects, roles, accounts, settings, servers, the voice) changed, reads them again if so, and updates the screen. It is one tiny file check per second.
+- **History lists a ticket's own-copy conversations.** They were saved next to the copy of the project, not next to the project, so History never showed them. Resume opens them in that copy. The list is also read again when a conversation ends or is put away, so it is no longer empty right after New conversation.
+- **History shows 30 at a time.** More than 30 conversations: a Show more button adds 30 more each time (61 conversations take two presses).
+- **A calmer top bar.** The two plan figures are just a label and a number (the first is called "5 hours" now), with no bars. In a narrow window (about half a screen) the Kona word and the version are hidden too, so the open pages have room.
+- **The tray of pages draws no scrollbar,** so the top bar keeps its height.
+
 ## 0.41.1, 2026-11-18
 
 A fix for the tray of pages: it now works like browser tabs, and clicking a page in it no longer closes the one you were on.

@@ -48,6 +48,7 @@ pub struct Accounts {
     base: PathBuf,
     file: PathBuf,
     list: Mutex<Vec<Account>>,
+    stamp: crate::sync::Stamp,
     /// accounts that had no folder (they followed the PC's login) and were given one by this start of Kona
     migrated: Mutex<Vec<String>>,
 }
@@ -55,6 +56,7 @@ pub struct Accounts {
 impl Accounts {
     pub fn load(base: &Path) -> Self {
         let file = base.join("accounts.json");
+        let stamp = crate::sync::Stamp::new(&file);
         let mut list = fs::read_to_string(&file).ok().and_then(|t| serde_json::from_str::<FileData>(&t).ok()).map(|d| d.accounts).unwrap_or_default();
         // an account of an older Kona that followed the PC's own login gets a login folder of its own: empty and signed out, so it can never show a login that the terminal changed
         let mut migrated = vec![];
@@ -65,11 +67,19 @@ impl Accounts {
                 migrated.push(a.id.clone());
             }
         }
-        let me = Self { base: base.to_path_buf(), file, list: Mutex::new(list.clone()), migrated: Mutex::new(migrated.clone()) };
+        let me = Self { base: base.to_path_buf(), file, list: Mutex::new(list.clone()), stamp, migrated: Mutex::new(migrated.clone()) };
         if !migrated.is_empty() {
             let _ = me.save(&list);
         }
         me
+    }
+
+    /// Another Kona window changed the file: read the list again. True when it was read (the screen is then told).
+    pub fn reload(&self) -> bool {
+        if !self.stamp.changed() { return false; }
+        if let Some(d) = fs::read_to_string(&self.file).ok().and_then(|t| serde_json::from_str::<FileData>(&t).ok()) { *self.list.lock().unwrap() = d.accounts; }
+        self.stamp.mark();
+        true
     }
 
     /// The accounts that were given a folder by this start of Kona (asked once).
@@ -82,7 +92,9 @@ impl Accounts {
             fs::create_dir_all(dir).map_err(|e| e.to_string())?;
         }
         let data = FileData { version: 1, accounts: list.to_vec() };
-        fs::write(&self.file, serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?).map_err(|e| e.to_string())
+        let done = fs::write(&self.file, serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?).map_err(|e| e.to_string());
+        self.stamp.mark();
+        done
     }
 
     pub fn all(&self) -> Vec<Account> {

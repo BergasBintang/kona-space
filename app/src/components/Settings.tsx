@@ -2,6 +2,7 @@
 // the size of the window, updates, backups, and where Kona keeps its things. Nothing here belongs to one project (those are in ProjectSettings),
 // and nothing here changes a project's own files.
 import { useCallback, useEffect, useState } from "react";
+import { useSyncTick } from "../lib/sync";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { backupNow, deleteBackup, getSettings, listBackups, setSettings, type Account, type BackupInfo, type Settings as SettingsT } from "../lib/api";
 import { Accounts } from "./Accounts";
@@ -28,7 +29,8 @@ export function GeneralSettings({ accounts, onAccounts, version }: { accounts: A
   const update = useUpdate();
 
   const load = useCallback(() => { getSettings().then(setS).catch(() => {}); listBackups().then(setBackups).catch(() => setBackups([])); }, []);
-  useEffect(() => { load(); }, [load]);
+  const syncSettings = useSyncTick("settings"); // another Kona window changed the settings: read them again
+  useEffect(() => { load(); }, [load, syncSettings]);
   useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(null), 9000); return () => clearTimeout(t); }, [notice]);
   const doBackup = async () => {
     setBusy(true); setError(null);

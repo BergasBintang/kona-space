@@ -71,6 +71,7 @@ struct FileData {
 pub struct Servers {
     file: PathBuf,
     list: Mutex<Vec<Host>>,
+    stamp: crate::sync::Stamp,
 }
 
 fn clean_line(s: &str, what: &str, max: usize) -> Result<String, String> {
@@ -104,13 +105,24 @@ impl Servers {
     pub fn load(base: &Path) -> Self {
         let file = base.join("ssh-hosts.json");
         let list = fs::read_to_string(&file).ok().and_then(|t| serde_json::from_str::<FileData>(&t).ok()).map(|d| d.hosts).unwrap_or_default();
-        Self { file, list: Mutex::new(list) }
+        let stamp = crate::sync::Stamp::new(&file);
+        Self { file, list: Mutex::new(list), stamp }
+    }
+
+    /// Another Kona window changed the file: read the list again. True when it was read (the screen is then told).
+    pub fn reload(&self) -> bool {
+        if !self.stamp.changed() { return false; }
+        if let Some(d) = fs::read_to_string(&self.file).ok().and_then(|t| serde_json::from_str::<FileData>(&t).ok()) { *self.list.lock().unwrap() = d.hosts; }
+        self.stamp.mark();
+        true
     }
 
     fn save(&self, list: &[Host]) -> Result<(), String> {
         if let Some(d) = self.file.parent() { fs::create_dir_all(d).map_err(|e| e.to_string())?; }
         let t = serde_json::to_string_pretty(&FileData { version: 1, hosts: list.to_vec() }).map_err(|e| e.to_string())?;
-        fs::write(&self.file, t).map_err(|e| e.to_string())
+        let done = fs::write(&self.file, t).map_err(|e| e.to_string());
+        self.stamp.mark();
+        done
     }
 
     pub fn for_project(&self, project_id: &str) -> Vec<Host> {

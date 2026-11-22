@@ -1,0 +1,73 @@
+/* UI details: one small set of timings and the base styles that use them.
+   Copy this file into the project's styles. Where the project already has its own colours, timings or class names, keep the project's and delete the copies here.
+   Every value below the first block is a plain default: change the colours to the project's own. */
+
+:root {
+  /* fast start, soft landing: things that appear or answer the person */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  /* slow-fast-slow: things that move from one place to another, or change shape */
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  /* panels and drawers that slide in from an edge */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --dur-press: 120ms;   /* a button going down or up */
+  --dur-tooltip: 160ms;
+  --dur-menu: 200ms;    /* menus, popovers, small fades */
+  --dur-panel: 280ms;   /* panels, drawers, dialogs */
+
+  /* colours the pieces below need: replace with the project's */
+  --btn-hover: #e6e0d2;
+  --focus: #1f6f66;
+  --skel: #e6e0d2;
+  --hold-fill: #1f6f66;
+  --danger-soft: #f4d6d2;
+  --breathe-low: 0.55;
+}
+
+.btn {
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-press) var(--ease-out);
+  user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:active { transform: scale(0.97); }
+@media (hover: hover) { .btn:hover { background-color: var(--btn-hover); } }
+.btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .panel { transform: none; transition: opacity var(--dur-menu) linear; }
+  .breathe { animation-duration: 2.4s; --breathe-low: 0.8; }
+  .failed { animation: flash 300ms linear; }
+}
+@keyframes flash { 50% { background-color: var(--danger-soft); } }
+
+.skel {
+  background: var(--skel);
+  animation: skel-in 240ms var(--ease-out) 140ms both, skel-pulse 1.8s ease-in-out 380ms infinite;
+}
+@keyframes skel-in { from { opacity: 0; } }
+@keyframes skel-pulse { 50% { opacity: 0.55; } }
+
+.mark .check { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 240ms var(--ease-in-out) 120ms; }
+.mark.done .check { stroke-dashoffset: 0; }
+
+@keyframes shake {
+  0%, 100% { transform: none; }
+  15% { transform: translateX(-6px); }
+  30% { transform: translateX(6px); }
+  50% { transform: translateX(-4px); }
+  70% { transform: translateX(4px); }
+  85% { transform: translateX(-2px); }
+}
+.failed { animation: shake 350ms var(--ease-in-out); }
+
+.num [data-view] { font-variant-numeric: tabular-nums; display: inline-block; min-width: 4ch; text-align: right; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.hold { position: relative; overflow: hidden; --p: 0; }
+.hold::before { content: ''; position: absolute; inset: 0; background: var(--hold-fill); transform: scaleX(var(--p)); transform-origin: left; }
+
+[data-input-mode='pointer'] :focus-visible { outline: none; }
+[data-input-mode='keyboard'] :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+[data-paused], [data-paused] * { animation-play-state: paused !important; }

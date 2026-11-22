@@ -42,6 +42,7 @@ import { localDate, redact } from "./lib/brain/text.ts";
 import { loadZoom, stepZoom } from "./lib/zoom";
 import { checkForUpdate } from "./lib/update";
 import { useSyncTick } from "./lib/sync";
+import { sendToSession } from "./lib/send";
 import { UpdateCard } from "./components/UpdateCard";
 import { getSettings, earlierSessions, HISTORY_PAGE, projectClaim, projectRelease, projectsTaken, saveNote, wantedRemove, officeSay, officeMapLoad, officeMapSave, officeMapReset, mockupTicketDraft, type Earlier } from "./lib/api";
 
@@ -126,6 +127,19 @@ export default function App() {
 
   // a notice goes away by itself after a few seconds
   useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(null), 9000); return () => clearTimeout(t); }, [notice]);
+
+  // messages that waited for an answer go as soon as the person is ready again (one at a time, in order); this lives here, not in the chat, so it works with the page closed or minimized
+  const sendingQueue = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const id of state.order) {
+      const s = state.sessions[id];
+      if (!s || s.run !== "ready" || s.queue.length === 0 || sendingQueue.current.has(id)) continue;
+      const next = s.queue[0];
+      sendingQueue.current.add(id);
+      dispatch({ type: "queue-remove", sessionId: id, id: next.id });
+      void sendToSession(dispatch as (a: unknown) => void, id, next.text, next.images).finally(() => sendingQueue.current.delete(id));
+    }
+  }, [state]);
 
   // a second Kona window changed one of the shared lists: read it again (see lib/sync.ts)
   const syncProjects = useSyncTick("projects"), syncRoles = useSyncTick("roles"), syncAccounts = useSyncTick("accounts"), syncVoice = useSyncTick("voice");

@@ -548,7 +548,7 @@ function MockupView({ project, card, base, send, onBack }: { project: Project; c
             <Button small variant="quiet" on={!everyDevice} aria-pressed={!everyDevice} onClick={() => setEveryDevice(false)}>Only {device.label}</Button>
           </div>
           <textarea autoFocus value={noteText} onChange={(e) => setNoteText(e.target.value.slice(0, NOTE_MAX))} rows={3} aria-label="What should change here?" placeholder="What should change here?"
-            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addNote(); } }} className={`py-2 leading-5 ${field}`} />
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); addNote(); } }} className={`py-2 leading-5 ${field}`} />
           <div className="flex justify-end gap-2">
             <Button small variant="ghost" onClick={closeNote}>Cancel</Button>
             <Button small disabled={noteText.trim() === ""} onClick={addNote}>Add note</Button>

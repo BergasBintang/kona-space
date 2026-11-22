@@ -59,3 +59,50 @@ test("a step of a helper (a side chain) does not change the memory of the conver
   const st = reducer(started(), { type: "event", sessionId: "s1", record: { ...step(50_000, 0), isSidechain: true } });
   assert.equal(st.sessions.s1.context, undefined);
 });
+
+// ---- Stop, and messages that wait for the answer (the owner chose Stop + queue + Send now, 2026-11-22)
+const waiting = () => reducer(started(), { type: "user-sent", sessionId: "s1", text: "do a long thing", images: [] });
+const q = (id: string) => ({ id, text: `message ${id}`, images: [] });
+
+test("messages written while the person works wait in order, Send now goes to the front, and one can be taken back", () => {
+  let st = waiting();
+  assert.equal(st.sessions.s1.run, "working");
+  st = reducer(st, { type: "queue-add", sessionId: "s1", item: q("a") });
+  st = reducer(st, { type: "queue-add", sessionId: "s1", item: q("b") });
+  st = reducer(st, { type: "queue-add", sessionId: "s1", item: q("now"), front: true });
+  assert.deepEqual(st.sessions.s1.queue.map((x) => x.id), ["now", "a", "b"]);
+  st = reducer(st, { type: "queue-remove", sessionId: "s1", id: "a" });
+  assert.deepEqual(st.sessions.s1.queue.map((x) => x.id), ["now", "b"]);
+});
+
+test("Stop drops what was waiting, and the turn that ends is a plain note saying so, not a problem", () => {
+  let st = reducer(reducer(waiting(), { type: "queue-add", sessionId: "s1", item: q("a") }), { type: "queue-add", sessionId: "s1", item: q("b") });
+  st = reducer(st, { type: "stop-asked", sessionId: "s1", keepQueue: false });
+  assert.equal(st.sessions.s1.queue.length, 0);
+  st = reducer(st, { type: "event", sessionId: "s1", record: { type: "result", subtype: "error_during_execution", is_error: true, result: "" } });
+  const s = st.sessions.s1;
+  assert.equal(s.run, "ready");
+  assert.equal(s.stopping, null);
+  const notes = s.items.filter((x) => x.kind === "note");
+  assert.ok(notes.some((n) => n.kind === "note" && n.tone === "info" && n.text === "Stopped. 2 waiting messages were not sent."));
+  assert.ok(!notes.some((n) => n.kind === "note" && n.tone === "problem"));
+});
+
+test("Send now keeps the other waiting messages behind it, and a stop with nothing waiting says just Stopped.", () => {
+  let st = reducer(waiting(), { type: "queue-add", sessionId: "s1", item: q("a") });
+  st = reducer(st, { type: "queue-add", sessionId: "s1", item: q("now"), front: true });
+  st = reducer(st, { type: "stop-asked", sessionId: "s1", keepQueue: true });
+  assert.deepEqual(st.sessions.s1.queue.map((x) => x.id), ["now", "a"]);
+  st = reducer(st, { type: "event", sessionId: "s1", record: { type: "result", subtype: "error_during_execution", is_error: true } });
+  assert.ok(st.sessions.s1.items.some((x) => x.kind === "note" && x.text === "Stopped."));
+  const alone = reducer(reducer(waiting(), { type: "stop-asked", sessionId: "s1", keepQueue: false }), { type: "event", sessionId: "s1", record: { type: "result", is_error: true } });
+  assert.ok(alone.sessions.s1.items.some((x) => x.kind === "note" && x.text === "Stopped."));
+});
+
+test("an error nobody asked for is still shown as a problem, and a stop that arrives after a good answer leaves no note", () => {
+  const bad = reducer(waiting(), { type: "event", sessionId: "s1", record: { type: "result", is_error: true, result: "Claude broke" } });
+  assert.ok(bad.sessions.s1.items.some((x) => x.kind === "note" && x.tone === "problem" && x.text === "Claude broke"));
+  const late = reducer(reducer(waiting(), { type: "stop-asked", sessionId: "s1", keepQueue: false }), { type: "event", sessionId: "s1", record: { type: "result", is_error: false, result: "done" } });
+  assert.equal(late.sessions.s1.stopping, null);
+  assert.ok(!late.sessions.s1.items.some((x) => x.kind === "note" && /Stopped/.test(x.text)));
+});

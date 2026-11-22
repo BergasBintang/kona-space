@@ -9,7 +9,9 @@ import { isRested, kilo, memoryOf } from "../lib/memory";
 import { Markdown } from "./brain/Markdown";
 import { Needs } from "./Needs";
 import { roleLabel, type Project, type Role, type RoleKit } from "../lib/api";
-import { dollars, permissionTitle, type Item, type Question, type RunState, type Session } from "../lib/sessions";
+import { dollars, permissionTitle, type Item, type Question, type Queued, type RunState, type Session } from "../lib/sessions";
+import { interruptSession, sendToSession } from "../lib/send";
+import { noPicks, pick, valueOf, write, type Picks } from "../lib/questionpick";
 
 const RUN_BADGE: Record<RunState, { state: GlyphState; label: string }> = {
   starting: { state: "idle", label: "Starting" },
@@ -113,43 +115,71 @@ export function PermissionCard({ it, who, onAnswer }: { it: Extract<Item, { kind
   );
 }
 
-/** One of Claude's multiple-choice questions, as a card: the options are buttons, "Other" is a text box, and the pick goes back to Claude as the answer (decision 64). */
+/** One of Claude's multiple-choice questions, as a card (decision 64). While it waits for the owner it shows ONE question at a time, with steps to move between them (answering a one-answer question moves on by itself);
+ * afterwards it shows every question with what was answered. The options are buttons and "Other" is a text box: for a one-answer question the two exclude each other (lib/questionpick.ts). */
 export function QuestionCard({ it, who, onAnswer }: { it: Extract<Item, { kind: "question" }>; who: string; onAnswer: (answers: Record<string, string> | null) => void }) {
   const open = it.status === "asking";
-  const [picked, setPicked] = useState<Record<string, string[]>>({});
-  const [other, setOther] = useState<Record<string, string>>({});
-  const value = (q: Question) => [...(picked[q.question] ?? []), ...(other[q.question]?.trim() ? [other[q.question].trim()] : [])].join(", ");
-  const ready = it.questions.every((q) => value(q) !== "");
-  const toggle = (q: Question, label: string) => setPicked((p) => {
-    const cur = p[q.question] ?? [];
-    return { ...p, [q.question]: q.multiSelect ? (cur.includes(label) ? cur.filter((x) => x !== label) : [...cur, label]) : cur.includes(label) ? [] : [label] };
-  });
+  const [picks, setPicks] = useState<Picks>(noPicks);
+  const [page, setPage] = useState(0);
+  const total = it.questions.length;
+  const here = Math.min(page, total - 1);
+  const done = (q: Question) => valueOf(picks, q) !== "";
+  const ready = it.questions.every(done);
+  const firstOpen = it.questions.findIndex((q) => !done(q));
+  const submit = () => onAnswer(Object.fromEntries(it.questions.map((q) => [q.question, valueOf(picks, q)])));
+  const choose = (q: Question, label: string) => {
+    const next = pick(picks, q, label);
+    setPicks(next);
+    if (!q.multiSelect && valueOf(next, q) !== "" && here < total - 1) setPage(here + 1); // a one-answer question moves on once it is answered
+  };
+  const label = (q: Question, i: number) => q.header || `Question ${i + 1}`;
+  const block = (q: Question, interactive: boolean) => (
+    <fieldset key={q.question} className="m-0 flex min-w-0 flex-col gap-2.5 border-0 p-0" disabled={!interactive}>
+      <legend className="mb-1 p-0 text-[15px] leading-6 font-bold">{q.header && <span className="font-pixel mr-2 border border-line-strong px-1.5 text-[12px] leading-5 font-bold text-text-secondary">{q.header}</span>}{q.question}</legend>
+      <div className="flex flex-col gap-1.5">
+        {q.options.map((o) => {
+          const on = (picks.picked[q.question] ?? []).includes(o.label) || (!interactive && it.answers?.[q.question]?.split(", ").includes(o.label));
+          return (
+            <button key={o.label} type="button" aria-pressed={on} onClick={() => choose(q, o.label)}
+              className={`px-btn px-btn-paper flex flex-col items-start px-2 py-1 text-left ${on ? "px-on" : ""} disabled:cursor-default`} disabled={!interactive}>
+              <span className="text-[15px] leading-6 font-bold">{o.label}</span>
+              {o.description && <span className="text-[13px] leading-5 text-text-secondary">{o.description}</span>}
+            </button>
+          );
+        })}
+        {interactive
+          ? <input value={picks.other[q.question] ?? ""} onChange={(e) => setPicks((p) => write(p, q, e.target.value))}
+              onKeyDown={(e) => { if (e.key !== "Enter" || e.nativeEvent.isComposing) return; e.preventDefault(); if (!done(q)) return; if (here < total - 1) setPage(here + 1); else if (ready) submit(); }}
+              placeholder={q.multiSelect ? "Other: add your own answer" : "Other: write your own answer"} aria-label={`Other answer to: ${q.question}`}
+              className="bare h-10 border-2 border-line-subtle bg-inset px-3 text-[14px] text-text placeholder:text-text-tertiary" />
+          : it.answers?.[q.question] && !q.options.some((o) => it.answers![q.question].split(", ").includes(o.label)) && <span className="text-[14px] leading-5 text-text-secondary">You wrote: {it.answers[q.question]}</span>}
+      </div>
+    </fieldset>
+  );
   return (
     <div className="flex max-w-[680px] flex-col gap-5 border border-line-subtle bg-surface-2 p-6" role="group" aria-label={`${who} asks`}>
-      <div className="flex items-center gap-3"><Glyph state={open ? "waiting" : it.status === "answered" ? "done" : "stopped"} size={22} /><h2 className="m-0 text-[17px] leading-6 font-bold">{who} asks</h2></div>
-      {it.questions.map((q) => (
-        <fieldset key={q.question} className="m-0 flex min-w-0 flex-col gap-2.5 border-0 p-0" disabled={!open}>
-          <legend className="mb-1 p-0 text-[15px] leading-6 font-bold">{q.header && <span className="font-pixel mr-2 border border-line-strong px-1.5 text-[12px] leading-5 font-bold text-text-secondary">{q.header}</span>}{q.question}</legend>
-          <div className="flex flex-col gap-1.5">
-            {q.options.map((o) => {
-              const on = (picked[q.question] ?? []).includes(o.label) || (!open && it.answers?.[q.question]?.split(", ").includes(o.label));
-              return (
-                <button key={o.label} type="button" aria-pressed={on} onClick={() => toggle(q, o.label)}
-                  className={`px-btn px-btn-paper flex flex-col items-start px-2 py-1 text-left ${on ? "px-on" : ""} disabled:cursor-default`} disabled={!open}>
-                  <span className="text-[15px] leading-6 font-bold">{o.label}</span>
-                  {o.description && <span className="text-[13px] leading-5 text-text-secondary">{o.description}</span>}
-                </button>
-              );
-            })}
-            {open ? <input value={other[q.question] ?? ""} onChange={(e) => setOther((x) => ({ ...x, [q.question]: e.target.value }))} placeholder="Other: write your own answer" aria-label={`Other answer to: ${q.question}`} className="bare h-10 border-2 border-line-subtle bg-inset px-3 text-[14px] text-text placeholder:text-text-tertiary" />
-              : it.answers?.[q.question] && !q.options.some((o) => it.answers![q.question].split(", ").includes(o.label)) && <span className="text-[14px] leading-5 text-text-secondary">You wrote: {it.answers[q.question]}</span>}
-          </div>
-        </fieldset>
-      ))}
+      <div className="flex items-center gap-3">
+        <Glyph state={open ? "waiting" : it.status === "answered" ? "done" : "stopped"} size={22} />
+        <h2 className="m-0 text-[17px] leading-6 font-bold">{who} asks</h2>
+        {open && total > 1 && <span className="ml-auto text-[13px] leading-5 text-text-tertiary" data-step>Question {here + 1} of {total}</span>}
+      </div>
+      {open && total > 1 && (
+        <div role="tablist" aria-label="The questions" className="flex flex-wrap gap-1.5">
+          {it.questions.map((q, i) => (
+            <Button key={q.question} variant="quiet" tiny on={i === here} role="tab" aria-selected={i === here} aria-label={`${label(q, i)}, ${done(q) ? "answered" : "not answered yet"}`} onClick={() => setPage(i)}>
+              <Glyph state={done(q) ? "done" : "waiting"} size={14} />{label(q, i)}
+            </Button>
+          ))}
+        </div>
+      )}
+      {open ? block(it.questions[here], true) : it.questions.map((q) => block(q, false))}
       {open ? (
-        <div className="flex justify-end gap-3">
+        <div className="flex items-center justify-end gap-3">
+          {!ready && here === total - 1 && total > 1 && <span className="mr-auto text-[13px] leading-5 text-text-tertiary">{label(it.questions[firstOpen], firstOpen)} is not answered yet</span>}
           <Button variant="quiet" onClick={() => onAnswer(null)} title={`Tell ${who} you would rather not answer`}>Skip</Button>
-          <Button onClick={() => onAnswer(Object.fromEntries(it.questions.map((q) => [q.question, value(q)])))} disabled={!ready}>Send answer</Button>
+          {total > 1 && here > 0 && <Button variant="quiet" onClick={() => setPage(here - 1)}>Back</Button>}
+          {total > 1 && here < total - 1 && <Button variant="quiet" onClick={() => setPage(here + 1)}>Next</Button>}
+          {here === total - 1 && <Button onClick={submit} disabled={!ready}>Send answer</Button>}
         </div>
       ) : (
         <span className="flex items-center gap-2 text-[13px] leading-5 text-text-secondary"><Glyph state={it.status === "answered" ? "done" : "stopped"} size={14} /> {it.status === "answered" ? "You answered" : "You chose not to answer"}</span>
@@ -220,7 +250,9 @@ const readImage = (f: File) =>
   });
 
 /** The message box. `run` is null before the first message (nothing is blocked then). */
-export function Composer({ run, who, onSend, busyHint }: { run: RunState | null; who: string; onSend: (text: string, images: Attached[]) => void; busyHint?: string | null }) {
+export function Composer({ run, who, onSend, busyHint, queue = [], onQueue, onSendNow, onUnqueue, onStop }: {
+  /** messages waiting for the answer to finish (shown above the box, each with Remove) */ queue?: Queued[]; /** the person is working: a message written now waits */ onQueue?: (text: string, images: Attached[]) => void;
+  /** stop the turn and send this first */ onSendNow?: (text: string, images: Attached[]) => void; onUnqueue?: (id: string) => void; /** stop the turn, keep the conversation */ onStop?: () => void; run: RunState | null; who: string; onSend: (text: string, images: Attached[]) => void; busyHint?: string | null }) {
   const [text, setText] = useState("");
   const [images, setImages] = useState<Attached[]>([]);
   const file = useRef<HTMLInputElement>(null);
@@ -241,7 +273,8 @@ export function Composer({ run, who, onSend, busyHint }: { run: RunState | null;
     watch.observe(el);
     return () => watch.disconnect();
   }, []);
-  const blocked = run === "working" || run === "waiting" || run === "ended" || run === "starting" || !!busyHint;
+  const working = run === "working" && !!onQueue; // while the person works, a message waits for the answer (or goes at once with Send now)
+  const blocked = (run === "working" && !onQueue) || run === "waiting" || run === "ended" || run === "starting" || !!busyHint;
   const canSend = !blocked && (text.trim().length > 0 || images.length > 0);
 
   const add = async (files: File[]) => {
@@ -253,13 +286,25 @@ export function Composer({ run, who, onSend, busyHint }: { run: RunState | null;
     const files = [...e.clipboardData.items].filter((i) => i.kind === "file" && i.type.startsWith("image/")).map((i) => i.getAsFile()).filter((f): f is File => !!f);
     if (files.length) { e.preventDefault(); void add(files); }
   };
-  const send = () => { if (!canSend) return; onSend(text.trim() || "(see the picture)", images); setText(""); setImages([]); };
-  const onKey = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } };
-  const hint = busyHint ?? (run === "waiting" ? `Answer ${who}'s question above first` : run === "working" ? `${who} is working` : run === "ended" ? "This session has ended" : "");
+  const send = () => { if (!canSend) return; (working ? onQueue! : onSend)(text.trim() || "(see the picture)", images); setText(""); setImages([]); };
+  const sendNow = () => { if (!canSend || !working || !onSendNow) return; onSendNow(text.trim() || "(see the picture)", images); setText(""); setImages([]); };
+  const onKey = (e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } };
+  const hint = busyHint ?? (run === "waiting" ? `Answer ${who}'s question above first` : run === "working" && !working ? `${who} is working` : run === "ended" ? "This session has ended" : "");
 
   return (
     <div className="px-8 pb-6">
       <div className="flex flex-col gap-3 border border-line-strong bg-surface-2 px-[18px] pt-3.5 pb-3" onDrop={(e) => { e.preventDefault(); void add([...e.dataTransfer.files]); }} onDragOver={(e) => e.preventDefault()}>
+        {queue.length > 0 && (
+          <div className="flex flex-col gap-1.5" aria-label="Messages waiting to be sent">
+            <span className="text-[13px] leading-5 text-text-tertiary">{queue.length === 1 ? "This message is sent when the answer is done" : "These messages are sent, in this order, when the answer is done"}</span>
+            {queue.map((q) => (
+              <div key={q.id} className="flex items-center gap-3 border border-line-subtle bg-surface-1 px-3 py-1.5" data-queued={q.id}>
+                <span className="min-w-0 flex-1 truncate text-[14px] leading-5">{q.text}{q.images.length > 0 ? ` (+${q.images.length} picture${q.images.length === 1 ? "" : "s"})` : ""}</span>
+                {onUnqueue && <Button variant="quiet" tiny onClick={() => onUnqueue(q.id)} aria-label={`Do not send: ${q.text.slice(0, 40)}`}>Remove</Button>}
+              </div>
+            ))}
+          </div>
+        )}
         {images.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {images.map((im, i) => (
@@ -272,7 +317,7 @@ export function Composer({ run, who, onSend, busyHint }: { run: RunState | null;
         )}
         <textarea
           ref={area} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onKey} onPaste={onPaste} rows={2} disabled={run === "ended"}
-          placeholder={`Message ${who}. Press Enter to send, or paste a picture.`}
+          placeholder={working ? `Message ${who}. Enter sends it when the answer is done.` : `Message ${who}. Press Enter to send, or paste a picture.`}
           className="w-full resize-none overflow-y-auto border-0 bg-transparent text-[15px] leading-6 text-text outline-none placeholder:text-text-tertiary"
           aria-label={`Message to ${who}`}
         />
@@ -281,7 +326,9 @@ export function Composer({ run, who, onSend, busyHint }: { run: RunState | null;
           <input ref={file} type="file" accept="image/*" multiple hidden onChange={(e) => { void add([...(e.target.files ?? [])]); e.target.value = ""; }} />
           <div className="flex items-center gap-3">
             {hint && <span className="text-[13px] leading-5 text-text-tertiary">{hint}</span>}
-            <Button small onClick={send} disabled={!canSend}>Send</Button>
+            {onStop && (run === "working" || run === "waiting") && <Button variant="danger" small onClick={onStop} title={`Stop what ${who} is doing now. The conversation stays open.${queue.length ? " Messages that are waiting are not sent." : ""}`}>Stop</Button>}
+            {working && <Button variant="quiet" small onClick={sendNow} disabled={!canSend} title="Stop the answer and send this message at once">Send now</Button>}
+            <Button small onClick={send} disabled={!canSend}>{working ? "Send after the answer" : "Send"}</Button>
           </div>
         </div>
       </div>
@@ -332,9 +379,12 @@ export function Chat({ s, role, dispatch, onNote, onSaveAnswer, onNew }: {
       dispatch({ type: "event", sessionId: s.id, record: { type: "kona/refused", why: "the message holds the text of a private key. Keys stay in their files; give " + who + " the path, never the key." } });
       return;
     }
-    dispatch({ type: "user-sent", sessionId: s.id, text, images: images.map((i) => i.url) });
-    await invoke("send_message", { sessionId: s.id, text, images: images.map((i) => ({ media_type: i.mediaType, data: i.data })) });
+    await sendToSession(dispatch as (a: unknown) => void, s.id, text, images);
   };
+  // while the person works: a message waits for the answer, Send now stops the turn and goes first, Stop stops it and drops what waits
+  const queueIt = (text: string, images: Attached[]) => dispatch({ type: "queue-add", sessionId: s.id, item: { id: crypto.randomUUID(), text, images } });
+  const sendNow = (text: string, images: Attached[]) => { dispatch({ type: "queue-add", sessionId: s.id, item: { id: crypto.randomUUID(), text, images }, front: true }); dispatch({ type: "stop-asked", sessionId: s.id, keepQueue: true }); void interruptSession(s.id); };
+  const stopIt = () => { dispatch({ type: "stop-asked", sessionId: s.id, keepQueue: false }); void interruptSession(s.id); };
   // Claude Code's own /compact keeps what matters and drops the rest (tested in the stream mode Kona uses: 18,899 tokens became 1,466 and it still remembered the talk)
   const compact = async () => {
     dispatch({ type: "compacting", sessionId: s.id });
@@ -352,7 +402,7 @@ export function Chat({ s, role, dispatch, onNote, onSaveAnswer, onNew }: {
           <span className="flex shrink-0 gap-2"><Button variant="ghost" small onClick={() => dispatch({ type: "brain-question", sessionId: s.id, question: null })}>Not now</Button><Button small onClick={() => onSaveAnswer(lastAnswer.text)}>Save to the brain</Button></span>
         </div>
       )}
-      <Composer run={s.run} who={who} onSend={send} />
+      <Composer run={s.run} who={who} onSend={send} queue={s.queue} onQueue={queueIt} onSendNow={sendNow} onUnqueue={(id) => dispatch({ type: "queue-remove", sessionId: s.id, id })} onStop={stopIt} />
     </div>
   );
 }

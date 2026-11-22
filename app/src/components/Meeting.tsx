@@ -190,7 +190,7 @@ function Say({ run, onSay }: { run: Run; onSay: MeetingProps["onSay"] }) {
     <div className="flex shrink-0 flex-col gap-1 border-t border-line-subtle px-8 py-3">
       <div className="flex items-end gap-2">
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={2} aria-label="Say something to the meeting" placeholder="Say something to the meeting"
-          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }}
           className="min-w-0 flex-1 border border-line-strong bg-inset px-3.5 py-2.5 text-[15px] leading-6 text-text placeholder:text-text-tertiary" />
         <IconButton icon="send" label="Send to the meeting" variant="primary" disabled={text.trim() === ""} onClick={() => void send()} />
       </div>

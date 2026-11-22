@@ -62,7 +62,7 @@ export function KibbyChat({ who, onSay, onClose }: { who: Who; onSay: (history: 
           </div>
           <div className="flex items-center gap-2">
             <input ref={input} value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={500} disabled={thinking} placeholder={`Say something to ${name}…`} aria-label={`Say something to ${name}`}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void send(); } else if (e.key === "Escape") { e.stopPropagation(); onClose(); } }}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } else if (e.key === "Escape") { e.stopPropagation(); onClose(); } }}
               className="h-10 min-w-0 flex-1 border border-line-strong bg-inset px-3 text-[15px] text-text placeholder:text-text-tertiary" />
             <Button small onClick={() => void send()} disabled={thinking || !draft.trim()}>Send</Button>
             <Button small variant="ghost" onClick={onClose}>Bye</Button>

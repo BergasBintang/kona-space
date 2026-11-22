@@ -2,6 +2,17 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.44.0, 2026-11-22
+
+Stop and wait while a person works, one question at a time, a skill for UI details, and a chat-box fix.
+
+- **The chat box no longer sends half a word.** With an input method (Japanese, Chinese, Korean and the like) Enter picks the word being built. Kona took it for "send" and sent the half-written message. It now waits for the real Enter. The same fix is in the Meeting box, the Kibby box, the note box of Mockups and the Other box of a question.
+- **A Stop button.** While a person works you can stop what they are doing and keep the conversation. Before, the only way was End session, which closed the program.
+- **You can write while they work.** A message written meanwhile waits above the box and is sent by itself when the answer is done (Remove takes it back). Send now stops the answer and sends it at once. Stop also drops the waiting messages and says how many.
+- **Questions one at a time.** Claude's multiple-choice questions show one question per step, with Back and Next. A one-answer question moves on once you answer it. Typing in the Other box un-clicks the option you had chosen (and clicking an option empties the box); when several answers are allowed the choices stay.
+- **A new skill, UI details, for the Design and Frontend people.** A small library of the details that keep a screen from feeling flat: one set of timings, patterns for agent screens (status marks, tool-call chips, a thinking line, a chat box, hold to confirm, undo), everyday patterns (tooltips, numbers, loading, menus, lists), the rules every detail must keep (reduced motion, keyboard, spoken changes, speed) and what to leave out. It also holds three ready files: a checklist for the flat test, a CSS file with the timings and base styles, and a JavaScript file with ten tested helpers. It comes with every new project.
+- **A cleaner top bar.** The 5 hours and Week figures are two small chips with the number in bold, like the chips of the open pages. Near the limit a chip turns amber.
+
 ## 0.43.0, 2026-11-22
 
 A project opens in one Kona window at a time.

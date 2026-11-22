@@ -95,9 +95,12 @@ export function PlanBar({ label, window: w0, readAt, warnLine = "Close to the li
     </div>
   );
   if (compact) {
+    // the top bar: one small paper chip for each limit, its label in words and its number the heaviest thing in it (the same chip as the tray of pages); near the limit the chip turns amber and gets a mark
     return (
-      <div className="flex flex-col gap-1" title={[label, pct === null ? "not read yet" : `${pct}%`, resetLine, warn ? warnLine : null].filter(Boolean).join(" · ")}>
-        <div className="flex items-baseline gap-2"><span className="font-pixel text-[13px] leading-4 text-text-secondary">{label}</span><span className="font-pixel text-[13px] leading-4 font-bold" style={{ color: warn ? color : undefined }}>{pct === null ? "—" : `${pct}%`}{warn ? " !" : ""}</span></div>
+      <div className={`flex items-center gap-2 border bg-surface-2 px-2.5 py-0.5 max-[1100px]:px-2 ${warn ? "" : "border-line-subtle"}`} style={warn ? { borderColor: color } : undefined} title={[label, pct === null ? "not read yet" : `${pct}%`, resetLine, warn ? warnLine : null].filter(Boolean).join(" · ")}>
+        <span className="font-pixel text-[13px] leading-5 text-text-secondary">{label}</span>
+        {warn && <Glyph state="waiting" size={14} />}
+        <span className="font-pixel text-[18px] leading-5 font-bold text-text max-[1100px]:text-[16px]" style={{ color: warn ? color : undefined }}>{pct === null ? "—" : `${pct}%`}</span>
       </div>
     );
   }

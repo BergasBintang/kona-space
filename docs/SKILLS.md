@@ -24,7 +24,7 @@ Kona's built-in skills use `templates/` and `references/`. They have no `scripts
 - **A new project** gets all the skills in `.kona/skills/` and everyone's tree in `.kona/role-kits.json` when it is added. A folder that already has `role-kits.json` is left alone.
 - **An older project** keeps what it has. The Skills tab offers "Use it for this person" and "For everyone in this project"; the tree joins what is there, and nothing of the owner's is replaced.
 - **Updates.** `.kona/builtin-skills.json` holds a fingerprint of what Kona wrote. When a new version of Kona has better text, a copy still exactly as Kona wrote it is replaced. A copy the owner changed, and a skill the owner deleted, stay that way.
-- **Cost.** A session only sees that person's skills (`--plugin-dir`), so forty-three skills in the folder cost nothing extra. Each person starts at about 280 to 500 tokens: their list plus the tree.
+- **Cost.** A session only sees that person's skills (`--plugin-dir`), so forty-six skills in the folder cost nothing extra. Each person starts at about 280 to 500 tokens: their list plus the tree.
 
 ## Rules for a built-in skill
 
@@ -53,6 +53,7 @@ Kona's built-in skills use `templates/` and `references/`. They have no `scripts
 | [anthropics/skills](https://github.com/anthropics/skills) | 19 skills | Apache 2.0 for many; docx, pdf, pptx and xlsx are source-available | The folder layout, and the idea of `test-in-the-browser` and `accessibility`-style checks |
 | [trailofbits/skills](https://github.com/trailofbits/skills) | Security audits with CodeQL and Semgrep | not checked | The idea of proving each finding |
 | [travisvn](https://github.com/travisvn/awesome-claude-skills) and [ComposioHQ](https://github.com/ComposioHQ/awesome-claude-skills) lists | Directories of other skills | varies | Showed that support, product and secretary work are thinly covered elsewhere |
+| [DavidHDev/react-bits](https://github.com/DavidHDev/react-bits) (read 2026-11-22, cloned to a temp folder and counted by scripts, nothing installed) | 219 animated React parts in five groups, of which 35 "micro" ones are agent screens (status mark, tool-call chip, thinking line, chat box, hold to confirm, undo), plus a motion token set, tooltip, number and speed-governor helpers | MIT + Commons Clause: use inside a product is allowed, selling or bundling the parts is not | The ideas, timings and rules only, written fresh, no code copied: the skill `ui-details`. Details and the measured cost of heavy effects: `docs/UI-RESEARCH-react-bits.md` |
 
 **Rules from Anthropic's pages** ([Claude Code skills](https://code.claude.com/docs/en/skills), [best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)):
 

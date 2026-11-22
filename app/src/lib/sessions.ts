@@ -46,6 +46,10 @@ export type Session = {
   mode: string;
   title: string; // the first thing you asked, shortened
   run: RunState;
+  /** messages the owner wrote while the person was working: they go, in this order, when the answer is done (or at once, for "Send now") */
+  queue: Queued[];
+  /** the owner pressed Stop (or Send now): how many waiting messages Stop dropped, until the turn that ends says so; null when no stop is under way */
+  stopping: number | null;
   items: Item[];
   draft: string; // text that is still arriving
   costTotal: number; // dollars so far, an estimate at list price
@@ -54,6 +58,9 @@ export type Session = {
   context?: number; // the memory: tokens Claude read for its last step (unknown until the first reply of this run)
   lastAt?: number; // when the conversation last moved (a message, a reply), in milliseconds; the cache goes cold an hour after it
 };
+
+/** A message waiting for the person to finish: its text and its pictures (what the screen shows and what is sent). */
+export type Queued = { id: string; text: string; images: { mediaType: string; data: string; url: string }[] };
 
 /** The two plan bars of one account, and when they were last read. Each account has its own limits. */
 export type Plan = { fiveHour?: PlanWindow; sevenDay?: PlanWindow; at: number };
@@ -78,6 +85,9 @@ export const initialState: State = { sessions: {}, order: [], selected: null, pl
 export type Action =
   | { type: "event"; sessionId: string; record: any }
   | { type: "select"; id: string }
+  | { type: "queue-add"; sessionId: string; item: Queued; front?: boolean }
+  | { type: "queue-remove"; sessionId: string; id: string }
+  | { type: "stop-asked"; sessionId: string; keepQueue: boolean }
   | { type: "user-sent"; sessionId: string; text: string; images: string[] }
   | { type: "compacting"; sessionId: string }
   | { type: "permission-answered"; sessionId: string; requestId: string; allowed: boolean }
@@ -124,6 +134,10 @@ const push = (s: Session, item: Item): Session => ({ ...s, items: [...s.items, i
 export function reducer(state: State, a: Action): State {
   switch (a.type) {
     case "select": return { ...state, selected: a.id };
+    case "queue-add": return update(state, a.sessionId, (s) => ({ ...s, queue: a.front ? [a.item, ...s.queue] : [...s.queue, a.item] }));
+    case "queue-remove": return update(state, a.sessionId, (s) => ({ ...s, queue: s.queue.filter((q) => q.id !== a.id) }));
+    // Stop drops what was waiting (the owner wants everything to stop); Send now keeps the others behind the new message
+    case "stop-asked": return update(state, a.sessionId, (s) => ({ ...s, stopping: a.keepQueue ? 0 : s.queue.length, queue: a.keepQueue ? s.queue : [] }));
     case "forget": {
       const { [a.id]: _gone, ...rest } = state.sessions;
       const order = state.order.filter((x) => x !== a.id);
@@ -154,7 +168,7 @@ function onEvent(state: State, sessionId: string, r: any): State {
   const type: string = r?.type ?? "";
 
   if (type === "kona/started") {
-    const session: Session = { id: sessionId, folder: r.folder, workDir: r.workDir ?? r.folder, roleId: r.roleId ?? null, accountId: r.accountId ?? "main", voice: !!r.voice, ticketId: r.ticketId ?? null, brainQuestion: null, endedLine: "This session has ended.", model: r.model, mode: r.mode, title: "", run: "ready", items: [{ kind: "note" as const, id: nextId("n"), tone: "info" as const, text: `Started in ${String(r.folder ?? "").replace(/[\\/]+$/, "").split(/[\\/]/).pop() || "the project"}.` }, ...(r.resumed ? [{ kind: "note" as const, id: nextId("n"), tone: "info" as const, text: "This is an earlier session you resumed. Claude remembers it; the earlier messages are not shown here." }] : [])], draft: "", costTotal: 0, costLast: 0, turns: 0 };
+    const session: Session = { id: sessionId, folder: r.folder, workDir: r.workDir ?? r.folder, roleId: r.roleId ?? null, accountId: r.accountId ?? "main", voice: !!r.voice, ticketId: r.ticketId ?? null, brainQuestion: null, endedLine: "This session has ended.", model: r.model, mode: r.mode, title: "", run: "ready", queue: [], stopping: null, items: [{ kind: "note" as const, id: nextId("n"), tone: "info" as const, text: `Started in ${String(r.folder ?? "").replace(/[\\/]+$/, "").split(/[\\/]/).pop() || "the project"}.` }, ...(r.resumed ? [{ kind: "note" as const, id: nextId("n"), tone: "info" as const, text: "This is an earlier session you resumed. Claude remembers it; the earlier messages are not shown here." }] : [])], draft: "", costTotal: 0, costLast: 0, turns: 0 };
     return { ...state, sessions: { ...state.sessions, [sessionId]: session }, order: [...state.order.filter((x) => x !== sessionId), sessionId], selected: sessionId };
   }
   if (type === "rate_limit_event") {
@@ -216,8 +230,11 @@ function onEvent(state: State, sessionId: string, r: any): State {
       }
       case "result": {
         const total = typeof r.total_cost_usd === "number" ? r.total_cost_usd : s.costTotal;
-        let next: Session = { ...s, run: "ready", draft: "", costTotal: total, costLast: r.kona_turn_cost_usd ?? 0, turns: s.turns + 1, lastAt: Date.now() };
-        if (r.is_error) next = push(next, { kind: "note", id: nextId("n"), tone: "problem", text: typeof r.result === "string" && r.result ? r.result : "Claude stopped with an error." });
+        let next: Session = { ...s, run: "ready", draft: "", costTotal: total, costLast: r.kona_turn_cost_usd ?? 0, turns: s.turns + 1, lastAt: Date.now(), stopping: null };
+        if (r.is_error && s.stopping !== null) { // the owner stopped it: not a problem
+          const n = s.stopping;
+          next = push(next, { kind: "note", id: nextId("n"), tone: "info", text: n > 0 ? `Stopped. ${n} waiting message${n === 1 ? " was" : "s were"} not sent.` : "Stopped." });
+        } else if (r.is_error) next = push(next, { kind: "note", id: nextId("n"), tone: "problem", text: typeof r.result === "string" && r.result ? r.result : "Claude stopped with an error." });
         return next;
       }
       case "kona/stderr": {

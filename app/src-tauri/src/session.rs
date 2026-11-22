@@ -130,6 +130,11 @@ impl Sessions {
         )
     }
 
+    /// Stop the turn that is running and keep the conversation: Claude Code ends the turn (a result that is an error) and waits for the next message. This is not `stop`, which ends the program.
+    pub fn interrupt(&self, session_id: &str) -> Result<(), String> {
+        self.send_line(session_id, json!({"type": "control_request", "request_id": format!("kona-interrupt-{}", uuid::Uuid::new_v4()), "request": {"subtype": "interrupt"}}))
+    }
+
     pub fn stop(&self, session_id: &str) {
         if let Some(mut h) = self.map.lock().unwrap().remove(session_id)
             && let Some(s) = h.stop.take() {

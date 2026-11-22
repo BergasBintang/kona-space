@@ -35,10 +35,12 @@ export function TopBar({ project, onHome, sheetOpen, place, onPlace, onAttention
         <Button variant="quiet" small onClick={() => onPlace("leftovers")} aria-label={`${leftBehind} left behind`}><Glyph state="left" size={16} />{leftBehind} left behind</Button>
       )}
       {project && (
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-5">
           {accountLabel && <span className="font-pixel text-[14px] leading-5 font-bold text-text-secondary">{accountLabel}</span>}
-          <PlanBar compact label="5 hours" window={plan?.fiveHour} readAt={plan?.at} warnLine={limitLine} />
-          <PlanBar compact label="Week" window={plan?.sevenDay} readAt={plan?.at} warnLine={limitLine} />
+          <div className="flex items-center gap-2">
+            <PlanBar compact label="5 hours" window={plan?.fiveHour} readAt={plan?.at} warnLine={limitLine} />
+            <PlanBar compact label="Week" window={plan?.sevenDay} readAt={plan?.at} warnLine={limitLine} />
+          </div>
         </div>
       )}
       <span className="font-mono text-[12px] text-text-tertiary max-[1100px]:hidden">{version ? `v${version}` : ""}</span>

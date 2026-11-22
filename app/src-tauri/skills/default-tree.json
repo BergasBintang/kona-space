@@ -23,6 +23,9 @@
       ["reverse-a-mockup", "A built page, copied static with made-up data"],
       ["ui-words", "Buttons, errors, empty states"]
     ] },
+    { "branch": "Making it feel alive", "when": "the screen is right but feels flat", "skills": [
+      ["ui-details", "Timings and patterns for states, motion and feedback"]
+    ] },
     { "branch": "Judging a screen", "when": "something already exists", "skills": [
       ["ui-critique", "What is wrong, ranked"],
       ["accessibility-check", "Keyboard, contrast, screen readers"]
@@ -32,6 +35,7 @@
     { "branch": "Building", "when": "adding or changing what people see", "skills": [
       ["build-a-screen", "Any screen, form or component"],
       ["build-from-a-mockup", "A mockup the owner agreed to, built for real"],
+      ["ui-details", "Motion and feedback details"],
       ["make-a-mockup", "A page to click through, with made-up data"],
       ["make-a-live-mockup", "The real program, run in the Mockups sheet on demo data"],
       ["reverse-a-mockup", "A built page, copied static with made-up data"],

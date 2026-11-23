@@ -34,6 +34,10 @@ portable-pty = "0.9.0"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+# Rust keeps every old piece of a debug build so the next one is quick, and nothing ever cleans them up: the folder had grown to 44 GB. Turned off 2026-11-24; a rebuild takes about a minute longer.
+[profile.dev]
+incremental = false
+
 [profile.release]
 codegen-units = 1
 lto = true

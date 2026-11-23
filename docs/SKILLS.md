@@ -24,7 +24,7 @@ Kona's built-in skills use `templates/` and `references/`. They have no `scripts
 - **A new project** gets all the skills in `.kona/skills/` and everyone's tree in `.kona/role-kits.json` when it is added. A folder that already has `role-kits.json` is left alone.
 - **An older project** keeps what it has. The Skills tab offers "Use it for this person" and "For everyone in this project"; the tree joins what is there, and nothing of the owner's is replaced.
 - **Updates.** `.kona/builtin-skills.json` holds a fingerprint of what Kona wrote. When a new version of Kona has better text, a copy still exactly as Kona wrote it is replaced. A copy the owner changed, and a skill the owner deleted, stay that way.
-- **Cost.** A session only sees that person's skills (`--plugin-dir`), so forty-six skills in the folder cost nothing extra. Each person starts at about 280 to 500 tokens: their list plus the tree.
+- **Cost.** A session only sees that person's skills (`--plugin-dir`), so forty-eight skills in the folder cost nothing extra. Each person starts at about 280 to 500 tokens: their list plus the tree.
 
 ## Rules for a built-in skill
 
@@ -81,3 +81,31 @@ Kona's built-in skills use `templates/` and `references/`. They have no `scripts
 | `build-from-a-mockup` | frontend | Builds the page for real in the project's stack: maps the mockup's value codes to the project's tokens, keeps the HTML and CSS, swaps the fake API for the real client, and lists every difference |
 
 **Tried in real conversations (2026-11-04, Haiku, a throwaway school project, the built program):** Jiro built a sign-in page and a course list from a card in a ticket copy and handed over a faithful report; Nokka made a course page that runs in the sheet; a session reversed two pages of the built site. **Found:** a mockup runs where a form cannot be sent, so a submit button does nothing (the skills now say to use a plain button with a click handler); a ticket copy needs read access to the main folder's mockups and skill files (a read rule, not `--add-dir`, which also allows writing). Details: `docs/LESSONS.md`, section 15.
+
+## The humanizer skills (2026-11-23, decision 103)
+
+Two skills for text that sounds machine-made or translated, one per language. They are in the trees of Content, Marketing, Support and the Secretary.
+
+| Skill | What it does | Files it opens |
+|---|---|---|
+| `humanize-text` | English. Marks the tells (staging instead of stating, inflation, forced rhythm, formatting by rule, chat leftovers, writing for the wrong reader), rewrites keeping every fact, checks the draft against the source, and sends Indonesian to the other skill | `references/english-tells.md`, `references/before-after-en.md` |
+| `humanize-indonesian` | Bahasa Indonesia. Chooses the register and the form of address first, marks the tells by strength, edits with the official rules behind every correction, and also guides writing Indonesian from nothing | `references/registers.md`, `references/tells-id.md`, `references/official-rules.md`, `references/before-after-id.md` |
+
+**Sources read (2026-11-23).** All written fresh, no text copied; the ideas and the public rules were used.
+
+| Source | What it has | Licence | What we took |
+|---|---|---|---|
+| [blader/humanizer](https://github.com/blader/humanizer) | One skill, 26 patterns in six groups, a four-step way of working; patterns from Wikipedia's "Signs of AI writing" | MIT | The groups, the "when not to act" list, the rule to keep every fact |
+| [adhiprib/humanizer-indonesia](https://github.com/adhiprib/humanizer-indonesia) | A long Indonesian catalog (syntax, words, cohesion, discourse), thresholds, registers | MIT | The idea of nominalization and calques as tells, the exemptions (patents, contracts, quotes) |
+| [apissaj/humanizer-id](https://github.com/apissaj/humanizer-id) | Editing modes, 14 sub-skills, a data file of calques, references to PUEBI, EYD and the Badan Bahasa books | MIT | The list of official sources worth reading, the "safe harbors" idea |
+| [ardha27/humanizer-id](https://github.com/ardha27/humanizer-id) | Casual and slang control, built on slang datasets | MIT | The warning against over-gaul and against mixing *gue/lo* with *aku/kamu* |
+| [ariosenodev/humanizer-bahasa-indonesia](https://github.com/ariosenodev/humanizer-bahasa-indonesia) | 21 patterns adapted from the Wikipedia guide | MIT | The pattern list for stock phrases |
+| Badan Bahasa (Kemendikdasmen): *Bentuk dan Pilihan Kata*, *Kalimat*, *Paragraf* (2019), EYD Edisi V (2022), KBBI VI Daring | The rules | Public documents | The rules in `official-rules.md`, each with how well it is backed (read, inference, not verified) |
+
+**What the research found, in plain words.** Almost nothing about AI-written Indonesian is measured. One study of high-school essays (ChatGPT-4o) found less word variety, fewer modal verbs and more even sentences in the machine texts. Its classifier reached about 90% on that one kind of text and fell to about 71 to 77% on paraphrased text in another project, and it flagged a formal human essay. Every list of stock phrases comes from commercial blogs or translated English lists. The one calque with a real source is *di mana* and *yang mana* used as relative words (Badan Bahasa calls it `penggunaan kata yang tidak cermat`). Detectors are unreliable. So the skills present themselves as an editing aid, label every tell with its strength, and never promise to beat a detector.
+
+**Rules these two skills keep.** Never invent a fact, a name, a number or a consequence; leave quotes, legal text, names, code and data alone; do not shorten more than the author would; change nothing when there is nothing to fix; do not type badly on purpose to look human; say what was and was not done.
+
+**Tried in a real conversation.** `app/tests/humanize-skills.mjs`, in a throwaway project, with Nobo (Content): an Indonesian post, an English post, a letter with nothing to fix and a thin bio, in one conversation. The first runs found that the English reference was sometimes not opened and that a consequence was added to a fact; both were fixed in the wording and tried again.
+
+**Not covered.** A native Indonesian editor has not judged the example sentences. The TBBBI was not read directly. The two skills do not rewrite code comments or commit messages as a special case.

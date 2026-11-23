@@ -2,6 +2,16 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.46.0, 2026-11-23
+
+Two skills that make text sound like a person wrote it, in English and in Bahasa Indonesia.
+
+- **A new skill, Humanize text (English).** It finds what makes a text sound machine-made (a contrast nobody asked for, a one-line closer, inflated words, triads of three, chat leftovers, a reply that explains what the reader already knows) and rewrites it keeping every fact. It leaves quotes, names, legal text and code alone, changes nothing when there is nothing to fix, and never adds a fact or a consequence the source does not state.
+- **A new skill, Humanize Indonesian.** It picks the register first (formal, business, casual, slang) and the form of address (*Anda*, *kamu*, *Kak*, *Bapak/Ibu*), because most machine-sounding Indonesian is the wrong register. Each tell is labelled by how well it is backed: a rule of Badan Bahasa (for example *yang mana* and *di mana* as connectors, *meskipun … tetapi* in one sentence, a preposition in front of the subject), wasteful wording, a habit, or only a blog's claim. It carries the official spelling, number and punctuation rules (and does not ban the dash, which EYD Edisi V allows), and it can also guide writing Indonesian from nothing.
+- **Honest about what is known.** Almost nothing about AI-written Indonesian has been measured, and detectors are unreliable on it. The skills are an editing aid: they never promise a text will pass a detector.
+- **Who has them.** Content, Marketing, Support and the Secretary, next to Plain words. A new project gets them; an older project takes them from the Skills tab.
+- **Tried in a real conversation** in a throwaway project: an Indonesian post and an English post were fixed with every name and figure kept, a formal letter with nothing to fix was left exactly as it was, and a thin bio was cut to what the source says with no invented detail. A native Indonesian reader has not yet judged the sentences.
+
 ## 0.45.0, 2026-11-23
 
 MCP tools have their own place: one list for Kona, chosen per project and per person.

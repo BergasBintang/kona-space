@@ -109,7 +109,9 @@
     { "branch": "Writing it", "when": "the message is settled", "skills": [
       ["landing-copy", "A page with one action"],
       ["launch-note", "Announcing something new"],
-      ["plain-words", "Any text that reads stiff"]
+      ["plain-words", "Any text that reads stiff"],
+      ["humanize-text", "English that sounds machine-made"],
+      ["humanize-indonesian", "Indonesian that sounds machine-made or translated"]
     ] }
   ],
   "content": [
@@ -118,7 +120,9 @@
     ] },
     { "branch": "Writing", "when": "making or improving a text", "skills": [
       ["write-an-article", "Articles and guides"],
-      ["plain-words", "Any text that reads stiff"]
+      ["plain-words", "Any text that reads stiff"],
+      ["humanize-text", "English that sounds machine-made"],
+      ["humanize-indonesian", "Indonesian that sounds machine-made or translated"]
     ] },
     { "branch": "Checking", "when": "a page already exists", "skills": [
       ["page-seo-check", "Why a page is not found"]
@@ -127,7 +131,9 @@
   "support": [
     { "branch": "Answering", "when": "one person is waiting", "skills": [
       ["support-reply", "A question or a complaint"],
-      ["plain-words", "A reply that reads stiff"]
+      ["plain-words", "A reply that reads stiff"],
+      ["humanize-text", "English that sounds machine-made"],
+      ["humanize-indonesian", "Indonesian that sounds machine-made or translated"]
     ] },
     { "branch": "Sorting", "when": "many reports or a suspected bug", "skills": [
       ["triage-reports", "Many reports at once"],
@@ -145,7 +151,9 @@
     { "branch": "Writing things down", "when": "the owner wants a record or a summary", "skills": [
       ["meeting-notes", "After a talk"],
       ["status-update", "What is going on"],
-      ["plain-words", "Anything that reads stiff"]
+      ["plain-words", "Anything that reads stiff"],
+      ["humanize-text", "English that sounds machine-made"],
+      ["humanize-indonesian", "Indonesian that sounds machine-made or translated"]
     ] }
   ]
 }

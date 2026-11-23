@@ -1029,3 +1029,17 @@ The owner closed the last ten tickets (T-0018 to T-0027), so all 27 are Done, an
 | A screen that still holds an older copy of a person's choices could have saved over their MCP ticks | The Skills page saved the whole kit it had, including an empty tool list | The owner of a field is the only page that writes it: the Skills page saves through `save_kit_keeping_mcp`, which keeps the ticks from the file |
 | A secret in a tool's arguments could have reached the screen | A card could have shown the command line | Show the program's name or the web address's host, never arguments or settings. A test puts secrets in the arguments, the settings and the address, and looks for them in everything the screen is given |
 | My own slips: ran `python3 -` with a heredoc (it waited for input, lesson 22) and chained `sleep` before a check (blocked); a regex typed on the command line lost its backslash (`/\s+/` became `/s+/` and ate every letter s in a printout) | The shell takes backslashes and the tool refuses a long sleep | Scripts go in a file (Write or Edit), never `-` and never a regex inside `node -e`. To wait for something, use a Monitor with an until-loop |
+
+---
+
+## 43. The humanizer skills: research that is mostly folklore (2026-11-23, decision 103)
+
+| What was seen | Cause | Rule to keep |
+|---|---|---|
+| Every list of "AI phrases in Indonesian" turned out to come from commercial blogs or translated English lists | Almost nothing is measured for Indonesian; the one study read points to even sentences, less word variety and fewer modals, not to phrases | A skill that says "this is a tell" must say how well that is backed. The Indonesian tells carry a strength (Aturan, Hemat, Kebiasaan, Lemah), and a correction needs a rule behind it |
+| A source on the wrong side of an "official" claim: popular sites list `meskipun … tetapi` as fine, the Badan Bahasa book calls it wrong | Popular pages copy each other | Read the primary book before saying a form is wrong, and write what could not be read (the TBBBI) as "not verified" |
+| The dash looked like a tell to ban | EYD Edisi V allows it for asides and ranges | Do not turn a habit into a ban; ban only the use that is the fault |
+| The English skill's reference file was opened in one run and skipped in the next | Sonnet knows the usual patterns and went straight to the edit | A pointer to a file is an order ("every time, before you change a word"), and the file must hold something the model does not already do (here: when not to act) |
+| The person added "so teams wait less" to a fact that said "cuts sync time by 30%" | A model finishes the thought | Name the habit in the rule with the example, and put a check for it in the test |
+| One test check failed on a good answer (the person asked for details without a question mark) and another on an ordinary closing line | The checks looked at the words, not at the behaviour | When a check fails, read the answer before changing the skill. Then loosen the check or fix the skill, and say which |
+| The dev window could not start: port 1420 was in use | The first dev run's vite server was left behind when its parent was stopped | After stopping a dev window, look for its vite process and stop that too (it is the one listening on 1420) |

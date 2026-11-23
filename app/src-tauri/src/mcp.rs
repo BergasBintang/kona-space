@@ -345,11 +345,17 @@ pub fn run(args: &[String]) {
 mod tests {
     use super::*;
 
-    fn ctx(name: &str) -> Ctx {
+    /// A session's context in a throwaway project folder. The folder is removed when the test ends, also when it fails (before, eight of them were left in the temp folder at every run).
+    struct Temp(Ctx);
+    impl std::ops::Deref for Temp { type Target = Ctx; fn deref(&self) -> &Ctx { &self.0 } }
+    impl std::ops::DerefMut for Temp { fn deref_mut(&mut self) -> &mut Ctx { &mut self.0 } }
+    impl Drop for Temp { fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0.project); } }
+
+    fn ctx(name: &str) -> Temp {
         let d = std::env::temp_dir().join(format!("kona-mcp-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
-        Ctx { dir: tickets::dir(&d), project: d, who: "session test".into(), session: "abc12345-0000".into(), role: "backend".into(), ticket: String::new(), roles: vec![] }
+        Temp(Ctx { dir: tickets::dir(&d), project: d, who: "session test".into(), session: "abc12345-0000".into(), role: "backend".into(), ticket: String::new(), roles: vec![] })
     }
     fn note(c: &Ctx, id: &str) -> String {
         std::fs::read_to_string(brain::dir(&c.project).join(format!("{id}.md"))).unwrap_or_default()

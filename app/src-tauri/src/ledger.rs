@@ -212,9 +212,10 @@ mod tests {
 
     #[test]
     fn cost_hours_sums_per_folder_and_hour() {
-        let path = std::env::temp_dir().join(format!("kona-ledger-hours-{}", std::process::id())).join("kona.db");
-        let _ = std::fs::remove_file(&path);
-        let ledger = Ledger::open(&path).unwrap();
+        let dir = std::env::temp_dir().join(format!("kona-ledger-hours-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let _clean = crate::testdir::Clean(dir.clone()); // declared before the ledger, so the database is closed first and the folder removed after it
+        let ledger = Ledger::open(&dir.join("kona.db")).unwrap();
         {
             let conn = ledger.conn.lock().unwrap();
             // two turns in one hour, one two hours later, and one for another folder; minutes 20 and 25 stay in one hour in any time zone

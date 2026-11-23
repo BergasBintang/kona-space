@@ -28,6 +28,8 @@ mod session;
 mod ssh;
 mod summary;
 mod sync;
+#[cfg(test)]
+mod testdir;
 mod terminal;
 mod tickets;
 mod winproc;

@@ -654,11 +654,17 @@ pub fn kit_for(role: &Role, folder: &Path) -> Result<Kit, String> {
 mod tests {
     use super::*;
 
-    fn temp(name: &str) -> PathBuf {
+    /// A throwaway folder for a test, removed when the value is dropped: when the test ends, also when it fails. (Before, every run left about forty of them in the temp folder.)
+    struct Temp(PathBuf);
+    impl std::ops::Deref for Temp { type Target = Path; fn deref(&self) -> &Path { &self.0 } }
+    impl AsRef<Path> for Temp { fn as_ref(&self) -> &Path { &self.0 } }
+    impl Drop for Temp { fn drop(&mut self) { let _ = fs::remove_dir_all(&self.0); } }
+
+    fn temp(name: &str) -> Temp {
         let d = std::env::temp_dir().join(format!("kona-test-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&d);
         fs::create_dir_all(&d).unwrap();
-        d
+        Temp(d)
     }
 
     fn skill(dir: &Path, name: &str, desc: &str) {

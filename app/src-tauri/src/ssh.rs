@@ -660,8 +660,11 @@ mod tests {
         Host { id: label.into(), project_id: "p".into(), label: label.into(), host: h.into(), port: 22, user: user.into(), key_path: "k".into(), fingerprints: vec![], roles: roles.iter().map(|s| s.to_string()).collect(), notes: String::new(), ..Default::default() }
     }
 
-    fn fresh(name: &str) -> Servers {
-        Servers::load(&std::env::temp_dir().join(format!("kona-ssh-{name}-{}", std::process::id())))
+    /// A list of servers in a throwaway folder; keep the second value in a named binding, the folder is removed when it is dropped.
+    fn fresh(name: &str) -> (Servers, crate::testdir::Clean) {
+        let dir = std::env::temp_dir().join(format!("kona-ssh-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        (Servers::load(&dir), crate::testdir::Clean(dir))
     }
 
     fn repo_card(label: &str, alias: &str, repo: &str) -> Host {
@@ -670,7 +673,7 @@ mod tests {
 
     #[test]
     fn a_repo_card_gets_its_defaults_and_a_clean_repo_name() {
-        let s = fresh("repo");
+        let (s, _clean) = fresh("repo");
         let h = s.save_host(repo_card("Kona", "github-kona", "https://github.com/Owner/kona-space.git")).unwrap();
         assert_eq!((h.repo.as_str(), h.user.as_str(), h.real_host.as_str(), h.port), ("Owner/kona-space", "git", "github.com", 22));
         assert!(s.save_host(repo_card("Bad", "github-bad", "just-a-name")).is_err());
@@ -692,7 +695,7 @@ mod tests {
 
     #[test]
     fn a_pull_names_a_server_of_the_same_project_and_goes_with_it() {
-        let s = fresh("pull");
+        let (s, _clean) = fresh("pull");
         let mut web = host("Web", "web.example.test", "deploy", &[]);
         web.id = String::new();
         let web = s.save_host(web).unwrap();
@@ -835,6 +838,7 @@ mod tests {
     #[test]
     fn only_a_path_is_kept_never_key_text() {
         let dir = std::env::temp_dir().join(format!("kona-ssh-test-{}", std::process::id()));
+        let _clean = crate::testdir::Clean(dir.clone());
         let s = Servers::load(&dir);
         let mut h = host("Web", "web.example.test", "deploy", &[]);
         h.id = String::new();

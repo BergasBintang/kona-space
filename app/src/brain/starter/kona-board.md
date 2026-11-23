@@ -12,7 +12,7 @@ Backlog, Ready, In progress, Review, Done. A card can also be flagged "Waiting o
 Each ticket is a plain text file in the project's hidden `.kona/tickets` folder. You can read, edit and back them up without Kona.
 
 ## Agents can raise and update tickets
-Every Kona session gets a small tool server for the board. Claude can list, read, create and update tickets. It can move a card up to Review, never to Done, and never delete one. The history records which session and role made each change.
+Every Kona session gets a small tool server for the board. Claude can list, read, create and update tickets. It can move a card up to Review, never to Done, and never delete one. The history records which session and role made each change. The same tool server has two read-only tools: `list_team` (every person's name, job, skills and servers) and `list_connections` (each tool server, where it comes from, whether it is on in this project and who may use it).
 
 ## You decide
 Only you move a card to Done. Dragging a card to In progress does not start a session; press Start session on the card, which makes the branch and the copy first. See [[tickets-and-worktrees]].

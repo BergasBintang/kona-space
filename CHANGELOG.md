@@ -2,6 +2,15 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.48.0, 2026-11-24
+
+Every worker now starts knowing what Kona is and who is on the team, and a tool server that comes from another project asks before it is switched on.
+
+- **A paragraph about Kona and the team, in every session** (also a resumed one): what Kona is, its screens, that a person does one thing at a time, that skills and tool servers are given per project, and one line for each of the eleven people: name, job, the first two sentences of what they do (your edits to a brief count), and which one is "you".
+- **Two read-only tools.** `list_team` gives each person's full job description, how freely they work, and the skills and tool servers they may use in this project. `list_connections` gives each tool server, where it comes from (this project, or found in another project, and which), whether it is used here, and who may use it. A server that is off here is said to be off, not "connected". Nothing in them can change a setting.
+- **A notice before a tool server from another project is switched on.** On the Access page, pressing Used here on a server this project does not have itself (Kona only kept a copy from another project) opens a question that names where it was found. Cancel leaves it off. While it is on, its card says the project does not have it itself, and `list_connections` says the same to the workers. A server the project or your Claude settings have themselves is switched on as before, with no question.
+- **Not in this version:** whether a server really started for a person (connected, still starting, failed) is known only to the open window, so the workers' tool does not say it.
+
 ## 0.47.0, 2026-11-24
 
 A note's group is written on the note, so the Notes list, the Map, the Ask page and the workers' tools can no longer disagree. And a question that takes one answer no longer looks like one that takes several.

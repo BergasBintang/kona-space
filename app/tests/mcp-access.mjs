@@ -113,14 +113,20 @@ try {
   ok("it is pressed in as Not used here", await pressed("probe", "Not used here") === "true" && await pressed("probe", "Used here") === "false");
 
   // 3. switch on, then choose a person
-  ok("Used here is pressed", await press("Used here", card("probe")) && await c.waitFor(`${card("probe")}.innerText.includes('People who may use it')`, 5000, 100));
+  // a tool this project does not have itself asks first (the notice): Cancel leaves it off, "Use it here" switches it on
+  const dialog = `(document.querySelector('[role="dialog"]')?.innerText ?? '').replace(/\\s+/g, ' ')`;
+  ok("Used here on a tool B does not have asks first, and names where it was found", await press("Used here", card("probe")) && await c.waitFor(`${dialog}.includes('Use probe in ${NAME_B}?')`, 4000, 100) && (await c.ev(dialog)).includes(`Found in ${NAME_A}`), await c.ev(dialog));
+  ok("Cancel leaves it off", await press("Cancel", `document.querySelector('[role="dialog"]')`) && await c.waitFor(`!document.querySelector('[role="dialog"]')`, 3000, 100) && !(fs.existsSync(path.join(B, ".kona", "mcp-on.json")) && JSON.parse(fs.readFileSync(path.join(B, ".kona", "mcp-on.json"), "utf8")).on.includes("probe")) && !(await c.ev(`${card("probe")}.innerText`)).includes("People who may use it"));
+  const useHere = async (n) => await press("Used here", card(n)) && await c.waitFor(`!!document.querySelector('[role="dialog"]')`, 4000, 100) && await press("Use it here", `document.querySelector('[role="dialog"]')`) && await c.waitFor(`${card(n)}.innerText.includes('People who may use it')`, 5000, 100);
+  ok("Use it here switches it on", await useHere("probe"));
+  ok("while it is on, the card says the project does not have it itself", (await c.ev(`${card("probe")}.innerText`)).includes(`${NAME_B} does not have it itself`));
   ok("it says no one can use it yet", (await c.ev(`${card("probe")}.innerText`)).includes("No one can use it yet"));
   ok("the project's file says it is on", JSON.parse(fs.readFileSync(path.join(B, ".kona", "mcp-on.json"), "utf8")).on.includes("probe"));
   ok("vault is still off", !(await c.ev(`${card("vault")}.innerText`)).includes("People who may use it"));
   ok(`${jiro.person} is ticked`, await press(jiro.person, card("probe")) && await c.waitFor(`${card("probe")}.innerText.includes('No open conversation uses it yet')`, 5000, 100));
   ok("the person's choice is kept in the project", JSON.parse(fs.readFileSync(path.join(B, ".kona", "role-kits.json"), "utf8")).frontend.mcp.includes("probe"));
   ok("the button of the person is pressed in", await c.ev(`[...${card("probe")}.querySelectorAll('button')].find((b) => b.textContent.trim() === ${JSON.stringify(jiro.person)})?.getAttribute('aria-pressed')`) === "true");
-  ok("shadcn (the real tool, started by npx) is switched on and the same person is ticked", await press("Used here", card("shadcn")) && await c.waitFor(`${card("shadcn")}.innerText.includes('People who may use it')`, 5000, 100) && await press(jiro.person, card("shadcn")) && await c.waitFor(`${card("shadcn")}.innerText.includes('No open conversation uses it yet')`, 5000, 100));
+  ok("shadcn (the real tool, started by npx) is switched on and the same person is ticked", await useHere("shadcn") && await press(jiro.person, card("shadcn")) && await c.waitFor(`${card("shadcn")}.innerText.includes('No open conversation uses it yet')`, 5000, 100));
 
   // 4. a real conversation: the person calls the tool
   ok("B opens again", await openProject(NAME_B));

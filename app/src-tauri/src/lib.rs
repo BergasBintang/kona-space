@@ -137,7 +137,10 @@ async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: Sta
         }
         None => skills::Kit::default(),
     };
-    let id = session::start(app, &sessions, folder.clone(), role, account, persona, project_name, ticket, work_dir, brain_digest, ssh_hosts, kit, model, mode, resume).await?;
+    // the whole team goes into the session's instructions, so nobody starts without knowing who else works here (the same list on a resumed session: the instructions are given again each time)
+    let team = roles.all();
+    let base = kona_base(&app).ok();
+    let id = session::start(app, &sessions, folder.clone(), role, account, persona, project_name, ticket, work_dir, brain_digest, ssh_hosts, kit, team, base, model, mode, resume).await?;
     if let Some(t) = ticket_id {
         let _ = tickets::link_session(&tickets::dir(std::path::Path::new(&folder)), &t, &id, &who);
     }

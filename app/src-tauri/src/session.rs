@@ -50,6 +50,57 @@ const BRAIN_RULES: &str = "This project has a brain: markdown notes the owner re
 - If the project has a journey note (front matter `kind: journey`, the map of what a person does in the product; `read_note` the starter note `kona-journey` for its format), a ticket that changes a step, a screen, a field or an error updates that note in the same ticket, saved with `save_note`. If nothing in the journey changes, write the line `Journey: no change` in the ticket's Done when. When you create or change the file of a page or modal that is a step of the journey, put one comment in it with the step's id, `kona-step: <id>` (any comment syntax). Never keep a second copy of the journey in another note or a picture.
 - These rules about Kona's tools and files come with the Kona version running now. If a CLAUDE.md or note in the project says something different about them, follow these and tell the owner that file is out of date. Never copy these rules into CLAUDE.md.";
 
+/// Added to every session: what Kona is, so a worker is never a stranger in the program it runs in. Kept short on purpose: it is paid for in every session.
+/// The screens are the places of `src/lib/places.ts`; what each is for is in the starter note `kona-screens`, which the workers can read.
+const KONA_INTRO: &str = "You are working inside Kona, a desktop workspace where the owner works with Claude Code. In Kona every role is a person with a name and a job, and together they are the owner's team. The owner talks to one person at a time, and a person does one thing at a time in a project. Work is planned on a board of tickets (list_tickets, get_ticket, create_ticket, update_ticket); only the owner moves a ticket to done. Lasting knowledge goes into the project's brain, its notes. The owner's screens are Office (where the people are), Board, Meeting (workflows that run by themselves), Worktrees, Brain, Files, Mockups, Leftovers, Connections, Costs and Settings. The starter note kona-screens says what each is for: read_note it, or search_brain, before you tell the owner how Kona works, and never guess.
+- For each project the owner chooses which skills and which tool servers each person may use. You have only what you were given here. If you need another, say which one and ask the owner to switch it on (a tool server: Connections, Access tab); do not work around it. `list_connections` shows each server, where it comes from, whether it is on in this project and who may use it. Do not take a server's name in `claude mcp list` as proof that you may use it.
+- `list_team` gives the full job description, skills and servers of each person. Use it before you hand work to someone, and call people by the names and jobs below.";
+
+/// How many letters of a person's job description go into the team list that every session starts with.
+const JOB_LINE_MAX: usize = 190;
+
+/// A person's whole job description on one line: the brief without its opening sentence "You are working as the X role." (their name and job are said next to it).
+pub fn job_text(brief: &str) -> String {
+    let flat = brief.split_whitespace().collect::<Vec<_>>().join(" ");
+    let Some(r) = flat.strip_prefix("You are working as the") else { return flat };
+    if let Some((_, t)) = r.split_once(" role. ") { return t.to_string(); }
+    // "the Secretary role, the front desk of the office. Answer ...": what follows the comma is part of the job
+    if let Some((_, t)) = r.split_once(" role, ") {
+        let mut c = t.chars();
+        return c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default();
+    }
+    if r.ends_with(" role.") { String::new() } else { r.trim().to_string() }
+}
+
+/// The job of a person in a few words: their brief without the opening sentence "You are working as the X role.", the first two sentences, cut at a word when it is long.
+pub fn job_line(brief: &str) -> String {
+    let rest = job_text(brief);
+    let mut out = String::new();
+    let mut sentences = 0;
+    for part in rest.split_inclusive(". ") {
+        if sentences == 2 { break; }
+        out.push_str(part);
+        sentences += 1;
+    }
+    let out = out.trim().to_string();
+    if out.chars().count() <= JOB_LINE_MAX { return out; }
+    let cut: String = out.chars().take(JOB_LINE_MAX).collect();
+    format!("{}…", cut.rsplit_once(' ').map(|(a, _)| a).unwrap_or(&cut).trim_end_matches(['.', ',', ';']))
+}
+
+/// The team, as every session starts with it: who is who, with their job, and which one is you. A worker who does not know its teammates cannot hand work on, or say who does what.
+pub fn team_prompt(team: &[Role], me: Option<&str>) -> Option<String> {
+    if team.is_empty() { return None; }
+    let mut out = vec![format!("{KONA_INTRO}\nThe team now (name, job, what the person does):")];
+    for r in team {
+        let name = if r.person.is_empty() { r.name.clone() } else { format!("{}, {}", r.person, r.name) };
+        let job = job_line(&r.brief);
+        out.push(format!("- {name}{}{}", if me == Some(r.id.as_str()) { " (you)" } else { "" }, if job.is_empty() { String::new() } else { format!(": {job}") }));
+    }
+    out.push("Work that belongs to someone else goes to them as a ticket (create_ticket, with their name or job in role), not into your own work.".into());
+    Some(out.join("\n"))
+}
+
 /// What the owner wrote for each skill of this person: when to use it. It is a hint, added to the instructions; the skill itself still describes itself to Claude.
 /// With branches it reads as a tree (the job, a branch for each kind of work, the skills under it), so the person narrows down from the kind of work to the skill that fits best.
 pub fn skill_notes(kit: &crate::skills::Kit) -> Option<String> {
@@ -196,7 +247,7 @@ pub fn claude_version(exe: &PathBuf) -> Option<String> {
     Some(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Option<Role>, account: Option<Account>, persona: Persona, project_name: String, ticket: Option<Ticket>, work_dir: String, digest: Option<String>, ssh_hosts: Vec<crate::ssh::Host>, kit: crate::skills::Kit, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
+pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Option<Role>, account: Option<Account>, persona: Persona, project_name: String, ticket: Option<Ticket>, work_dir: String, digest: Option<String>, ssh_hosts: Vec<crate::ssh::Host>, kit: crate::skills::Kit, team: Vec<Role>, base: Option<PathBuf>, model: String, mode: String, resume: Option<String>) -> Result<String, String> {
     let exe = find_claude().ok_or("Claude Code was not found on this PC")?;
     // each `claude` program takes about 400 MB: every project has its own number of sessions at once (its settings), or the default of Settings on the welcome page
     let default_cap = app.try_state::<crate::backup::SettingsStore>().map(|s| s.get().max_sessions).unwrap_or(2);
@@ -219,15 +270,17 @@ pub async fn start(app: AppHandle, sessions: &Sessions, folder: String, role: Op
     let voice_prompt = match &role { Some(r) => Persona::for_role(&r.person, r.persona.trim(), &r.voice, persona.enabled).prompt(), None => persona.prompt() }; // a person talks in their own voice; with no role the shared one
     let extra: Vec<String> = role.as_ref().map(|r| if r.person.is_empty() { r.brief.trim().to_string() } else { format!("Your name is {}. {}", r.person, r.brief.trim()) }).filter(|b| !b.is_empty()).into_iter().chain(skill_notes(&kit))
         .chain(crate::ssh::allowed_prompt(&ssh_hosts, role.as_ref().map(|r| r.id.as_str())))
-        .chain(ticket.as_ref().map(|t| tickets::prompt_for(t, &folder))).chain(digest.filter(|d| !d.trim().is_empty())).chain([BRAIN_RULES.to_string(), READABLE_FILES.to_string()]).chain(voice_prompt).collect();
+        .chain(ticket.as_ref().map(|t| tickets::prompt_for(t, &folder))).chain(digest.filter(|d| !d.trim().is_empty())).chain(team_prompt(&team, role.as_ref().map(|r| r.id.as_str()))).chain([BRAIN_RULES.to_string(), READABLE_FILES.to_string()]).chain(voice_prompt).collect();
     if !extra.is_empty() {
         cmd.args(["--append-system-prompt", &extra.join("\n\n")]);
     }
     // the board's tool server: Kona's own program, started by Claude Code for this one session (see mcp.rs)
     let mut servers = serde_json::Map::new();
     if let Ok(me) = std::env::current_exe() {
+        // `--base` is Kona's data folder and `--account-dir` the login folder of the account: the tool server reads the team and the connections from them (read only)
         servers.insert("kona-board".into(), json!({"command": me.to_string_lossy(), "args": [
-            "--mcp-board", "--folder", folder, "--session", id, "--role", role.as_ref().map(|r| r.id.as_str()).unwrap_or(""), "--ticket", ticket.as_ref().map(|t| t.id.as_str()).unwrap_or("")
+            "--mcp-board", "--folder", folder, "--session", id, "--role", role.as_ref().map(|r| r.id.as_str()).unwrap_or(""), "--ticket", ticket.as_ref().map(|t| t.id.as_str()).unwrap_or(""),
+            "--base", base.as_ref().map(|b| b.to_string_lossy().into_owned()).unwrap_or_default(), "--account-dir", account.as_ref().and_then(|a| a.config_dir.clone()).unwrap_or_default()
         ]}));
     }
     // a session as a role gets only what that role was given (see skills.rs): its connectors, its skills, and none of the user-level ones
@@ -419,5 +472,29 @@ mod tests {
         assert_eq!(find_busy(&map, "design", "d:/norbit"), None, "another person is free");
         map.remove("s1");
         assert_eq!(find_busy(&map, "product", "d:/norbit"), None, "an ended session frees the person");
+    }
+
+    #[test]
+    fn every_session_starts_knowing_kona_and_the_whole_team() {
+        let team = crate::roles::starting_roles();
+        let said = team_prompt(&team, Some("frontend")).unwrap();
+        for r in &team { assert!(said.contains(&format!("{}, {}", r.person, r.name)), "{} is missing", r.person); }
+        assert!(said.contains("Jiro, Frontend (you): Build and fix what people see and click."), "{said}");
+        assert!(said.contains("Kiki, Product: Turn what the owner wants into small, clear tickets"), "{said}");
+        assert!(!said.contains("You are working as the"), "the opening sentence is not repeated for each person");
+        assert!(said.contains("inside Kona") && said.contains("list_team") && said.contains("list_connections") && said.contains("kona-screens"));
+        assert!(team_prompt(&[], None).is_none(), "no team, no paragraph");
+        assert!(team_prompt(&team, None).unwrap().matches("(you)").count() == 0, "with no role, nobody is you");
+    }
+
+    #[test]
+    fn a_long_job_description_is_cut_at_a_word_and_never_inside_a_letter() {
+        assert_eq!(job_line("You are working as the QA role. Try it. Then report. Third sentence."), "Try it. Then report.");
+        let long = format!("You are working as the X role. {}", "Écrire des mots très longs, ".repeat(30));
+        let cut = job_line(&long);
+        assert!(cut.chars().count() <= 191 && cut.ends_with('…') && !cut.contains("  "), "{cut}");
+        assert_eq!(job_line("You are working as the Product role."), "", "a brief with nothing after the opening says nothing twice");
+        assert_eq!(job_line("You are working as the Secretary role, the front desk of the office. Answer questions. Then more."), "The front desk of the office. Answer questions.");
+        assert_eq!(job_line("Does the books."),"Does the books.", "a brief the owner rewrote is used as it is");
     }
 }

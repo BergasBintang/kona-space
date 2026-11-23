@@ -25,6 +25,7 @@ export function Mcp({ project, roles, accountId, sessions, onKits }: { project: 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null); // the tool being changed
   const [drop, setDrop] = useState<McpRow | null>(null);
+  const [ask, setAsk] = useState<McpRow | null>(null); // a tool this project does not have itself, about to be switched on: the owner confirms it is on purpose
 
   const load = useCallback(() => { mcpCatalog(accountId, project.folder).then(setRows).catch((e) => { setRows([]); setError(String(e)); }); }, [accountId, project.folder]);
   useEffect(() => { setRows(null); setError(null); load(); }, [load]);
@@ -61,7 +62,7 @@ export function Mcp({ project, roles, accountId, sessions, onKits }: { project: 
           <div className="flex shrink-0 items-center gap-2">
             <div role="group" aria-label={`${r.name} in ${project.name}`} className="flex gap-2">
               <Button variant="quiet" small on={!r.on} aria-pressed={!r.on} disabled={busy === r.name} onClick={() => void setOn(r, false)}>Not used here</Button>
-              <Button variant="quiet" small on={r.on} aria-pressed={r.on} disabled={busy === r.name} onClick={() => void setOn(r, true)}>Used here</Button>
+              <Button variant="quiet" small on={r.on} aria-pressed={r.on} disabled={busy === r.name} onClick={() => r.here ? void setOn(r, true) : setAsk(r)}>Used here</Button>
             </div>
             {!r.here && <Button variant="ghost" small onClick={() => setDrop(r)}>Remove…</Button>}
           </div>
@@ -78,6 +79,7 @@ export function Mcp({ project, roles, accountId, sessions, onKits }: { project: 
           </div>
         )}
         <div className="flex flex-col gap-1">
+          {r.on && !r.here && <span className="flex items-center gap-2 text-[13px] leading-5 font-bold text-state-waiting"><Glyph state="waiting" size={14} />{project.name} does not have it itself: it runs from the copy Kona kept</span>}
           {r.on && r.roles.length === 0 && <span className="flex items-center gap-2 text-[13px] leading-5 font-bold text-state-waiting"><Glyph state="waiting" size={14} />No one can use it yet</span>}
           {r.on && r.roles.length > 0 && lines.length === 0 && <span className="flex items-center gap-2 text-[13px] leading-5 text-text-secondary"><Glyph state="idle" size={14} />No open conversation uses it yet</span>}
           {lines.map((l) => <span key={l.roleId} className={`flex items-center gap-2 text-[13px] leading-5 ${LINE[l.state].bad ? "font-bold text-state-left" : "text-text-secondary"}`}><Glyph state={LINE[l.state].glyph} size={14} />{LINE[l.state].text(who(l.roleId))}</span>)}
@@ -101,6 +103,12 @@ export function Mcp({ project, roles, accountId, sessions, onKits }: { project: 
       {rows?.length === 0 && !error && <p className="m-0 text-[14px] leading-5 text-text-secondary">None found yet.</p>}
       {error && <p role="alert" className="m-0 text-[14px] leading-5 font-bold text-state-left">{error}</p>}
       {rows?.map(card)}
+      {ask && (
+        <Confirm title={`Use ${ask.name} in ${project.name}?`} confirmLabel="Use it here" onConfirm={() => { const r = ask; setAsk(null); void setOn(r, true); }} onCancel={() => setAsk(null)}>
+          <p className="m-0">{project.name} does not have “{ask.name}” itself. {ask.source}, and Kona kept a copy of how to start it. If you switch it on, {project.name} runs that copy.</p>
+          <p className="m-0">It brings tools of its own that this project never chose. Switch it on only if you meant to.</p>
+        </Confirm>
+      )}
       {drop && (
         <Confirm title="Remove this tool from the list?" confirmLabel="Remove it" danger onConfirm={() => void remove(drop)} onCancel={() => setDrop(null)}>
           <p className="m-0">“{drop.name}” is taken off Kona's list, in every project. Nothing is uninstalled. If a project or your Claude settings still have it, it comes back the next time that project looks.</p>

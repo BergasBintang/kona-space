@@ -17,6 +17,9 @@ struct Ctx {
     role: String, // the role id, or empty
     ticket: String, // the ticket this session works on (T-0012), or empty
     roles: Vec<(String, String, String)>, // id, job, person
+    team: Vec<crate::roles::Role>, // the same people in full, with the owner's edits to their briefs
+    base: PathBuf, // Kona's data folder; empty when the session was started without it
+    config_dir: Option<String>, // the login folder of the account the session runs under
 }
 
 /// A note's id from words: lower-case letters and digits joined by single dashes, up to 60 characters.
@@ -189,9 +192,52 @@ fn arg(args: &[String], name: &str) -> String {
     args.iter().position(|a| a == name).and_then(|i| args.get(i + 1)).cloned().unwrap_or_default()
 }
 
-// the roles are a fixed list since 0.20.0 (decision 43), so the tool server no longer reads a file for them
-fn read_roles() -> Vec<(String, String, String)> {
-    crate::roles::starting_roles().into_iter().map(|r| (r.id, r.name, r.person)).collect()
+// the roles are a fixed list since 0.20.0 (decision 43); the owner's edits to a brief are in Kona's data folder, so the full team is read from there when the session gave it
+fn read_team(base: &Path) -> Vec<crate::roles::Role> {
+    if base.as_os_str().is_empty() { crate::roles::starting_roles() } else { crate::roles::Roles::load(base).all() }
+}
+
+const MODES: [(&str, &str); 4] = [
+    ("plan", "Plans only and changes no file"),
+    ("default", "Asks the owner before each step that changes something"),
+    ("acceptEdits", "May edit files without asking and asks before other steps"),
+    ("auto", "Works in auto mode"),
+];
+
+/// Who is on the team, in full: the name, the job, what the person does, how freely they work, and what they may use in this project. Read only.
+fn list_team(ctx: &Ctx) -> String {
+    let kits = crate::skills::load_kits(&ctx.project);
+    let on = crate::connectors::on_set(&ctx.project);
+    let mut out = vec![format!("The team has {} people. Each does one thing at a time in a project. Hand work to someone with create_ticket (role: their name or job).", ctx.team.len())];
+    for r in &ctx.team {
+        let kit = kits.get(&r.id).cloned().unwrap_or_default();
+        let how = MODES.iter().find(|m| m.0 == r.mode).map(|m| m.1).unwrap_or("Works in the mode the owner chose");
+        let list = |v: &[String]| if v.is_empty() { "none".to_string() } else { v.join(", ") };
+        let servers: Vec<String> = kit.mcp.iter().map(|s| if on.contains(s) { s.clone() } else { format!("{s} (ticked, but switched off in this project, so not loaded)") }).collect();
+        let job = crate::session::job_text(&r.brief);
+        out.push(format!("\n{}{}\n  Group: {}. Model: {}. {}.\n  Job: {}\n  Skills here: {}\n  Tool servers here: {}",
+            r.the(), if r.id == ctx.role { " (you)" } else { "" }, r.group, r.model, how,
+            if job.is_empty() { "-".to_string() } else { job }, list(&kit.skills), list(&servers)));
+    }
+    out.join("\n")
+}
+
+/// The tool servers (MCP) Kona knows for this project, as the owner's Connections screen, Access tab, shows them. Read only: the owner switches servers on and off.
+/// Whether a server really started in a conversation is not known here (Claude Code reports it only to the open window), so it is not said.
+fn list_connections(ctx: &Ctx) -> String {
+    if ctx.base.as_os_str().is_empty() { return "Kona did not give this session its data folder, so the list cannot be read. Ask the owner to look at the Connections screen, Access tab.".into(); }
+    let rows = crate::connectors::catalog_read_only(&ctx.base, ctx.config_dir.as_deref(), &ctx.project);
+    if rows.is_empty() { return "Kona knows no tool servers for this project.".into(); }
+    let who = |ids: &[String]| ids.iter().map(|id| ctx.team.iter().find(|r| &r.id == id).map(|r| r.the()).unwrap_or_else(|| id.clone())).collect::<Vec<_>>().join(", ");
+    let on_n = rows.iter().filter(|r| r.on).count();
+    let mut out = vec![format!("{} tool servers known, {} used in this project. A server is loaded in a conversation only when it is used in this project and the person is ticked for it.", rows.len(), on_n)];
+    for r in &rows {
+        let used = if r.on && !r.here { "Used here, but this project does not have it itself: it runs from the copy Kona kept from another project" } else if r.on { "Used here" } else { "Not used here (off in this project: nobody gets it)" };
+        let people = if r.roles.is_empty() { "nobody ticked".to_string() } else if r.on { format!("may use it: {}", who(&r.roles)) } else { format!("ticked earlier, kept for later: {}", who(&r.roles)) };
+        out.push(format!("- {} ({}: {}). {}. {}. {}.", r.name, r.kind, r.detail, r.source, used, people));
+    }
+    out.push("A server that comes from another project (\"Found in ...\") is only a copy in Kona's list. It does nothing until the owner switches it on here.".into());
+    out.join("\n")
 }
 
 /// How one person refers to another: "Kiki the Product".
@@ -204,6 +250,10 @@ fn tools() -> Value {
     json!([
         {"name": "list_tickets", "description": "List the tickets of this project, one line each. Optionally only one column.",
          "inputSchema": {"type": "object", "properties": {"status": {"type": "string", "enum": ["backlog", "ready", "in-progress", "review", "done"]}}}},
+        {"name": "list_team", "description": "Who is on the team in this Kona: each person's name, job, what they do, how freely they work, and the skills and tool servers they may use in this project. Use it to know who does what, and before you hand work to someone.",
+         "inputSchema": {"type": "object", "properties": {}}},
+        {"name": "list_connections", "description": "The tool servers (MCP) Kona knows for this project, as the owner's Connections screen (Access tab) shows them: each one's name, where it comes from (this project, or found in another project and which), whether it is used in this project, and which people may use it. Read only: only the owner switches servers on or off. Use it instead of `claude mcp list`, which does not show what Kona allows.",
+         "inputSchema": {"type": "object", "properties": {}}},
         {"name": "get_ticket", "description": "Read one ticket in full: description, done-when text, next step, sessions and history.",
          "inputSchema": {"type": "object", "properties": {"id": {"type": "string", "description": "For example T-0012"}}, "required": ["id"]}},
         {"name": "create_ticket", "description": "Raise a new ticket in this project. It starts in Backlog unless you say Ready. Write the title and the done-when text in plain words.",
@@ -274,6 +324,8 @@ fn call(ctx: &Ctx, name: &str, a: &Value) -> Result<String, String> {
             let list: Vec<String> = tickets::list(&ctx.dir).iter().filter(|t| only.as_ref().is_none_or(|s| &t.status == s)).map(|t| line(ctx, t)).collect();
             Ok(if list.is_empty() { "No tickets.".into() } else { list.join("\n") })
         }
+        "list_team" => Ok(list_team(ctx)),
+        "list_connections" => Ok(list_connections(ctx)),
         "get_ticket" => Ok(full(ctx, &tickets::get(&ctx.dir, &text_of(a, "id").unwrap_or_default())?)),
         "create_ticket" => {
             let status = text_of(a, "status");
@@ -359,10 +411,13 @@ pub fn run(args: &[String]) {
     let session = arg(args, "--session");
     let role = arg(args, "--role");
     let ticket = Some(arg(args, "--ticket")).filter(|t| tickets::valid_id(t)).unwrap_or_default();
-    let roles = read_roles();
+    let base = PathBuf::from(arg(args, "--base"));
+    let config_dir = Some(arg(args, "--account-dir")).filter(|d| !d.is_empty());
+    let team = read_team(&base);
+    let roles: Vec<(String, String, String)> = team.iter().map(|r| (r.id.clone(), r.name.clone(), r.person.clone())).collect();
     let role_name = roles.iter().find(|r| r.0 == role).map(the);
     let who = format!("session {}{}", &session[..session.len().min(8)], role_name.map(|n| format!(" (role: {n})")).unwrap_or_default());
-    let ctx = Ctx { dir: tickets::dir(Path::new(&folder)), project: PathBuf::from(&folder), who, session: session.clone(), role: role.clone(), ticket, roles };
+    let ctx = Ctx { dir: tickets::dir(Path::new(&folder)), project: PathBuf::from(&folder), who, session: session.clone(), role: role.clone(), ticket, roles, team, base, config_dir };
     let stdin = std::io::stdin();
     let mut out = std::io::stdout();
     for line in stdin.lock().lines() {
@@ -392,7 +447,44 @@ mod tests {
         let d = std::env::temp_dir().join(format!("kona-mcp-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
-        Temp(Ctx { dir: tickets::dir(&d), project: d, who: "session test".into(), session: "abc12345-0000".into(), role: "backend".into(), ticket: String::new(), roles: vec![] })
+        Temp(Ctx { dir: tickets::dir(&d), project: d, who: "session test".into(), session: "abc12345-0000".into(), role: "backend".into(), ticket: String::new(), roles: vec![], team: crate::roles::starting_roles(), base: PathBuf::new(), config_dir: None })
+    }
+
+    #[test]
+    fn a_worker_can_read_who_is_on_the_team_and_what_each_person_may_use() {
+        let c = ctx("team");
+        let said = list_team(&c);
+        for r in crate::roles::starting_roles() { assert!(said.contains(&r.the()), "{} is missing: {said}", r.the()); }
+        assert!(said.contains("Jiro the Frontend") && said.contains("Build and fix what people see and click"), "{said}");
+        assert!(said.contains("Kit the Backend (you)"), "the person asking is marked: {said}");
+        assert!(!said.contains("You are working as the"), "the opening sentence is said by the name and the job: {said}");
+        // what the owner ticked for a person in this project shows, and a server that is off here says so
+        crate::skills::save_kit(&c.project, "backend", crate::skills::RoleKit { skills: vec!["make-a-mockup".into()], mcp: vec!["playwright".into()], ..Default::default() }).unwrap();
+        std::fs::write(c.project.join(".kona").join("mcp-on.json"), r#"{"on": []}"#).unwrap();
+        let said = list_team(&c);
+        assert!(said.contains("Skills here: make-a-mockup") && said.contains("playwright (ticked, but switched off in this project"), "{said}");
+    }
+
+    #[test]
+    fn the_connections_a_worker_reads_say_off_when_the_server_is_off_here_and_name_the_other_project() {
+        let c = ctx("conn");
+        let base = c.project.join("base");
+        std::fs::create_dir_all(&base).unwrap();
+        // a server another project found, kept in Kona's list; this project has no file of it
+        std::fs::write(base.join("mcp-servers.json"), r#"{"servers": {"shadcn": {"def": {"command": "npx", "args": ["shadcn@latest", "mcp"]}, "origin": "Other Project"}}}"#).unwrap();
+        std::fs::create_dir_all(c.project.join(".kona")).unwrap();
+        std::fs::write(c.project.join(".kona").join("mcp-on.json"), r#"{"on": ["shadcn"]}"#).unwrap();
+        std::fs::write(c.project.join(".kona").join("role-kits.json"), r#"{"frontend": {"mcp": ["shadcn", "playwright"]}}"#).unwrap();
+        let mut c = c;
+        c.base = base;
+        let said = list_connections(&c);
+        assert!(said.contains("shadcn") && said.contains("Found in Other Project") && said.contains("Used here, but this project does not have it itself") && said.contains("Jiro the Frontend"), "{said}");
+        // switched off here: reported as off, the person is only kept for later
+        std::fs::write(c.project.join(".kona").join("mcp-on.json"), r#"{"on": []}"#).unwrap();
+        let said = list_connections(&c);
+        assert!(said.contains("Not used here") && said.contains("ticked earlier, kept for later: Jiro the Frontend"), "{said}");
+        // reading never changes Kona's list
+        assert!(std::fs::read_to_string(c.base.join("mcp-servers.json")).unwrap().contains("Other Project"));
     }
     fn note(c: &Ctx, id: &str) -> String {
         std::fs::read_to_string(brain::dir(&c.project).join(format!("{id}.md"))).unwrap_or_default()

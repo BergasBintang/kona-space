@@ -133,6 +133,15 @@ pub fn on_set(folder: &Path) -> BTreeSet<String> {
 
 /// Every connector Kona knows, as this project sees it. It also remembers what this project (and the account) has, in Kona's list.
 pub fn catalog(base: &Path, config_dir: Option<&str>, folder: &Path, project_name: &str) -> Vec<McpRow> {
+    rows(base, config_dir, folder, project_name, true)
+}
+
+/// The same list, only read: nothing is remembered in Kona's list. This is what a worker's `list_connections` tool uses.
+pub fn catalog_read_only(base: &Path, config_dir: Option<&str>, folder: &Path) -> Vec<McpRow> {
+    rows(base, config_dir, folder, "", false)
+}
+
+fn rows(base: &Path, config_dir: Option<&str>, folder: &Path, project_name: &str, remember: bool) -> Vec<McpRow> {
     let here = found_here(config_dir, folder);
     let mut list = load_list(base);
     let mut changed = false;
@@ -142,7 +151,7 @@ pub fn catalog(base: &Path, config_dir: Option<&str>, folder: &Path, project_nam
             changed = true;
         }
     }
-    if changed && let Err(e) = save_list(base, &list) { eprintln!("could not keep the list of connectors: {e}"); }
+    if changed && remember && let Err(e) = save_list(base, &list) { eprintln!("could not keep the list of connectors: {e}"); }
     let kits = skills::load_kits(folder);
     let on = read_on(folder).unwrap_or_else(|| ticked(&kits));
     let names = here.iter().map(|(n, _, _)| n.clone()).chain(list.servers.keys().filter(|n| !here.iter().any(|(h, _, _)| h == *n)).cloned());

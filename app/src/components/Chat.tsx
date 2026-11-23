@@ -115,6 +115,19 @@ export function PermissionCard({ it, who, onAnswer }: { it: Extract<Item, { kind
   );
 }
 
+/** The mark in front of an option. A question that takes ONE answer gets a round mark with a dot, a question that takes SEVERAL gets a square mark with a tick, so a glance at the first option says which kind
+ * it is before anything is pressed (decision 105; the words "Pick one" / "Pick as many as you like" say it too, for a screen reader). The shape never changes, only whether it is filled. */
+export function ChoiceMark({ many, on }: { many: boolean; on: boolean }) {
+  return (
+    <span aria-hidden="true" data-mark={many ? "square" : "round"} data-on={on || undefined}
+      className={`mt-[4px] flex h-4 w-4 shrink-0 items-center justify-center border-2 ${many ? "" : "rounded-full"} ${on ? "border-accent bg-accent text-on-accent" : "border-line-strong bg-inset"}`}>
+      {on && (many
+        ? <svg viewBox="0 0 10 10" width="10" height="10"><path d="M1.5 5.2 4 7.7l4.5-5.4" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
+        : <span className="h-1.5 w-1.5 rounded-full bg-current" />)}
+    </span>
+  );
+}
+
 /** One of Claude's multiple-choice questions, as a card (decision 64). While it waits for the owner it shows ONE question at a time, with steps to move between them (answering a one-answer question moves on by itself);
  * afterwards it shows every question with what was answered. The options are buttons and "Other" is a text box: for a one-answer question the two exclude each other (lib/questionpick.ts). */
 export function QuestionCard({ it, who, onAnswer }: { it: Extract<Item, { kind: "question" }>; who: string; onAnswer: (answers: Record<string, string> | null) => void }) {
@@ -134,16 +147,20 @@ export function QuestionCard({ it, who, onAnswer }: { it: Extract<Item, { kind: 
   };
   const label = (q: Question, i: number) => q.header || `Question ${i + 1}`;
   const block = (q: Question, interactive: boolean) => (
-    <fieldset key={q.question} className="m-0 flex min-w-0 flex-col gap-2.5 border-0 p-0" disabled={!interactive}>
+    <fieldset key={q.question} data-choice={q.multiSelect ? "many" : "one"} className="m-0 flex min-w-0 flex-col gap-2.5 border-0 p-0" disabled={!interactive}>
       <legend className="mb-1 p-0 text-[15px] leading-6 font-bold">{q.header && <span className="font-pixel mr-2 border border-line-strong px-1.5 text-[12px] leading-5 font-bold text-text-secondary">{q.header}</span>}{q.question}</legend>
+      {interactive && <span data-pick-hint className="text-[13px] leading-5 font-bold text-text-secondary">{q.multiSelect ? "Pick as many as you like" : "Pick one"}</span>}
       <div className="flex flex-col gap-1.5">
         {q.options.map((o) => {
           const on = (picks.picked[q.question] ?? []).includes(o.label) || (!interactive && it.answers?.[q.question]?.split(", ").includes(o.label));
           return (
             <button key={o.label} type="button" aria-pressed={on} onClick={() => choose(q, o.label)}
-              className={`px-btn px-btn-paper flex flex-col items-start px-2 py-1 text-left ${on ? "px-on" : ""} disabled:cursor-default`} disabled={!interactive}>
-              <span className="text-[15px] leading-6 font-bold">{o.label}</span>
-              {o.description && <span className="text-[13px] leading-5 text-text-secondary">{o.description}</span>}
+              className={`px-btn px-btn-paper flex items-start gap-2.5 px-2 py-1 text-left ${on ? "px-on" : ""} disabled:cursor-default`} disabled={!interactive}>
+              <ChoiceMark many={q.multiSelect === true} on={!!on} />
+              <span className="flex min-w-0 flex-col items-start">
+                <span className="text-[15px] leading-6 font-bold">{o.label}</span>
+                {o.description && <span className="text-[13px] leading-5 text-text-secondary">{o.description}</span>}
+              </span>
             </button>
           );
         })}

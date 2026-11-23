@@ -29,7 +29,18 @@ fn slug(s: &str) -> String {
 }
 
 /// The front matter keys Kona writes itself on a note a session saves. Any other key a note has (where a document was moved from, its status) is kept when the note is saved again.
-const MANAGED: [&str; 10] = ["title", "kind", "date", "updated", "status", "source", "session", "role", "ticket", "tickets"];
+const MANAGED: [&str; 11] = ["title", "kind", "date", "updated", "status", "source", "session", "role", "ticket", "tickets", "topic"];
+
+/// The topics the project's own notes use, with how many notes each has, the biggest first (the spelling of the first note that used it).
+fn topic_counts(project: &std::path::Path) -> Vec<(String, usize)> {
+    let mut by: std::collections::HashMap<String, (String, usize)> = std::collections::HashMap::new();
+    for n in brain_search::load_notes(project).into_iter().filter(|n| n.layer == "project" && !n.generated && !n.topic.is_empty()) {
+        by.entry(n.topic.to_lowercase()).or_insert_with(|| (n.topic.clone(), 0)).1 += 1;
+    }
+    let mut v: Vec<(String, usize)> = by.into_values().collect();
+    v.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.to_lowercase().cmp(&b.0.to_lowercase())));
+    v
+}
 
 /// A note's front matter as ordered pairs (keys in lower case), and its body (the text after the closing `---`).
 fn split_note(text: &str) -> (Vec<(String, String)>, String) {
@@ -109,7 +120,10 @@ fn save_note(ctx: &Ctx, a: &Value) -> Result<String, String> {
     if title.is_empty() { title = old_get("title").unwrap_or_else(|| id.clone()); }
     // saving a whole note again starts from the kind given (note when none); changing one section keeps the note's own kind
     let kind = kind_arg.or_else(|| if section.is_some() { old_get("kind") } else { None }).unwrap_or_else(|| "note".into());
+    let topic = brain::clean_topic(&text_of(a, "topic").unwrap_or_default());
+    let topic = if topic.is_empty() { old_get("topic").map(|t| brain::clean_topic(&t)).unwrap_or_default() } else { topic };
     let mut text = format!("---\ntitle: {title}\nkind: {kind}\ndate: {date}\n");
+    if !topic.is_empty() { text.push_str(&format!("topic: {topic}\n")); }
     if date != today { text.push_str(&format!("updated: {today}\n")); }
     if kind == "open" { let st = if section.is_some() { old_get("status").unwrap_or_else(|| "open".into()) } else { "open".into() }; text.push_str(&format!("status: {st}\n")); }
     text.push_str("source: agent\n");
@@ -137,23 +151,37 @@ fn save_note(ctx: &Ctx, a: &Value) -> Result<String, String> {
     }
     text.push('\n');
     let n = brain::save(&ctx.project, &id, &text)?;
-    Ok(format!("{} note {id} in the project's brain ({}). The owner sees it in the Brain place, and any session finds it with search_brain.", if old.is_some() { "Updated" } else { "Saved" }, n.path))
+    brain::regenerate_indexes(&ctx.project); // the list of every note by topic, when the project has one
+    let mut said = format!("{} note {id} in the project's brain ({}). The owner sees it in the Brain place, and any session finds it with search_brain.", if old.is_some() { "Updated" } else { "Saved" }, n.path);
+    if topic.is_empty() {
+        let known = topic_counts(&ctx.project);
+        if !known.is_empty() {
+            said.push_str(&format!(" It has no topic yet. The project's topics are: {}. Save it again under the same id with topic set to the one that fits (a new one only if none does), so it is filed with its notes.", known.iter().map(|(t, c)| format!("{t} ({c})")).collect::<Vec<_>>().join(", ")));
+        }
+    }
+    Ok(said)
 }
 
 /// One line for each of the project's own notes, newest first, so a session can see what is already there.
 fn list_notes(ctx: &Ctx, a: &Value) -> String {
     let only = text_of(a, "kind");
-    let mut rows: Vec<(String, String, String, String)> = brain_search::load_notes(&ctx.project).into_iter().filter(|n| n.layer == "project").filter_map(|n| {
+    let want_topic = text_of(a, "topic").map(|t| brain::clean_topic(&t).to_lowercase()).filter(|t| !t.is_empty());
+    let known = topic_counts(&ctx.project);
+    let mut rows: Vec<(String, String, String, String, String)> = brain_search::load_notes(&ctx.project).into_iter().filter(|n| n.layer == "project" && !n.generated).filter_map(|n| {
         let (meta, _) = brain_search::front_matter(&n.raw);
         let kind = meta.get("kind").cloned().unwrap_or_else(|| "note".into());
         if only.as_ref().is_some_and(|k| *k != kind) { return None; }
-        Some((meta.get("date").cloned().unwrap_or_default(), n.id, kind, n.title))
+        if want_topic.as_ref().is_some_and(|t| *t != n.topic.to_lowercase()) { return None; }
+        Some((meta.get("date").cloned().unwrap_or_default(), n.id, kind, n.title, n.topic))
     }).collect();
     rows.sort_by(|x, y| y.0.cmp(&x.0).then(x.1.cmp(&y.1)));
-    if rows.is_empty() { return "The project's brain has no notes of its own yet.".into(); }
+    if rows.is_empty() { return if want_topic.is_some() { "No note of the project has that topic. The topics are on the first line of list_notes.".into() } else { "The project's brain has no notes of its own yet.".into() }; }
     let total = rows.len();
-    let mut out: Vec<String> = rows.into_iter().take(80).map(|(d, id, k, t)| format!("{id} [{k}] {d} {t}")).collect();
-    if total > 80 { out.push(format!("... and {} older notes. Use search_brain to look for one.", total - 80)); }
+    let mut out: Vec<String> = vec![];
+    // the map of the brain: the topics and how many notes each has, so a session picks a topic first instead of reading eighty lines (decision 104)
+    if !known.is_empty() && want_topic.is_none() { out.push(format!("Topics: {}. Ask for one with list_notes topic=\"...\".", known.iter().map(|(t, c)| format!("{t} ({c})")).collect::<Vec<_>>().join(", "))); }
+    out.extend(rows.into_iter().take(80).map(|(d, id, k, t, topic)| if topic.is_empty() { format!("{id} [{k}] {d} {t}") } else { format!("{id} [{k}] {d} {t} ({topic})") }));
+    if total > 80 { out.push(format!("... and {} older notes. Ask for one topic with list_notes topic=\"...\", or use search_brain to look for one.", total - 80)); }
     out.join("\n")
 }
 
@@ -194,14 +222,17 @@ fn tools() -> Value {
          "inputSchema": {"type": "object", "properties": {"query": {"type": "string", "description": "The question or the words to look for."}}, "required": ["query"]}},
         {"name": "read_note", "description": "Read some lines of one note of the brain, by the note id and line numbers that search_brain gave.",
          "inputSchema": {"type": "object", "properties": {"id": {"type": "string"}, "from_line": {"type": "integer"}, "to_line": {"type": "integer"}}, "required": ["id"]}},
-        {"name": "list_notes", "description": "List the notes of this project's brain that belong to the project (not Claude's memory or Kona's starter notes), newest first, one line each: id, kind, date, title. Use it to see what is already written before you add a note.",
-         "inputSchema": {"type": "object", "properties": {"kind": {"type": "string", "enum": ["decision", "topic", "open", "note", "journey", "session"], "description": "Only notes of this kind. Optional."}}}},
+        {"name": "list_notes", "description": "List the notes of this project's brain that belong to the project (not Claude's memory or Kona's starter notes), newest first, one line each: id, kind, date, title and, in brackets, its topic. When the notes name topics, the first line lists the topics with how many notes each has: this is the map of the brain, so look there first and then ask for one topic. Use it to see what is already written before you add a note.",
+         "inputSchema": {"type": "object", "properties": {
+            "kind": {"type": "string", "enum": ["decision", "topic", "open", "note", "journey", "session"], "description": "Only notes of this kind. Optional."},
+            "topic": {"type": "string", "description": "Only the notes of this topic, spelled as the first line of the list gives it. Optional."}}}},
         {"name": "save_note", "description": "Save something worth keeping into this project's brain, so the owner and every later session can find it with search_brain. Use it for decisions with their reason, facts about the project that the code does not show (how it is deployed, what a name means, a limit, a rule of the owner's), the result of a piece of research, and work still open. Do not save secrets, passwords or keys, what the code or git history already shows, or the chat itself. Search first: if a note on the topic exists, write a new note that links to it with [[its-id]] rather than a copy. Write the body in markdown: a one or two sentence summary first, then short sections. Documents (reports, plans, designs) are notes too: write them here, never as files in docs/. A note you saved before can be updated under the same id: send the whole text again, or only the part that changes with `section` (and `append` to add to the end of that part). The owner's notes are never changed. If you are working on a ticket, Kona adds that ticket to the note itself: do not write it into the title or the front matter.",
          "inputSchema": {"type": "object", "properties": {
             "title": {"type": "string", "description": "What the note is about, in 3 to 10 words."},
             "body": {"type": "string", "description": "The text of the note in markdown, without front matter."},
             "kind": {"type": "string", "enum": ["decision", "topic", "open", "note", "journey"], "description": "decision: something decided, with the reason. topic: how something works or what was found. open: work still to do. journey: the map of what a person does in the product, in the format of the starter note kona-journey (the project has one at most). note: anything else. Default note."},
             "id": {"type": "string", "description": "Lower-case letters, digits and dashes. Optional: made from the title when left out."},
+            "topic": {"type": "string", "description": "What the note is about, in one to four words. Use one of the topics list_notes shows on its first line when one fits, so the note lands with the others of its topic; a new topic only when none fits. Optional: a note saved again keeps its topic."},
             "section": {"type": "string", "description": "To change one part of a note you saved before: its id in id and the heading of that part here (without the #). body then replaces that section only; the rest of the note stays as it is."},
             "append": {"type": "boolean", "description": "With section: add body at the end of that section instead of replacing it."}}, "required": ["body"]}}
     ])
@@ -280,7 +311,13 @@ fn call(ctx: &Ctx, name: &str, a: &Value) -> Result<String, String> {
             if ans.state == "none" && !brain_search::contains_secret(&q) {
                 let _ = brain::wanted_add(&ctx.project, &format!("(asked by a session) {}", q.trim()));
             }
-            Ok(brain_search::describe(&ans))
+            let mut said = brain_search::describe(&ans);
+            // the notes the first one links to and the notes that link to it: a session follows a link instead of searching again
+            if let Some(top) = ans.hits.first() {
+                let near = brain_search::related(&notes, &top.note_id);
+                if !near.is_empty() { said.push_str(&format!("\nLinked with the first note: {}.", near.join("; "))); }
+            }
+            Ok(said)
         }
         "list_notes" => Ok(list_notes(ctx, a)),
         "save_note" => save_note(ctx, a),
@@ -491,5 +528,81 @@ mod tests {
         assert!(no(json!({"title": "!!!", "body": "x"})).contains("letters or digits"));
         assert!(no(json!({"title": "A", "body": "x".repeat(61 * 1024)})).contains("60 KB"));
         assert_eq!(slug("  Why: the API's limit (v2)!  "), "why-the-api-s-limit-v2");
+    }
+
+    #[test]
+    fn a_session_files_a_note_under_a_topic_and_is_told_which_topics_exist() {
+        let c = ctx("topics");
+        let first = save_note(&c, &json!({"title": "Landing page brief", "kind": "decision", "body": "Approved.", "topic": "  Landing   page "})).unwrap();
+        assert!(!first.contains("no topic yet"), "a note with a topic is not told to pick one");
+        assert!(note(&c, "landing-page-brief").contains("
+topic: Landing page
+"), "the topic is written clean, once");
+        save_note(&c, &json!({"title": "Logo colours", "body": "Two colours.", "topic": "Brand"})).unwrap();
+        let said = save_note(&c, &json!({"title": "Hosting", "body": "A small server."})).unwrap();
+        assert!(said.contains("no topic yet") && said.contains("Landing page (1)") && said.contains("Brand (1)"), "{said}");
+        // saved again, a note keeps its topic, also when one section changes
+        save_note(&c, &json!({"title": "Landing page brief", "id": "landing-page-brief", "kind": "decision", "body": "Approved, again."})).unwrap();
+        assert!(note(&c, "landing-page-brief").contains("topic: Landing page"));
+        save_note(&c, &json!({"id": "logo-colours", "section": "Logo colours", "body": "Three colours now, " , "append": true})).ok();
+        assert_eq!(note(&c, "logo-colours").matches("topic:").count(), 1);
+        let all = list_notes(&c, &json!({}));
+        assert!(all.starts_with("Topics: Brand (1), Landing page (1)"), "{all}");
+        assert!(all.contains("landing-page-brief [decision]") && all.contains("(Landing page)"));
+        let one = list_notes(&c, &json!({"topic": "brand"}));
+        assert!(one.contains("logo-colours") && !one.contains("hosting") && !one.contains("Topics:"), "{one}");
+        assert!(list_notes(&c, &json!({"topic": "nothing"})).contains("No note of the project has that topic"));
+    }
+
+    #[test]
+    fn the_list_of_notes_by_topic_is_rewritten_when_a_note_is_saved_and_is_never_searched() {
+        let c = ctx("topic-list");
+        let dir = brain::dir(&c.project);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("every-note.md"), "---
+title: Every note by topic
+kind: note
+generated: topics
+---
+# Every note by topic
+
+## Old heading
+
+- [[landing-page-brief]]: the one-line summary that was written by hand
+").unwrap();
+        save_note(&c, &json!({"title": "Landing page brief", "body": "Approved the refund policy.", "topic": "Landing page"})).unwrap();
+        save_note(&c, &json!({"title": "Hosting", "body": "A small server."})).unwrap();
+        let list = note(&c, "every-note");
+        assert!(list.contains("## Landing page
+
+- [[landing-page-brief]]: the one-line summary that was written by hand"), "{list}");
+        assert!(list.contains("## No topic yet
+
+- [[hosting]]: Hosting"), "{list}");
+        assert!(!list.contains("Old heading") && list.contains("generated: topics") && list.contains("topic: Index"));
+        let asked = brain_search::search(&brain_search::load_notes(&c.project), "refund policy");
+        assert!(asked.hits.iter().all(|h| h.note_id != "every-note"), "the list does not answer");
+        // nothing changed, so nothing is written again
+        let before = std::fs::metadata(dir.join("every-note.md")).unwrap().modified().unwrap();
+        assert!(brain::regenerate_indexes(&c.project).is_empty());
+        assert_eq!(std::fs::metadata(dir.join("every-note.md")).unwrap().modified().unwrap(), before);
+    }
+
+    #[test]
+    fn search_brain_names_the_topic_and_the_notes_linked_with_the_first_note() {
+        let c = ctx("related");
+        save_note(&c, &json!({"title": "Refund policy", "body": "Refunds take thirty days after the order, see [[credit-table]].", "topic": "Money"})).unwrap();
+        save_note(&c, &json!({"title": "Credit table", "body": "One credit per page of a CV.", "topic": "Money"})).unwrap();
+        save_note(&c, &json!({"title": "Launch plan", "body": "The launch waits on the refund policy being approved.
+
+See [[refund-policy]].", "topic": "Plan"})).unwrap();
+        let notes = brain_search::load_notes(&c.project);
+        let ans = brain_search::search(&notes, "how many days do refunds take after the order");
+        let said = brain_search::describe(&ans);
+        assert!(said.contains("note id refund-policy, topic Money"), "{said}");
+        let near = brain_search::related(&notes, "refund-policy");
+        assert_eq!(near.len(), 2, "{near:?}");
+        assert!(near[0].starts_with("credit-table (Credit table; Money)"), "the notes it links to come first: {near:?}");
+        assert!(near[1].starts_with("launch-plan"), "{near:?}");
     }
 }

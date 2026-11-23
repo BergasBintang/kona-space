@@ -31,6 +31,10 @@ export type Note = {
   layer: Layer;
   title: string;
   kind: string; // session, decision, open, topic, starter, memory, note
+  /** what the note is about: the `topic:` line of its front matter, "" when it has none. The one place a note's group is written (decision 104). */
+  topic: string;
+  /** a note Kona writes itself from the topics (`generated:` in its front matter): the list of every note by topic. It is not searched and draws no links. */
+  generated: boolean;
   meta: Record<string, string>;
   /** the tickets it was written under, first one first (see ticketsOf) */
   tickets: string[];
@@ -43,6 +47,27 @@ export type Note = {
   links: Link[];
   secrets: string[]; // kinds of secret found in the text
 };
+
+/** A topic as it is kept: one line, single spaces, at most 40 letters. */
+export function cleanTopic(s: string | undefined): string {
+  return (s ?? "").replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 40).trim();
+}
+
+/** The text with one front matter line set (or, with an empty value, taken out). A note with no front matter gets one. Other lines and the body stay exactly as they were. */
+export function setFrontLine(text: string, key: string, value: string): string {
+  const eol = text.includes("\r\n") ? "\r\n" : "\n";
+  const t = text.replace(/\r\n/g, "\n");
+  const want = key.toLowerCase();
+  const line = value === "" ? null : `${key}: ${value}`;
+  if (!t.startsWith("---\n")) return line === null ? text : `---\n${line}\n---\n${t}`.replace(/\n/g, eol);
+  const lines = t.split("\n");
+  const close = lines.indexOf("---", 1);
+  if (close < 0) return text;
+  const at = lines.findIndex((l, i) => i > 0 && i < close && l.slice(0, Math.max(l.indexOf(":"), 0)).trim().toLowerCase() === want && l.includes(":"));
+  if (at >= 0) { if (line === null) lines.splice(at, 1); else lines[at] = line; }
+  else if (line !== null) lines.splice(close, 0, line);
+  return lines.join("\n").replace(/\n/g, eol);
+}
 
 export function frontMatter(text: string): { meta: Record<string, string>; bodyStart: number } {
   const t = text.replace(/\r/g, "");
@@ -117,7 +142,7 @@ export function parseNote(r: RawNote): Note {
   const title = meta.title || meta.name || (firstHeading ? firstHeading.replace(/^#\s+/, "").trim() : r.id === "memory-index" ? "Memory index" : r.id);
   const kind = meta.kind || (r.layer === "starter" ? "starter" : r.layer === "memory" ? "memory" : "note");
   return {
-    id: r.id, layer: r.layer, title, kind, meta, tickets: ticketsOf(meta), readonly: r.readonly, mtime: r.mtime, path: r.path, raw: r.text, words: words(r.text),
+    id: r.id, layer: r.layer, title, kind, topic: cleanTopic(meta.topic), generated: meta.generated !== undefined && r.layer === "project", meta, tickets: ticketsOf(meta), readonly: r.readonly, mtime: r.mtime, path: r.path, raw: r.text, words: words(r.text),
     sections: sectionsOf(r.id, r.text, bodyStart, title), links: linksOf(r.text, bodyStart), secrets: redact(r.text).found,
   };
 }

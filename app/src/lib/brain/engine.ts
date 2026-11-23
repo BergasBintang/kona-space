@@ -16,7 +16,11 @@ export const SEARCH = { window: 40, found: 0.8, partly: 0.4 };
 export type SearchOptions = { window?: number; found?: number; partly?: number };
 
 export type Edge = { s: string; t: string; k: "wiki" | "ref"; w: number; trust: "written" | "guessed" };
-export type Cluster = { id: string; members: string[]; label: string };
+/** `by` says how a group came to be: a topic the notes name, the project's notes that name none, a layer (Claude's memory, the starter notes), or only the links between them. */
+export type Cluster = { id: string; members: string[]; label: string; by: "topic" | "none" | "layer" | "links" };
+/** A note whose topic needs a look: it has none (`current` null), or its links point at another topic. `suggest` is only a suggestion. */
+export type TopicCheck = { noteId: string; title: string; current: string | null; suggest: string | null; why: string };
+export const NO_TOPIC = "No topic yet";
 
 export type Hit = { section: Section; note: Note; score: number; coverage: number; snippet: string; strength: "match" | "loose" | "weak" };
 export type SearchResult = {
@@ -34,6 +38,9 @@ export type Report = {
   hubs: { id: string; title: string; strength: number }[];
   clusters: { id: string; label: string; members: string[]; curated: string }[];
   disagreements: string[];
+  /** true when the notes name their topics: the groups are then the topics, and `topicChecks` lists the notes to look at */
+  topics: boolean;
+  topicChecks: TopicCheck[];
   counts: Record<string, number>;
 };
 
@@ -46,8 +53,13 @@ export class Brain {
   notes: Map<string, Note>;
   order: string[];
   edges: Edge[] = [];
+  /** the groups the screen shows: the topics the notes name, or (when no note names one) the notes that link to each other */
   clusters: Cluster[] = [];
   clusterOf = new Map<string, string>();
+  /** the notes grouped by their links alone, whatever the topics say: the check against the topics, and the groups of a project with no topics */
+  linkGroups: Cluster[] = [];
+  linkGroupOf = new Map<string, string>();
+  usesTopics = false;
   private lookup = new Map<string, string>();
   private tf: Map<string, Map<string, number>> = new Map(); // section id -> term -> weighted count
   private len: Map<string, number> = new Map();
@@ -81,8 +93,10 @@ export class Brain {
       this.lookup.set(norm(n.title), this.lookup.get(norm(n.title)) ?? n.id);
     }
     const map = new Map<string, Edge>();
+    // the list of every note by topic (written by Kona) links to all of them: its links would pull every group together and cover the map in lines, so it draws none
+    const list = new Set([...this.notes.values()].filter((n) => n.generated).map((n) => n.id));
     const add = (s: string, t: string, k: "wiki" | "ref") => {
-      if (s === t) return;
+      if (s === t || list.has(s) || list.has(t)) return;
       const key = `${s}\u0000${t}`;
       const old = map.get(key);
       if (!old || WEIGHT[k] > old.w) map.set(key, { s, t, k, w: WEIGHT[k], trust: "written" });
@@ -136,15 +150,75 @@ export class Brain {
     const groups = new Map<number, string[]>();
     ids.forEach((id, i) => { const g = groups.get(labels[i]) ?? []; g.push(id); groups.set(labels[i], g); });
     const sortedGroups = [...groups.values()].sort((a, b) => b.length - a.length || (a[0] < b[0] ? -1 : 1));
-    this.clusters = sortedGroups.map((members, k) => ({ id: `c${k + 1}`, members, label: "" }));
-    this.clusters.forEach((c) => c.members.forEach((m) => this.clusterOf.set(m, c.id)));
+    const byLinks: Cluster[] = sortedGroups.map((members, k) => ({ id: `c${k + 1}`, members, label: "", by: "links" as const }));
+    byLinks.forEach((c) => c.members.forEach((m) => this.linkGroupOf.set(m, c.id)));
     // a group is named after the most telling words of its notes' titles
-    for (const c of this.clusters) {
+    for (const c of byLinks) {
       const count = new Map<string, number>();
       for (const m of c.members) for (const t of new Set(terms(this.notes.get(m)!.title))) count.set(t, (count.get(t) ?? 0) + 1);
       const top = [...count].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, 2).map((x) => x[0]);
       c.label = c.members.length === 1 ? this.notes.get(c.members[0])!.title : top.length ? top.join(" ") : c.id;
     }
+    this.linkGroups = byLinks;
+    this.usesTopics = [...this.notes.values()].some((n) => n.layer === "project" && !n.generated && n.topic !== "");
+    if (!this.usesTopics) { this.clusters = byLinks; this.clusterOf = this.linkGroupOf; return; }
+    this.groupByTopic(ids);
+  }
+
+  /**
+   * The groups of a project whose notes name a topic: one group per topic, the notes that name none together in "No topic yet", and Claude's memory and the starter notes each in
+   * their own group (they are not the owner's to file). Nothing is guessed: the links only suggest a topic (see suggestTopic), they never place a note. So the Notes list, the Map,
+   * the list of notes the sessions read and the answers of the Ask page all say the same thing about where a note belongs.
+   */
+  private groupByTopic(ids: string[]) {
+    const by = new Map<string, { label: string; how: Cluster["by"]; members: string[] }>();
+    for (const id of ids) {
+      const n = this.notes.get(id)!;
+      const [label, how]: [string, Cluster["by"]] =
+        n.generated ? [n.topic || "Index", "topic"]
+        : n.layer === "project" ? (n.topic ? [n.topic, "topic"] : [NO_TOPIC, "none"])
+        : n.topic ? [n.topic, "topic"] : n.layer === "memory" ? ["Claude's memory", "layer"] : ["Kona starter notes", "layer"];
+      const key = `${how}\u0000${label.toLowerCase()}`;
+      const g = by.get(key) ?? { label, how, members: [] };
+      g.members.push(id);
+      by.set(key, g);
+    }
+    const sorted = [...by.values()].sort((a, b) => b.members.length - a.members.length || (a.label.toLowerCase() < b.label.toLowerCase() ? -1 : 1));
+    this.clusters = sorted.map((g, k) => ({ id: `c${k + 1}`, members: g.members, label: g.label, by: g.how }));
+    this.clusterOf = new Map();
+    this.clusters.forEach((c) => c.members.forEach((m) => this.clusterOf.set(m, c.id)));
+  }
+
+  /**
+   * The topic a note's links point to most, from the project notes they reach that name a topic: the topic, how many of those notes name it, how many there are, and the count for every
+   * topic. Used to suggest a topic for a note that has none, and to ask the owner to look at a note whose links all point somewhere else. A suggestion only: it never moves a note.
+   */
+  suggestTopic(id: string): { topic: string; n: number; of: number; tally: Map<string, number> } | null {
+    const near = new Set<string>();
+    for (const e of this.edges) { if (e.s === id) near.add(e.t); else if (e.t === id) near.add(e.s); }
+    const tally = new Map<string, number>(), label = new Map<string, string>();
+    let of = 0;
+    for (const o of near) {
+      const n = this.notes.get(o);
+      if (!n || n.layer !== "project" || n.generated || !n.topic) continue;
+      const k = n.topic.toLowerCase();
+      of++; tally.set(k, (tally.get(k) ?? 0) + 1); if (!label.has(k)) label.set(k, n.topic);
+    }
+    if (of === 0) return null;
+    const [k, n] = [...tally].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0];
+    return { topic: label.get(k)!, n, of, tally };
+  }
+
+  /** The topics the project's own notes use, with how many notes each has, the biggest first. */
+  topicList(): { topic: string; count: number }[] {
+    const c = new Map<string, { topic: string; count: number }>();
+    for (const n of this.notes.values()) {
+      if (n.layer !== "project" || n.generated || !n.topic) continue;
+      const k = n.topic.toLowerCase();
+      const e = c.get(k) ?? { topic: n.topic, count: 0 };
+      e.count++; c.set(k, e);
+    }
+    return [...c.values()].sort((a, b) => b.count - a.count || (a.topic.toLowerCase() < b.topic.toLowerCase() ? -1 : 1));
   }
 
   /** The owner's own grouping of a note: its role, else its kind, else its layer. */
@@ -157,7 +231,8 @@ export class Brain {
   // ---- the section index and search ----------------------------------------------------------------------
 
   private indexSections() {
-    this.sectionList = [...this.notes.values()].flatMap((n) => n.sections);
+    // the list of every note by topic is not searched: it names every note, so it would answer every question about a note with a list instead of the note
+    this.sectionList = [...this.notes.values()].filter((n) => !n.generated).flatMap((n) => n.sections);
     let total = 0;
     for (const s of this.sectionList) {
       const note = this.notes.get(s.noteId)!;
@@ -166,6 +241,8 @@ export class Brain {
       for (const t of terms(s.heading)) tf.set(t, (tf.get(t) ?? 0) + 3);
       // the note's title says what every section of it is about, so its words count once in each (three times in the first)
       for (const t of terms(note.title)) tf.set(t, (tf.get(t) ?? 0) + (s.id.endsWith("#1") ? 3 : 1));
+      // so does its topic, once in each: it ranks the notes of a topic ahead of other notes that use the same words. It is not in headTerms, so it never makes a section look like an answer
+      for (const t of terms(note.topic)) tf.set(t, (tf.get(t) ?? 0) + 1);
       const ordered = terms(s.text);
       for (const t of ordered) tf.set(t, (tf.get(t) ?? 0) + 1);
       this.seq.set(s.id, ordered);
@@ -218,6 +295,12 @@ export class Brain {
   search(question: string, limit = 5, opts: SearchOptions = {}): SearchResult {
     const { window = SEARCH.window, found = SEARCH.found, partly = SEARCH.partly } = opts;
     const looked = { notes: this.notes.size, sections: this.sectionList.length, layers: [...new Set([...this.notes.values()].map((n) => n.layer))] as Layer[] };
+    // a question that names a note by its id (or its whole title) is a request for that note: no word-matching is needed, and the note is the answer
+    const asked = this.named(question);
+    if (asked.length > 0) {
+      const hits: Hit[] = asked.flatMap((n) => n.sections.slice(0, 3).map((s) => ({ section: s, note: n, score: 1000, coverage: 1, snippet: snippetOf(s, terms(n.title)), strength: "match" as const })));
+      return { state: "found", hits: hits.slice(0, limit), looked, nearest: null };
+    }
     const q = [...new Set(terms(redact(question).text))];
     if (q.length === 0) return { state: "none", hits: [], looked, nearest: null };
     const totalW = q.reduce((s, t) => s + this.idf(t), 0);
@@ -248,6 +331,20 @@ export class Brain {
     return { state: "partly", hits: scored.slice(0, 3), looked, nearest: this.nearest(q) };
   }
 
+  /** The notes (at most three) that a question names: by the note's id (a hyphenated name of 8 letters or more, standing alone) or by its whole title (12 letters or more). */
+  private named(question: string): Note[] {
+    const asked = fold(question);
+    const out: Note[] = [];
+    for (const n of this.notes.values()) {
+      if (n.generated) continue;
+      const byId = n.id.includes("-") && n.id.length >= 8 && new RegExp(`(?<![a-z0-9-])${n.id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![a-z0-9-])`).test(asked);
+      const title = fold(n.title).trim();
+      if (byId || (title.length >= 12 && asked.includes(title))) out.push(n);
+      if (out.length === 3) break;
+    }
+    return out;
+  }
+
   /** The note whose title and headings share the most of the question's words (for "open the nearest topic"). */
   private nearest(q: string[]): Note | null {
     let best: Note | null = null, bestScore = 0;
@@ -272,7 +369,8 @@ export class Brain {
     const mine = (n: Note) => n.layer !== "starter"; // the starter notes ship with Kona and are checked by tests, not by the owner
     for (const n of this.notes.values()) {
       for (const l of n.links) if (!l.target && mine(n)) warn("broken-link", `“${n.title}” links to [[${l.raw}]], which does not exist`, n.id, l.line);
-      if (mine(n) && n.layer === "project" && this.incoming(n.id).length === 0 && this.outgoing(n.id).length === 0) warn("orphan", `“${n.title}” has no links in or out`, n.id);
+      if (n.generated) { /* the list of notes by topic is written by Kona and draws no links, so it is not a lost note */ }
+      else if (mine(n) && n.layer === "project" && this.incoming(n.id).length === 0 && this.outgoing(n.id).length === 0) warn("orphan", `“${n.title}” has no links in or out`, n.id);
       // a note that links out to many notes and that nothing links to is the way in (an index, a "where to start" page), not a lost note: nothing needs to point at the door
       else if (mine(n) && n.layer === "project" && this.incoming(n.id).length === 0 && this.outgoing(n.id).length < ENTRY_LINKS) warn("orphan", `Nothing links to “${n.title}”`, n.id);
       // a title that names a ticket other than the ones the note was written under (Kona stamped those itself) may be about the wrong ticket
@@ -295,7 +393,10 @@ export class Brain {
     const hubs = [...strength].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, 5).map(([id, s]) => ({ id, title: this.notes.get(id)!.title, strength: s }));
     // computed groups against the owner's groups
     const disagreements: string[] = [];
+    const topicChecks: TopicCheck[] = [];
     const clusters = this.clusters.map((c) => {
+      // the groups are the topics the notes name: they cannot disagree with how the notes are filed. The links only suggest (below)
+      if (this.usesTopics) return { id: c.id, label: c.label, members: c.members, curated: c.label };
       const tally = new Map<string, number>();
       for (const m of c.members) { const g = this.curatedOf(this.notes.get(m)!); tally.set(g, (tally.get(g) ?? 0) + 1); }
       const [dom, domN] = [...tally].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0] ?? ["", 0];
@@ -306,6 +407,20 @@ export class Brain {
       }
       return { id: c.id, label: c.label, members: c.members, curated: dom };
     });
+    if (this.usesTopics) {
+      for (const n of this.notes.values()) {
+        if (n.layer !== "project" || n.generated) continue;
+        const sug = this.suggestTopic(n.id);
+        if (!n.topic) {
+          const sure = sug && sug.of >= 2 && sug.n / sug.of >= 0.5;
+          topicChecks.push({ noteId: n.id, title: n.title, current: null, suggest: sure ? sug.topic : null, why: sure ? `${sug.n} of the ${sug.of} notes it links with are about ${sug.topic}` : "It has no topic, and its links do not point at one topic" });
+        } else if (sug && sug.of >= 4 && sug.topic.toLowerCase() !== n.topic.toLowerCase() && sug.n / sug.of >= 0.6 && (sug.tally.get(n.topic.toLowerCase()) ?? 0) / sug.of <= 0.2) {
+          topicChecks.push({ noteId: n.id, title: n.title, current: n.topic, suggest: sug.topic, why: `${sug.n} of the ${sug.of} notes it links with are about ${sug.topic}, and only ${sug.tally.get(n.topic.toLowerCase()) ?? 0} about ${n.topic}` });
+        }
+      }
+      topicChecks.sort((a, b) => (a.current === null ? 0 : 1) - (b.current === null ? 0 : 1) || (a.title.toLowerCase() < b.title.toLowerCase() ? -1 : 1));
+      for (const c of topicChecks) if (c.current !== null) disagreements.push(`“${c.title}” is filed under ${c.current}, but ${c.why}.`);
+    }
     // a link between two groups where both ends are well tied into their own group is a surprising one
     const surprising = this.edges.filter((e) => this.clusterOf.get(e.s) !== this.clusterOf.get(e.t) && this.inside(e.s) >= 2 && this.inside(e.t) >= 2).slice(0, 3);
     for (const e of surprising) warn("bridge", `A link joins two groups: “${this.notes.get(e.s)!.title}” to “${this.notes.get(e.t)!.title}”`, e.s, undefined, "info");
@@ -338,7 +453,7 @@ export class Brain {
     }
     const counts: Record<string, number> = {};
     for (const w of warnings) if (w.severity === "warn") counts[w.code] = (counts[w.code] ?? 0) + 1;
-    return { warnings, hubs, clusters, disagreements, counts };
+    return { warnings, hubs, clusters, disagreements, topics: this.usesTopics, topicChecks, counts };
   }
 
   private inside(id: string): number {
@@ -357,6 +472,13 @@ export class Brain {
     return 6 + Math.min(10, Math.sqrt(this.strength.get(id) ?? 0) * 1.6);
   }
   private strength?: Map<string, number>;
+
+  /** Does the note have any link in or out? The map puts a note with none in the row along the bottom, outside any group's circle. */
+  isLinked(id: string): boolean {
+    this.linkedSet ??= new Set(this.edges.flatMap((e) => [e.s, e.t]));
+    return this.linkedSet.has(id);
+  }
+  private linkedSet?: Set<string>;
 
   /** The note every session starts from. The map puts it in the middle, as a clue that everything is read from here (null when there is no such note, or it has no links). */
   centreNote(): string | null {

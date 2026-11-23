@@ -2,6 +2,19 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.47.0, 2026-11-24
+
+A note's group is written on the note, so the Notes list, the Map, the Ask page and the workers' tools can no longer disagree. And a question that takes one answer no longer looks like one that takes several.
+
+- **A note names its topic.** One line in its front matter, such as `topic: Landing page`. The Notes list and the Map group by that line, named in full words, then "No topic yet", then Claude's memory and the starter notes. Before, the groups were made from the links alone and named after the two commonest words of the titles ("Norbit logo", "Page land"), and a hand-written index said something else.
+- **Links only suggest.** The Report has a new card, Check the topic: a note with no topic, or a note whose links nearly all go to another topic. Each says why and offers File under (it writes only the topic line). Nothing moves by itself. A project whose notes name no topic keeps the old link groups.
+- **The list of every note by topic writes itself.** A note with `generated: topics` in its front matter is rewritten from the topics whenever the Brain is read or a note is saved, keeping the one-line summaries written beside the links. It cannot go out of date, it is not searched (it used to answer questions in place of the notes), and it draws no lines on the Map.
+- **Ask and the workers.** A question that names a note by its id or its whole title is answered with that note. A topic ranks the notes of that topic first but never makes a note look like an answer. `list_notes` starts with the topics and how many notes each has and can list one topic; `save_note` takes a topic and tells a worker which topics exist when it left one out; `search_brain` names the topic of each hit and the notes linked with the first one. A session note takes the topic its own links agree on.
+- **Editing a note** has a Topic picker (the topics of the project, or a new one).
+- **Choice marks on a question.** A question that takes one answer has round marks and says "Pick one"; one that takes several has square marks with a tick and says "Pick as many as you like".
+- **Measured on a real project** (80 notes, 17 questions): the right note first for 10 questions instead of 9, and in the first three for 14 instead of 12; nothing false was reported as found. Most of the gain is the list of notes no longer answering for the notes.
+- **Not in this version:** topics for Claude's memory notes (they are read only), and a button that asks a model to name or suggest the topics of a whole project.
+
 ## 0.46.0, 2026-11-23
 
 Two skills that make text sound like a person wrote it, in English and in Bahasa Indonesia.

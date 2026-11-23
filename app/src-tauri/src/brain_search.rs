@@ -98,6 +98,10 @@ pub struct Note {
     pub id: String,
     pub layer: String,
     pub title: String,
+    /// what the note is about (its `topic:` line), empty when it has none
+    pub topic: String,
+    /// the list of every note by topic, written by Kona: it is not searched
+    pub generated: bool,
     pub raw: String,
     pub sections: Vec<Section>,
     pub secret: bool,
@@ -161,7 +165,9 @@ fn parse(id: &str, layer: &str, text: &str) -> Note {
     let (meta, body_start) = front_matter(text);
     let first_heading = text.replace('\r', "").split('\n').skip(body_start).find(|l| l.starts_with("# ")).map(|l| l[2..].trim().to_string());
     let title = meta.get("title").or_else(|| meta.get("name")).cloned().or(first_heading).unwrap_or_else(|| id.to_string());
-    Note { id: id.to_string(), layer: layer.to_string(), sections: sections_of(id, text, body_start, &title), title, raw: text.to_string(), secret: contains_secret(text) }
+    let topic = brain::clean_topic(meta.get("topic").map(String::as_str).unwrap_or(""));
+    let generated = layer == "project" && meta.contains_key("generated");
+    Note { id: id.to_string(), layer: layer.to_string(), sections: sections_of(id, text, body_start, &title), title, topic, generated, raw: text.to_string(), secret: contains_secret(text) }
 }
 
 /// Every note of a project's brain: its own, Claude's memory for it, and the starter notes (a project note beats a starter note of the same name).
@@ -178,6 +184,7 @@ pub struct Hit {
     pub note_id: String,
     pub layer: String,
     pub title: String,
+    pub topic: String,
     pub heading: String,
     pub start: usize,
     pub end: usize,
@@ -193,11 +200,37 @@ pub struct Answer {
 /// How many words wide the window is in which a section's words must stand together to count as answering (the same number as `SEARCH.window` in the screen's engine.ts).
 const WINDOW: usize = 40;
 
+/// The notes (at most three) that a question names: by the note's id (a hyphenated name of 8 letters or more, standing alone) or by its whole title (12 letters or more). The same rule as
+/// `named` in the screen's engine.ts. A note that looks like it holds a secret, and the list of notes by topic, are never named.
+fn named<'a>(notes: &'a [Note], question: &str) -> Vec<&'a Note> {
+    let asked = fold(question);
+    let edge = |c: Option<char>| !c.is_some_and(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+    let mut out = vec![];
+    for n in notes {
+        if n.generated || n.secret { continue; }
+        let by_id = n.id.contains('-') && n.id.len() >= 8 && asked.match_indices(n.id.as_str()).any(|(i, m)| edge(asked[..i].chars().next_back()) && edge(asked[i + m.len()..].chars().next()));
+        let title = fold(&n.title);
+        let title = title.trim();
+        if by_id || (title.chars().count() >= 12 && asked.contains(title)) { out.push(n); }
+        if out.len() == 3 { break; }
+    }
+    out
+}
+
 pub fn search(notes: &[Note], question: &str) -> Answer {
+    let asked = named(notes, question);
+    if !asked.is_empty() {
+        let hits = asked.iter().flat_map(|n| n.sections.iter().take(3).map(move |s| {
+            let line = s.text.lines().map(str::trim).find(|l| !l.is_empty() && !l.starts_with('#')).unwrap_or("").replace(['*', '`'], "");
+            let snippet: String = if line.chars().count() > 220 { format!("{}…", line.chars().take(219).collect::<String>()) } else { line };
+            Hit { note_id: n.id.clone(), layer: n.layer.clone(), title: n.title.clone(), topic: n.topic.clone(), heading: s.heading.clone(), start: s.start, end: s.end, coverage: 1.0, snippet }
+        })).take(5).collect();
+        return Answer { state: "found", hits };
+    }
     let q: Vec<String> = { let mut seen = HashSet::new(); terms(question).into_iter().filter(|t| seen.insert(t.clone())).collect() };
     if q.is_empty() { return Answer { state: "none", hits: vec![] }; }
-    // the sections that may be shown: nothing from a note that looks like it holds a secret
-    let secs: Vec<(&Note, &Section)> = notes.iter().filter(|n| !n.secret).flat_map(|n| n.sections.iter().filter(|s| !contains_secret(&s.text)).map(move |s| (n, s))).collect();
+    // the sections that may be shown: nothing from a note that looks like it holds a secret, and nothing from the list of notes by topic (it names every note, so it would answer for them)
+    let secs: Vec<(&Note, &Section)> = notes.iter().filter(|n| !n.secret && !n.generated).flat_map(|n| n.sections.iter().filter(|s| !contains_secret(&s.text)).map(move |s| (n, s))).collect();
     let n_sections = secs.len() as f64;
     let mut tfs: Vec<HashMap<String, f64>> = vec![];
     let mut seqs: Vec<Vec<String>> = vec![]; // each section's words in reading order
@@ -209,6 +242,8 @@ pub fn search(notes: &[Note], question: &str) -> Answer {
         let mut tf: HashMap<String, f64> = HashMap::new();
         for t in terms(&s.heading) { *tf.entry(t).or_default() += 3.0; }
         for t in terms(&note.title) { *tf.entry(t).or_default() += if s.first { 3.0 } else { 1.0 }; }
+        // the note's topic counts once in each section: it ranks the notes of a topic ahead of other notes that use the same words, and is not in `heads`, so it never makes a section look like an answer
+        for t in terms(&note.topic) { *tf.entry(t).or_default() += 1.0; }
         let ordered = terms(&s.text);
         for t in &ordered { *tf.entry(t.clone()).or_default() += 1.0; }
         seqs.push(ordered);
@@ -258,7 +293,7 @@ pub fn search(notes: &[Note], question: &str) -> Answer {
         let line = s.text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')).find(|l| terms(l).iter().any(|t| want.contains(t))).or_else(|| s.text.lines().map(str::trim).find(|l| !l.is_empty() && !l.starts_with('#'))).unwrap_or("");
         let clean: String = line.replace(['*', '`'], "");
         let snippet: String = if clean.chars().count() > 220 { format!("{}…", clean.chars().take(219).collect::<String>()) } else { clean };
-        Hit { note_id: note.id.clone(), layer: note.layer.clone(), title: note.title.clone(), heading: s.heading.clone(), start: s.start, end: s.end, coverage: cov, snippet }
+        Hit { note_id: note.id.clone(), layer: note.layer.clone(), title: note.title.clone(), topic: note.topic.clone(), heading: s.heading.clone(), start: s.start, end: s.end, coverage: cov, snippet }
     };
     if top.0 >= 0.8 {
         let floor = (top.0 - 0.25).max(0.5);
@@ -276,10 +311,51 @@ pub fn describe(a: &Answer) -> String {
         _ => return "Not in the brain. No note covers this. Do not treat the brain as having an answer; say so to the owner or look elsewhere.".to_string(),
     };
     for (i, h) in a.hits.iter().enumerate() {
-        s.push_str(&format!("{}. [{}] {} > {} (note id {}, lines {}-{}, covers {}% of the question)\n   {}\n", i + 1, h.layer, h.title, h.heading, h.note_id, h.start, h.end, (h.coverage * 100.0).round(), h.snippet));
+        let topic = if h.topic.is_empty() { String::new() } else { format!(", topic {}", h.topic) };
+        s.push_str(&format!("{}. [{}] {} > {} (note id {}{}, lines {}-{}, covers {}% of the question)\n   {}\n", i + 1, h.layer, h.title, h.heading, h.note_id, topic, h.start, h.end, (h.coverage * 100.0).round(), h.snippet));
     }
     s.push_str("Read the lines with read_note.");
     s
+}
+
+/// How a `[[link]]` is compared with a note's name or title: no accents, no case, dashes for spaces (the same as `normLink` in the screen's engine.ts).
+fn norm_link(s: &str) -> String {
+    let f = fold(s);
+    f.trim().trim_end_matches(".md").split(|c: char| c.is_whitespace() || c == '_').filter(|x| !x.is_empty()).collect::<Vec<_>>().join("-")
+}
+
+/// The names a note links to with `[[name]]`, `[[name#Heading]]` or `[[name|words]]`.
+fn link_names(raw: &str) -> Vec<String> {
+    let (mut out, mut rest) = (vec![], raw);
+    while let Some(i) = rest.find("[[") {
+        let after = &rest[i + 2..];
+        let Some(j) = after.find("]]") else { break };
+        let inner = &after[..j];
+        if !inner.contains('\n') {
+            let name = inner.split(['|', '#']).next().unwrap_or("").trim();
+            if !name.is_empty() { out.push(name.to_string()); }
+        }
+        rest = &after[j + 2..];
+    }
+    out
+}
+
+/// The notes a note links to and the notes that link to it, as `id (title; topic)`, at most four, the ones it links to first. A session follows these instead of searching again.
+pub fn related(notes: &[Note], id: &str) -> Vec<String> {
+    let mut by_name: HashMap<String, &str> = HashMap::new();
+    for n in notes.iter().filter(|n| !n.generated) {
+        by_name.entry(norm_link(&n.id)).or_insert(n.id.as_str());
+        by_name.entry(norm_link(&n.title)).or_insert(n.id.as_str());
+    }
+    let resolve = |raw: &str| by_name.get(&norm_link(raw)).copied();
+    let Some(me) = notes.iter().find(|n| n.id == id) else { return vec![] };
+    let mut ids: Vec<&str> = vec![];
+    for name in link_names(&me.raw) { if let Some(t) = resolve(&name) { if t != id && !ids.contains(&t) { ids.push(t); } } }
+    for n in notes.iter().filter(|n| !n.generated && !n.secret && n.id != id) {
+        if !ids.contains(&n.id.as_str()) && link_names(&n.raw).iter().any(|l| resolve(l) == Some(id)) { ids.push(n.id.as_str()); }
+    }
+    ids.into_iter().filter_map(|i| notes.iter().find(|n| n.id == i)).filter(|n| !n.secret).take(4)
+        .map(|n| if n.topic.is_empty() { format!("{} ({})", n.id, n.title) } else { format!("{} ({}; {})", n.id, n.title, n.topic) }).collect()
 }
 
 /// The tool server's reply to `read_note`: some lines of one note.
@@ -396,5 +472,60 @@ mod tests {
 Refunds take thirty days. Backups sit in Frankfurt.
 ")];
         assert_eq!(search(&short, "refunds thirty days backups Frankfurt").state, "found");
+    }
+
+    #[test]
+    fn a_question_that_names_a_note_by_its_id_or_title_is_answered_with_that_note() {
+        let notes = vec![
+            parse("board-start-flow-tickets", "project", "# Board start flow
+
+The order of the tickets.
+"),
+            parse("board-start-flow-tickets-live", "project", "# Another one
+
+Something else entirely.
+"),
+            parse("short", "project", "# Short
+
+Short note about a short thing.
+"),
+            parse("x-y-z-things", "project", "---
+title: How the deploy script is run on Fridays
+---
+# How the deploy script is run on Fridays
+
+We push, then run the script and check the page every Friday afternoon without fail.
+"),
+        ];
+        let a = search(&notes, "which index group is board-start-flow-tickets live?");
+        assert_eq!(a.state, "found");
+        assert!(a.hits.iter().all(|h| h.note_id == "board-start-flow-tickets"), "the id stands alone: the longer id is another note");
+        assert_eq!(search(&notes, "tell me about board-start-flow-tickets-live").hits[0].note_id, "board-start-flow-tickets-live");
+        assert!(search(&notes, "what does short say").hits.iter().all(|h| h.coverage < 1.0 || h.note_id != "x-y-z-things"));
+        assert_eq!(search(&notes, "where is How the deploy script is run on Fridays kept").hits[0].note_id, "x-y-z-things");
+    }
+
+    #[test]
+    fn the_list_of_notes_by_topic_is_not_searched_and_a_topic_never_makes_an_answer() {
+        let list = parse("every-note", "project", "---
+title: Every note by topic
+generated: topics
+---
+# Every note by topic
+
+- [[refund-policy]]: thirty days to ask for the refund after the order
+");
+        let note = parse("refund-policy", "project", "---
+title: Refund policy
+topic: Money back
+---
+# Refund policy
+
+Thirty days to ask after the order.
+");
+        assert!(list.generated && !note.generated && note.topic == "Money back");
+        let notes = vec![list, note];
+        assert!(search(&notes, "thirty days refund after the order").hits.iter().all(|h| h.note_id == "refund-policy"));
+        assert_ne!(search(&notes, "money back").state, "found", "only the topic says money back");
     }
 }

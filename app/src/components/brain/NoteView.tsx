@@ -5,8 +5,9 @@ import { useEffect, useRef, useState } from "react";
 import { deleteNote, noteCheck, saveNote } from "../../lib/api";
 import { linkedWith, noteCheckPrompt, readNoteCheck } from "../../lib/brain/notecheck.ts";
 import type { Brain } from "../../lib/brain/engine.ts";
-import { frontMatter, type Note } from "../../lib/brain/parse.ts";
+import { frontMatter, setFrontLine, type Note } from "../../lib/brain/parse.ts";
 import { Button, Glyph } from "../ui";
+import { Select } from "../pick";
 import { Confirm } from "../Confirm";
 import { Markdown } from "./Markdown";
 import { FindBar, Gutter, Outline, OutlineRail, useOutlineOpen, useReader } from "./Reader";
@@ -29,6 +30,31 @@ function ownerMark(text: string): string {
   return lines.join("\n");
 }
 
+const NO_TOPIC_PICK = "\u0000none", NEW_TOPIC_PICK = "\u0000new";
+
+/** The topic of the note being written: picked from the topics the project already uses, or a new one. It sets the `topic:` line of the note's front matter in the text below it. */
+function TopicField({ text, setText, brain, newTopic, setNewTopic }: { text: string; setText: (t: string) => void; brain: Brain; newTopic: boolean; setNewTopic: (b: boolean) => void }) {
+  const now = frontMatter(text).meta.topic ?? "";
+  const used = brain.topicList();
+  const options = [
+    { value: NO_TOPIC_PICK, label: "No topic yet" },
+    ...used.map((t) => ({ value: t.topic, label: t.topic, hint: `${t.count} ${t.count === 1 ? "note" : "notes"}` })),
+    ...(now && !used.some((t) => t.topic.toLowerCase() === now.toLowerCase()) && !newTopic ? [{ value: now, label: now }] : []),
+    { value: NEW_TOPIC_PICK, label: "A new topic…" },
+  ];
+  const picked = newTopic ? NEW_TOPIC_PICK : now === "" ? NO_TOPIC_PICK : used.find((t) => t.topic.toLowerCase() === now.toLowerCase())?.topic ?? now;
+  return (
+    <div className="flex flex-wrap items-end gap-3">
+      <Select label="Topic" className="w-80 max-w-full" value={picked} options={options} search={false}
+        onChange={(v) => { if (v === NEW_TOPIC_PICK) { setNewTopic(true); return; } setNewTopic(false); setText(setFrontLine(text, "topic", v === NO_TOPIC_PICK ? "" : v)); }} />
+      {newTopic && (
+        <input value={now} onChange={(e) => setText(setFrontLine(text, "topic", e.target.value.replace(/[\r\n]+/g, " ").slice(0, 40)))} placeholder="Name the topic, for example Landing page" aria-label="New topic name" autoFocus
+          className="h-11 min-w-0 flex-1 border border-line-strong bg-inset px-3.5 text-[14px] text-text placeholder:text-text-tertiary" />
+      )}
+    </div>
+  );
+}
+
 export function NoteView({ projectId, accountId, brain, note, draftTitle, onOpen, onClose, onChanged, onDirty }: {
   projectId: string; accountId: string | null; brain: Brain; note: Note | null; draftTitle?: string; onOpen: (id: string) => void; onClose: () => void; onChanged: (id: string | null) => void;
   /** tells the page whether there is text typed here that is not saved, so it can ask before another note replaces this one */
@@ -45,6 +71,7 @@ export function NoteView({ projectId, accountId, brain, note, draftTitle, onOpen
   useEffect(() => { onDirty?.(dirty); }, [dirty, onDirty]);
   useEffect(() => () => onDirty?.(false), [onDirty]);
   const [confirm, setConfirm] = useState(false);
+  const [newTopic, setNewTopic] = useState(false); // the Topic picker is on "A new topic…" and the words are typed beside it
   const [rendered, setRendered] = useState(true); // a page, or the text as written
   const [check, setCheck] = useState<null | { stage: "ask" | "running" | "done"; answer?: string; error?: string }>(null); // the on-request comparison with the linked notes
   const reader = useReader({ text: note ? note.raw : null, md: true, rendered, finds: !!note && !editing, anchor: null, resetKey: note?.id ?? null });
@@ -104,6 +131,8 @@ export function NoteView({ projectId, accountId, brain, note, draftTitle, onOpen
             <div className="flex flex-wrap items-center gap-2">
               <Chip>{LAYER_WORD[note.layer]}</Chip>
               {note.kind !== "starter" && note.kind !== "memory" && <Chip>{note.kind}</Chip>}
+              {note.layer === "project" && !note.generated && (note.topic || brain.usesTopics) && <Chip>{note.topic ? `Topic: ${note.topic}` : "No topic yet"}</Chip>}
+              {note.generated && <Chip>Written by Kona from the topics</Chip>}
               {note.meta.source === "agent" && note.meta.edited_by !== "owner" && <Chip>Saved by a session</Chip>}
               {note.meta.edited_by === "owner" && <Chip>Edited by you</Chip>}
               {note.tickets.map((t) => <Chip key={t}>{t}</Chip>)}
@@ -117,7 +146,7 @@ export function NoteView({ projectId, accountId, brain, note, draftTitle, onOpen
             <Button variant="ghost" small onClick={reader.toggleFind} aria-pressed={reader.finding} title="Find on this page (Ctrl+F)">Find</Button>
             {others.length > 0 && <Button variant="ghost" small onClick={() => setCheck({ stage: "ask" })} title="Ask whether this note disagrees with the notes it is linked with">Check for conflicts</Button>}
             <Button variant="ghost" small onClick={() => setRendered((r) => !r)} aria-pressed={rendered}>{rendered ? "Show the text" : "Show it as a page"}</Button>
-            {!note.readonly && <><Button variant="quiet" small onClick={() => setEditing(true)}>Edit</Button><Button variant="ghost" small onClick={() => setConfirm(true)}>Delete…</Button></>}
+            {!note.readonly && <>{!note.generated && <Button variant="quiet" small onClick={() => setEditing(true)}>Edit</Button>}<Button variant="ghost" small onClick={() => setConfirm(true)}>Delete…</Button></>}
           </div>
         )}
       </div>
@@ -131,6 +160,7 @@ export function NoteView({ projectId, accountId, brain, note, draftTitle, onOpen
               <input value={name} onChange={(e) => setName(slug(e.target.value))} aria-label="Note name" className="h-11 border border-line-strong bg-inset px-3.5 font-mono text-[14px] text-text" />
             </label>
           )}
+          <TopicField text={text} setText={setText} brain={brain} newTopic={newTopic} setNewTopic={setNewTopic} />
           <label className="flex flex-col gap-2">
             <span className="text-[13px] leading-5 font-bold text-text-secondary">The note (markdown). Link to another note with [[its name]].</span>
             <textarea value={text} onChange={(e) => setText(e.target.value)} rows={18} aria-label="The note" spellCheck={false} className="border border-line-strong bg-inset p-3.5 font-mono text-[13px] leading-5 text-text" />

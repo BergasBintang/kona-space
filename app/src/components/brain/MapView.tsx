@@ -43,8 +43,9 @@ export function MapView({ brain, onOpen }: { brain: Brain; onOpen: (id: string) 
   const linked = useMemo(() => new Set(sel ? brain.edges.filter((e) => e.s === sel || e.t === sel).flatMap((e) => [e.s, e.t]) : []), [brain, sel]);
   const summary = note ? (note.sections[0]?.text.split("\n").map((l) => l.trim()).find((l) => l && !/^#/.test(l)) ?? "").replace(/[*`]/g, "").slice(0, 200) : "";
 
-  const regions = useMemo(() => brain.clusters.filter((c) => c.members.length >= 2).map((c) => {
-    const pts = c.members.map((m) => pos.get(m)!).filter(Boolean);
+  // a topic can hold notes that link to nothing: they sit in the row along the bottom, so the circle is drawn round the notes that are in the group (the ones with a link), and the number is of all of them
+  const regions = useMemo(() => brain.clusters.filter((c) => c.members.filter((m) => brain.isLinked(m)).length >= 2).map((c) => {
+    const pts = c.members.filter((m) => brain.isLinked(m)).map((m) => pos.get(m)!).filter(Boolean);
     const { cx, cy, r } = groupCircle(pts); // the layout keeps these circles apart, so both use the same rule
     return { id: c.id, label: c.label, cx, cy, r, n: c.members.length };
   }), [brain, pos]);
@@ -181,7 +182,7 @@ export function MapView({ brain, onOpen }: { brain: Brain; onOpen: (id: string) 
         {note && (
           <>
             <h3 className="m-0 text-[17px] leading-6 font-bold">{note.title}</h3>
-            <div className="flex flex-wrap gap-2"><Chip>{LAYER_WORD[note.layer]}</Chip><Chip>Group: {brain.clusters.find((c) => c.id === brain.clusterOf.get(note.id))?.label}</Chip>{note.tickets.map((t) => <Chip key={t}>{t}</Chip>)}</div>
+            <div className="flex flex-wrap gap-2"><Chip>{LAYER_WORD[note.layer]}</Chip><Chip>{brain.usesTopics ? "Topic" : "Group"}: {brain.clusters.find((c) => c.id === brain.clusterOf.get(note.id))?.label}</Chip>{note.tickets.map((t) => <Chip key={t}>{t}</Chip>)}</div>
             {summary && <p className="m-0 text-[14px] leading-5 text-text-secondary">{summary}</p>}
             <div className="flex flex-col gap-1 text-[13px] leading-5 text-text-secondary">
               <span className="font-bold text-text">Links to ({brain.outgoing(note.id).length})</span>

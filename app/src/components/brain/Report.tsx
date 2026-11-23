@@ -5,8 +5,10 @@ import type { Wanted } from "../../lib/api";
 import { Button, Glyph } from "../ui";
 import { Help } from "../Help";
 
-export function Report({ brain, wanted, onOpen, onWrite, onDrop }: {
+export function Report({ brain, wanted, onOpen, onWrite, onDrop, onFile }: {
   brain: Brain; wanted: Wanted[]; onOpen: (id: string) => void; onWrite: (question: string) => void; onDrop: (question: string) => void;
+  /** file a note under a topic (writes its `topic:` line) */
+  onFile: (noteId: string, topic: string) => void;
 }) {
   const rep = brain.report(Date.now(), wanted.length);
   const warns = rep.warnings.filter((w) => w.severity === "warn");
@@ -32,6 +34,21 @@ export function Report({ brain, wanted, onOpen, onWrite, onDrop }: {
         ))}
       </Card>
 
+      {rep.topics && (
+        <Card title="Check the topic" count={rep.topicChecks.length} help={<><p className="m-0">A note with no topic, or a note whose links nearly all go to another topic. The suggestion is only a suggestion: nothing changes until you press File under.</p></>}>
+          {rep.topicChecks.length === 0 && <div className="flex items-center gap-2.5 text-[14px] leading-5 text-text-secondary"><Glyph state="done" size={16} /> Every note has a topic and its links agree with it.</div>}
+          {rep.topicChecks.map((c) => (
+            <div key={c.noteId} className="flex items-start justify-between gap-4 text-[14px] leading-5">
+              <span className="flex min-w-0 flex-col"><span className="truncate font-bold">{c.title}</span><span className="text-[13px] leading-5 text-text-tertiary">{c.current ? `Filed under ${c.current}. ` : ""}{c.why}.</span></span>
+              <span className="flex shrink-0 gap-2">
+                {c.suggest && <Button variant="quiet" tiny onClick={() => onFile(c.noteId, c.suggest!)}>File under {c.suggest}</Button>}
+                <Button variant="ghost" tiny onClick={() => onOpen(c.noteId)}>Open</Button>
+              </span>
+            </div>
+          ))}
+        </Card>
+      )}
+
       <Card title="Needs a look" count={warns.length}>
         {warns.length === 0 && <div className="flex items-center gap-2.5 text-[14px] leading-5 text-text-secondary"><Glyph state="done" size={16} /> Nothing needs a look.</div>}
         {warns.map((w, i) => (
@@ -52,15 +69,28 @@ export function Report({ brain, wanted, onOpen, onWrite, onDrop }: {
         {rep.hubs.length === 0 && <p className="m-0 text-[14px] leading-5 text-text-tertiary">No links yet.</p>}
       </Card>
 
-      <Card title="How your notes group" count={rep.clusters.length} help={<><p className="m-0">Notes that link to each other end up in a group, with no model involved.</p><p className="m-0">“Filed as” is how you or the notes themselves call them (role, kind or layer).</p></>}>
-        {rep.clusters.map((c) => (
-          <div key={c.id} className="flex items-baseline justify-between gap-4 text-[14px] leading-5">
-            <span className="truncate font-bold">{c.label}</span>
-            <span className="shrink-0 text-[13px] text-text-tertiary">{c.members.length} {c.members.length === 1 ? "note" : "notes"} · mostly filed as {c.curated}</span>
-          </div>
-        ))}
-        {rep.disagreements.map((d, i) => <p key={i} className="m-0 text-[13px] leading-5 text-state-waiting">{d}</p>)}
-      </Card>
+      {rep.topics ? (
+        <>
+          <Card title="Topics" count={rep.clusters.length} help={<><p className="m-0">Every note names its topic in its own front matter (the line <code>topic:</code>). The Notes list, the Map, the Ask page and the sessions' tools all use that one line, so they cannot disagree.</p><p className="m-0">The links never move a note. They only suggest a topic, below.</p></>}>
+            {[...brain.clusters].sort((a, b) => (a.by === "none" ? 1 : a.by === "layer" ? 2 : 0) - (b.by === "none" ? 1 : b.by === "layer" ? 2 : 0) || b.members.length - a.members.length).map((c) => (
+              <div key={c.id} className="flex items-baseline justify-between gap-4 text-[14px] leading-5">
+                <span className="truncate font-bold">{c.label}</span>
+                <span className="shrink-0 text-[13px] text-text-tertiary">{c.members.length} {c.members.length === 1 ? "note" : "notes"}</span>
+              </div>
+            ))}
+          </Card>
+        </>
+      ) : (
+        <Card title="How your notes group" count={rep.clusters.length} help={<><p className="m-0">Notes that link to each other end up in a group, with no model involved.</p><p className="m-0">“Filed as” is how you or the notes themselves call them (role, kind or layer).</p><p className="m-0">Give each note a <code>topic:</code> line in its front matter and the groups become those topics.</p></>}>
+          {rep.clusters.map((c) => (
+            <div key={c.id} className="flex items-baseline justify-between gap-4 text-[14px] leading-5">
+              <span className="truncate font-bold">{c.label}</span>
+              <span className="shrink-0 text-[13px] text-text-tertiary">{c.members.length} {c.members.length === 1 ? "note" : "notes"} · mostly filed as {c.curated}</span>
+            </div>
+          ))}
+          {rep.disagreements.map((d, i) => <p key={i} className="m-0 text-[13px] leading-5 text-state-waiting">{d}</p>)}
+        </Card>
+      )}
     </div>
   );
 }

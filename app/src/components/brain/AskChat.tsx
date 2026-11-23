@@ -135,7 +135,7 @@ function Turn({ t, onOpen, onRetry, onSave, onGoDeeper, onWeb, onWrite }: { t: C
               <div className="flex flex-col gap-1.5">
                 <span className="text-[13px] leading-5 text-text-tertiary">{sources.length ? "The notes this rests on" : "Haiku did not say which notes it used. It read these"}</span>
                 <ul className="m-0 flex list-none flex-wrap gap-x-3 gap-y-1 p-0">
-                  {(sources.length ? sources : t.sent).map((h) => <li key={h.section.id}><Button variant="ghost" tiny onClick={() => onOpen(h.note.id)}>{h.note.title} › {h.section.heading}</Button></li>)}
+                  {(sources.length ? sources : t.sent).map((h) => <li key={h.section.id}><Button variant="ghost" tiny onClick={() => onOpen(h.note.id)}>{h.note.title} › {h.section.heading}{h.note.topic ? ` · ${h.note.topic}` : ""}</Button></li>)}
                 </ul>
               </div>
             )}

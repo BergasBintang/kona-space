@@ -6,7 +6,7 @@ source: starter
 # How the brain works
 
 ## A graph of linked notes
-The brain is made of notes. A note can link to another with `[[its name]]`. Links make a map, and notes that link to each other end up in the same group.
+The brain is made of notes. A note can link to another with `[[its name]]`. Links make the map. A note's group is its topic: one line in its front matter, such as `topic: Landing page`. The Notes list, the Map, the Report, the Ask page and `list_notes` all read that line, so they agree. A note with no topic waits under No topic yet, and the Report suggests one from its links.
 
 ## Three layers
 - **Project:** your own notes in the project's `.kona/brain` folder. You can edit them.

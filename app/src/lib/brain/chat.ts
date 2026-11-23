@@ -26,7 +26,7 @@ function clip(s: string, max: number): string {
 export function chatPrompt(question: string, past: Past[], hits: Hit[]): { prompt: string; sent: Hit[] } {
   const sent = hits.slice(0, MAX_SECTIONS);
   const out: string[] = [];
-  sent.forEach((h, i) => out.push(`SECTION ${i + 1}: ${redact(h.note.title).text} > ${redact(h.section.heading).text}\n${redact(clip(h.section.text, MAX_SECTION)).text}`));
+  sent.forEach((h, i) => out.push(`SECTION ${i + 1}: ${redact(h.note.title).text} > ${redact(h.section.heading).text}${h.note.topic ? `\nTOPIC OF THIS NOTE: ${redact(h.note.topic).text}` : ""}\n${redact(clip(h.section.text, MAX_SECTION)).text}`));
   const before = past.filter((p) => p.answer.trim()).slice(-MAX_TURNS);
   if (before.length) out.push("EARLIER MESSAGES\n" + before.map((p) => `Question: ${redact(clip(p.question, MAX_PAST)).text}\nAnswer: ${redact(clip(p.answer, MAX_PAST)).text}`).join("\n\n"));
   out.push(`QUESTION\n${redact(clip(question, 600)).text}`);

@@ -84,6 +84,9 @@ try {
   ok("a question card appears", await c.waitFor(`!!document.querySelector('${card}')`, 90000, 500));
   const info = () => c.ev(`(() => { const g = document.querySelector('${card}'); if (!g) return null; return { step: g.querySelector('[data-step]')?.textContent ?? null, fieldsets: g.querySelectorAll('fieldset').length, tabs: [...g.querySelectorAll('[role=tab]')].map((t) => t.getAttribute('aria-label')), question: g.querySelector('legend')?.innerText.replace(/\\s+/g, ' ') ?? '', pressed: [...g.querySelectorAll('fieldset button[aria-pressed=true]')].map((b) => b.textContent.trim().split(/\\s+/)[0]), other: g.querySelector('fieldset input')?.value ?? null, send: [...g.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Send answer')?.disabled ?? null }; })()`);
   let i = await info();
+  const markInfo = () => c.ev(`(() => { const g = document.querySelector('${card} fieldset'); if (!g) return null; return { kind: g.dataset.choice, hint: g.querySelector('[data-pick-hint]')?.textContent ?? null, round: g.querySelectorAll('[data-mark=round]').length, square: g.querySelectorAll('[data-mark=square]').length, on: g.querySelectorAll('[data-mark][data-on]').length, options: g.querySelectorAll('button[aria-pressed]').length }; })()`);
+  let m = await markInfo();
+  ok("a question that takes ONE answer has round marks and says Pick one (decision 105)", m && m.kind === "one" && m.hint === "Pick one" && m.round === m.options && m.square === 0 && m.on === 0, JSON.stringify(m));
   ok("one question is shown at a time, with 'Question 1 of 3' and a step for each", i && i.fieldsets === 1 && /Question 1 of 3/.test(i.step ?? "") && i.tabs.length === 3, JSON.stringify(i));
   const clickOption = (n) => c.ev(`(() => { const bs = [...document.querySelectorAll('${card} fieldset button[aria-pressed]')]; if (!bs[${n}]) return false; bs[${n}].click(); return true; })()`);
   await clickOption(0); await wait(400);
@@ -108,6 +111,8 @@ try {
   await c.ev(`document.querySelectorAll('${card} [role=tab]')[1].click(); true`); await wait(300);
   await clickOption(0); await wait(400);
   i = await info();
+  m = await markInfo();
+  ok("a question that takes SEVERAL answers has square marks and says Pick as many as you like", m && m.kind === "many" && m.hint === "Pick as many as you like" && m.square === m.options && m.round === 0, JSON.stringify(m));
   ok("on the last question Send answer waits until every question is answered", /Question 3 of 3/.test(i.step ?? "") && i.send === true, JSON.stringify({ step: i.step, send: i.send }));
   await clickOption(0); await clickOption(1); await wait(200);
   await c.ev(`document.querySelector('${card} fieldset input').focus(); true`);
@@ -116,6 +121,7 @@ try {
   ok("with several answers allowed, typing in Other keeps the clicked options", i.pressed.length === 2 && i.other === "and pineapple", JSON.stringify({ pressed: i.pressed, other: i.other }));
   ok("Send answer is on now", i.send === false);
   ok("Send answer sends, and the card says You answered", await press("Send answer") && await c.waitFor(`/You answered/.test(document.querySelector('${sheet}')?.innerText ?? '')`, 10000, 300));
+  ok("in the answered card each choice keeps its shape, filled for what was picked, and the pick hint is gone", await c.ev(`(() => { const gs = [...document.querySelectorAll('${card} fieldset')]; return gs.length === 3 && gs[0].dataset.choice === 'one' && gs[2].dataset.choice === 'many' && gs.every((g) => !g.querySelector('[data-pick-hint]')) && gs[0].querySelectorAll('[data-mark=round]').length === 2 && gs[2].querySelectorAll('[data-mark=square][data-on]').length >= 1; })()`));
   ok("after the answer every question is listed with its answer", await c.ev(`document.querySelectorAll('${card} fieldset').length === 3`));
   await invoke("stop_session", { sessionId: sid }); await wait(1500);
 } catch (e) { console.log("FAIL the test stopped: " + String(e.stack ?? e).slice(0, 500)); failed++; }

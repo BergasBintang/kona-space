@@ -52,7 +52,15 @@ export async function writeSessionNote(j: NoteJob): Promise<{ id: string; title:
   const title = t || j.sessionTitle || "Session";
   let id = `session-${today()}-${j.sessionId.slice(0, 8)}`;
   while (brain.notes.has(id)) id += "-2";
-  const front = ["---", `title: ${title}`, "kind: session", `date: ${today()}`, `session: ${j.sessionId}`, j.roleId ? `role: ${j.roleId}` : "", j.ticketId ? `ticket: ${j.ticketId}` : "", "source: summary", "model: haiku", "---"].filter((l) => l !== "").join("\n");
+  // a project whose notes name their topics gets the topic that the new note's own links agree on; otherwise the note waits under No topic yet and the Report suggests one
+  let topic = "";
+  if (brain.usesTopics) {
+    const others: RawNote[] = [...brain.notes.values()].filter((n) => n.layer !== "starter").map((n) => ({ id: n.id, layer: n.layer, text: n.raw, readonly: n.readonly }));
+    const probe = new Brain([...others, ...starterNotes, { id, layer: "project", text: `---\ntitle: ${title}\n---\n# ${title}\n\n${body}\n`, readonly: false }]);
+    const s = probe.suggestTopic(id);
+    if (s && s.of >= 2 && s.n / s.of >= 0.5) topic = s.topic;
+  }
+  const front = ["---", `title: ${title}`, "kind: session", `date: ${today()}`, topic ? `topic: ${topic}` : "", `session: ${j.sessionId}`, j.roleId ? `role: ${j.roleId}` : "", j.ticketId ? `ticket: ${j.ticketId}` : "", "source: summary", "model: haiku", "---"].filter((l) => l !== "").join("\n");
   await saveNote(j.projectId, id, `${front}\n# ${title}\n\n${body}\n`);
   return { id, title };
 }

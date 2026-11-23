@@ -2,11 +2,11 @@
 // Layers: the project's own notes (editable), the starter notes that ship with Kona, and Claude's memory for the project (read only).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { loadBrain, wantedList, wantedRemove, type BrainData, type Project, type Wanted } from "../../lib/api";
+import { loadBrain, saveNote, wantedList, wantedRemove, type BrainData, type Project, type Wanted } from "../../lib/api";
 import { Brain as Engine } from "../../lib/brain/engine.ts";
 import { starterNotes } from "../../lib/brain/starter.ts";
 import { autoNoteOn, setAutoNote } from "../../lib/brain/summary.ts";
-import type { Layer, RawNote } from "../../lib/brain/parse.ts";
+import { setFrontLine, type Layer, type RawNote } from "../../lib/brain/parse.ts";
 import { Button, Glyph } from "../ui";
 import { Confirm } from "../Confirm";
 import { AskChat, type ChatTurn } from "./AskChat";
@@ -64,13 +64,22 @@ export function BrainPlace({ project, tab, onTab, onAsk }: { project: Project; t
     load(); setOpen(id); goTab("notes"); setNotice(id ? "Saved." : "Deleted.");
   };
 
+  /** the Report's "File under": writes the topic line of a note, nothing else, then reads the notes again */
+  const fileUnder = (id: string, topic: string) => {
+    const n = brain.notes.get(id);
+    if (!n || n.readonly) return;
+    void saveNote(project.id, id, setFrontLine(n.raw, "topic", topic)).then(() => { load(); setNotice(`Filed “${n.title}” under ${topic}.`); }).catch((e) => setError(String(e)));
+  };
+
   const countsLine = `${project.name}: ${counts.project} of your notes, ${counts.starter} starter notes${data?.memory_dir ? `, ${counts.memory} from Claude's memory` : ""}.`;
-  // the Notes list: the same groups as the Map (notes that link to each other, named after the words of their titles), the groups A to Z and the notes in each A to Z;
-  // the notes that link to no other note are together in the last group
+  // the Notes list: the same groups as the Map. When the notes name their topics (decision 104) the groups are those topics A to Z, then the notes with no topic, then Claude's memory and the
+  // starter notes; otherwise the notes that link to each other, named after the words of their titles, and the notes that link to no other note together in the last group.
+  // The notes in each group are A to Z.
   const byTitle = (a: { title: string; id: string }, b: { title: string; id: string }) => a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true }) || a.id.localeCompare(b.id);
   const sorted = [...brain.notes.values()].sort(byTitle);
-  const named = brain.clusters.filter((c) => c.members.length >= 2).map((c) => ({ key: c.label, label: c.label.charAt(0).toUpperCase() + c.label.slice(1), ids: new Set(c.members) }))
-    .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+  const rank = (by: string) => (by === "none" ? 1 : by === "layer" ? 2 : 0);
+  const named = brain.clusters.filter((c) => brain.usesTopics || c.members.length >= 2).map((c) => ({ key: `${c.by}:${c.label}`, rank: rank(c.by), label: c.label.charAt(0).toUpperCase() + c.label.slice(1), ids: new Set(c.members) }))
+    .sort((a, b) => a.rank - b.rank || a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
   const inGroup = new Set(named.flatMap((g) => [...g.ids]));
   const groups = [...named.map((g) => ({ key: g.key, label: g.label, notes: sorted.filter((n) => g.ids.has(n.id)) })), { key: "\u0000other", label: "Other notes", notes: sorted.filter((n) => !inGroup.has(n.id)) }].filter((g) => g.notes.length > 0);
   const fold = (key: string) => setFolded((s) => { const n = new Set(s); if (n.has(key)) n.delete(key); else n.add(key); return n; });
@@ -137,7 +146,7 @@ export function BrainPlace({ project, tab, onTab, onAsk }: { project: Project; t
     );
     fill = true;
   } else if (tab === "journey") body = <JourneyView projectId={project.id} accountId={project.account ?? null} brain={brain} onOpen={openNote} />;
-  else body = <Report brain={brain} wanted={wanted} onOpen={openNote} onWrite={writeNote} onDrop={(question) => { void wantedRemove(project.id, question).then(setWanted); }} />;
+  else body = <Report brain={brain} wanted={wanted} onOpen={openNote} onWrite={writeNote} onDrop={(question) => { void wantedRemove(project.id, question).then(setWanted); }} onFile={fileUnder} />;
 
   return (
     <main className="flex min-w-0 flex-1 flex-col">

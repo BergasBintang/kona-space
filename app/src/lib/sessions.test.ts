@@ -106,3 +106,12 @@ test("an error nobody asked for is still shown as a problem, and a stop that arr
   assert.equal(late.sessions.s1.stopping, null);
   assert.ok(!late.sessions.s1.items.some((x) => x.kind === "note" && /Stopped/.test(x.text)));
 });
+
+// what Claude Code really sent on 2026-11-23 (stream-json, strict MCP config): the init record names each tool it started, with how it went
+test("the tools Claude Code started are kept on the session; Kona's board is left out; an init without them changes nothing", () => {
+  const init = { type: "system", subtype: "init", mcp_servers: [{ name: "kona-board", status: "connected" }, { name: "shadcn", status: "connected", source: "dynamic" }, { name: "broken", status: "failed" }, { status: "connected" }] };
+  const s = reducer(started(), { type: "event", sessionId: "s1", record: init }).sessions.s1;
+  assert.deepEqual(s.mcp, [{ name: "shadcn", status: "connected" }, { name: "broken", status: "failed" }]);
+  const same = reducer(started(), { type: "event", sessionId: "s1", record: { type: "system", subtype: "init" } }).sessions.s1;
+  assert.equal(same.mcp, undefined, "unknown stays unknown");
+});

@@ -5,6 +5,7 @@ mod backup;
 mod brain;
 mod brain_search;
 mod bucket;
+mod connectors;
 mod files;
 mod job;
 mod journey_scan;
@@ -127,7 +128,11 @@ async fn start_session(app: AppHandle, sessions: State<'_, Sessions>, roles: Sta
     };
     // what this role may load in this project: only the skills and connectors chosen for it here (decisions 50 and 51)
     let kit = match &role {
-        Some(r) => skills::kit_for(r, account.as_ref().and_then(|a| a.config_dir.as_deref()), std::path::Path::new(&folder))?,
+        Some(r) => {
+            let mut kit = skills::kit_for(r, std::path::Path::new(&folder))?;
+            kit.mcp = connectors::session_servers(&kona_base(&app)?, account.as_ref().and_then(|a| a.config_dir.as_deref()), std::path::Path::new(&folder), &r.id);
+            kit
+        }
         None => skills::Kit::default(),
     };
     let id = session::start(app, &sessions, folder.clone(), role, account, persona, project_name, ticket, work_dir, brain_digest, ssh_hosts, kit, model, mode, resume).await?;
@@ -839,17 +844,37 @@ fn workflow_start(projects: State<'_, Projects>, folder: String, workflow: workf
 #[tauri::command]
 fn save_role_kit(roles: State<'_, Roles>, projects: State<'_, Projects>, folder: String, role_id: String, kit: skills::RoleKit) -> Result<skills::RoleKit, String> {
     if roles.get(&role_id).is_none() { return Err("That role does not exist".into()); }
-    skills::save_kit(&project_folder(&projects, &folder)?, &role_id, kit)
+    skills::save_kit_keeping_mcp(&project_folder(&projects, &folder)?, &role_id, kit)
 }
 
-/// The tool connectors (MCP servers) a role could be given for a project.
+/// Every tool connector (MCP server) Kona knows, as this project sees it: on or off here, and who may use it (decision 102). Looking also adds what the project and the account have to Kona's list.
 #[tauri::command]
-fn mcp_catalog(accounts: State<'_, Accounts>, projects: State<'_, Projects>, account_id: Option<String>, folder: String) -> Result<Vec<skills::McpInfo>, String> {
-    if !projects.allows(std::path::Path::new(&folder)) {
-        return Err("That folder is not inside a project".into());
-    }
+fn mcp_catalog(app: AppHandle, accounts: State<'_, Accounts>, projects: State<'_, Projects>, account_id: Option<String>, folder: String) -> Result<Vec<connectors::McpRow>, String> {
+    let path = project_folder(&projects, &folder)?;
     let dir = account_id.and_then(|id| accounts.get(&id)).and_then(|a| a.config_dir);
-    Ok(skills::mcp_catalog(dir.as_deref(), std::path::Path::new(&folder)))
+    let name = projects.all().into_iter().find(|p| projects::norm(std::path::Path::new(&p.folder)) == projects::norm(&path)).map(|p| p.name)
+        .unwrap_or_else(|| path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default());
+    Ok(connectors::catalog(&kona_base(&app)?, dir.as_deref(), &path, &name))
+}
+
+/// Switch a connector on or off for this project (off keeps who was ticked).
+#[tauri::command]
+fn mcp_set_on(projects: State<'_, Projects>, folder: String, name: String, on: bool) -> Result<(), String> {
+    connectors::set_on(&project_folder(&projects, &folder)?, &name, on)
+}
+
+/// Who may use a connector in this project: exactly these people. Gives back every person's choice as it is now.
+#[tauri::command]
+fn mcp_set_roles(roles: State<'_, Roles>, projects: State<'_, Projects>, folder: String, name: String, role_ids: Vec<String>) -> Result<std::collections::HashMap<String, skills::RoleKit>, String> {
+    if role_ids.iter().any(|id| roles.get(id).is_none()) { return Err("That role does not exist".into()); }
+    connectors::set_roles(&project_folder(&projects, &folder)?, &name, &role_ids)
+}
+
+/// Take a connector out of Kona's list (refused while this project or the account still has it).
+#[tauri::command]
+fn mcp_remove(app: AppHandle, accounts: State<'_, Accounts>, projects: State<'_, Projects>, account_id: Option<String>, folder: String, name: String) -> Result<(), String> {
+    let dir = account_id.and_then(|id| accounts.get(&id)).and_then(|a| a.config_dir);
+    connectors::remove(&kona_base(&app)?, dir.as_deref(), &project_folder(&projects, &folder)?, &name)
 }
 
 #[tauri::command]
@@ -1089,7 +1114,7 @@ pub fn run() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![cost_hours, read_skill_files, save_skill_folder, default_role_kit, apply_default_tree, check_claude, save_tool, delete_tool, read_skill, write_skill, delete_skill, start_session, send_message, answer_permission, interrupt_session, stop_session, list_projects, add_project, remove_project, set_project_group, set_project_sessions, rename_project, cost_rows, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, office_say, mockup_ticket_draft, note_check, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, workflow_list, workflow_save, workflow_delete, run_list, run_save, run_delete, office_map_load, office_map_save, office_map_reset, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, git_marks, read_file, mock_base, mock_cards, mock_files, project_claim, project_release, projects_taken, live_base, live_status, live_start, live_stop, live_data, live_delete_data, live_accounts, journey_markers, journey_check, brain_chat, mock_page_text, terminal::term_open, terminal::term_write, terminal::term_resize, terminal::term_close, terminal::term_close_all, terminal::term_buttons_load, terminal::term_buttons_save])
+        .invoke_handler(tauri::generate_handler![cost_hours, read_skill_files, save_skill_folder, default_role_kit, apply_default_tree, check_claude, save_tool, delete_tool, read_skill, write_skill, delete_skill, start_session, send_message, answer_permission, interrupt_session, stop_session, list_projects, add_project, remove_project, set_project_group, set_project_sessions, rename_project, cost_rows, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, office_say, mockup_ticket_draft, note_check, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, mcp_set_on, mcp_set_roles, mcp_remove, workflow_list, workflow_save, workflow_delete, run_list, run_save, run_delete, office_map_load, office_map_save, office_map_reset, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, git_marks, read_file, mock_base, mock_cards, mock_files, project_claim, project_release, projects_taken, live_base, live_status, live_start, live_stop, live_data, live_delete_data, live_accounts, journey_markers, journey_check, brain_chat, mock_page_text, terminal::term_open, terminal::term_write, terminal::term_resize, terminal::term_close, terminal::term_close_all, terminal::term_buttons_load, terminal::term_buttons_save])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         // a Live mockup's program never outlives Kona

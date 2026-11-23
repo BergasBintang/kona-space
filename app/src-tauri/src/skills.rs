@@ -1,4 +1,4 @@
-// What a session of a role may load: only the skills and tool connectors (MCP servers) the owner chose for that role IN THAT PROJECT
+// What a session of a role may load: only the skills and tool connectors (MCP servers, see connectors.rs) the owner chose for that role IN THAT PROJECT
 // (decisions 50 and 51). Why: every skill adds its name and description to the start of every session, and every connector adds its tools.
 // Measured on this PC (Claude Code 2.1.293, `claude -p` on Haiku): all installed skills and account connectors cost 41,232 tokens at the start;
 // the same session with only the project's settings, no connectors and one role skill cost 33,282. The way it is done:
@@ -201,14 +201,6 @@ pub fn apply_default_tree(folder: &Path, role_id: &str) -> Result<RoleKit, Strin
     save_kit(folder, role_id, kit)
 }
 
-#[derive(Serialize, Clone)]
-pub struct McpInfo {
-    pub name: String,
-    /// where it was found, in words
-    pub source: String,
-    pub kind: String,
-}
-
 /// What one role may use in one project.
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub struct RoleKit {
@@ -269,7 +261,7 @@ fn kits_file(folder: &Path) -> PathBuf {
     folder.join(".kona").join("role-kits.json")
 }
 
-fn home() -> Option<PathBuf> {
+pub(crate) fn home() -> Option<PathBuf> {
     std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME")).map(PathBuf::from)
 }
 
@@ -576,6 +568,12 @@ pub fn save_kit(folder: &Path, role_id: &str, kit: RoleKit) -> Result<RoleKit, S
     Ok(kit)
 }
 
+/// What the Skills page saves for a person. Which MCP tools they may use is the Access page's choice (decision 102), so it is kept as the file has it: a screen that still holds an older copy must not wipe it.
+pub fn save_kit_keeping_mcp(folder: &Path, role_id: &str, mut kit: RoleKit) -> Result<RoleKit, String> {
+    kit.mcp = load_kits(folder).get(role_id).map(|k| k.mcp.clone()).unwrap_or_default();
+    save_kit(folder, role_id, kit)
+}
+
 fn fnv(h: &mut u64, bytes: &[u8]) {
     for b in bytes { *h ^= *b as u64; *h = h.wrapping_mul(0x100000001b3); }
 }
@@ -639,45 +637,17 @@ fn prune(root: &Path, role_id: &str, keep: &str) {
     }
 }
 
-fn norm_path(s: &str) -> String {
+pub(crate) fn norm_path(s: &str) -> String {
     s.replace('\\', "/").trim_end_matches('/').to_lowercase()
 }
 
-/// Every connector definition Claude Code would know for this account and project: (name, where from, definition).
-fn mcp_defs(config_dir: Option<&str>, folder: &Path) -> Vec<(String, String, Value)> {
-    let mut out: Vec<(String, String, Value)> = Vec::new();
-    let mut take = |servers: Option<&Value>, source: &str| {
-        if let Some(Value::Object(m)) = servers {
-            for (k, v) in m {
-                if k != "kona-board" && clean_name(k) && v.is_object() && !out.iter().any(|(n, _, _)| n == k) { out.push((k.clone(), source.to_string(), v.clone())); }
-            }
-        }
-    };
-    let user_file = match config_dir { Some(d) => Some(PathBuf::from(d).join(".claude.json")), None => home().map(|h| h.join(".claude.json")) };
-    if let Some(j) = user_file.and_then(|f| fs::read_to_string(f).ok()).and_then(|t| serde_json::from_str::<Value>(&t).ok()) {
-        if let Some(Value::Object(projects)) = j.get("projects") {
-            let want = norm_path(&folder.to_string_lossy());
-            for (k, v) in projects { if norm_path(k) == want { take(v.get("mcpServers"), "this project, in your Claude settings"); } }
-        }
-        take(j.get("mcpServers"), "your Claude settings");
-    }
-    if let Some(j) = fs::read_to_string(folder.join(".mcp.json")).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok()) { take(j.get("mcpServers"), "the project's .mcp.json"); }
-    out
-}
-
-pub fn mcp_catalog(config_dir: Option<&str>, folder: &Path) -> Vec<McpInfo> {
-    mcp_defs(config_dir, folder).into_iter().map(|(name, source, d)| McpInfo { name, source, kind: if d.get("command").is_some() { "program".into() } else { "web address".into() } }).collect()
-}
-
-/// What a session of this role starts with in this project: its skills folder and the definitions of its connectors.
-pub fn kit_for(role: &Role, config_dir: Option<&str>, folder: &Path) -> Result<Kit, String> {
+/// What a session of this role starts with in this project: its skills folder, its notes and its tree. Its connectors are worked out by `connectors::session_servers`.
+pub fn kit_for(role: &Role, folder: &Path) -> Result<Kit, String> {
     refresh_builtins(folder);
     let mine = load_kits(folder).remove(&role.id).unwrap_or_default();
     let plugin_dir = build_plugin(folder, role, &mine.skills)?;
-    let defs = mcp_defs(config_dir, folder);
-    let mcp = mine.mcp.iter().filter_map(|n| defs.iter().find(|(d, _, _)| d == n).map(|(d, _, v)| (d.clone(), v.clone()))).collect();
     let notes = mine.skills.iter().filter_map(|s| mine.notes.get(s).map(|n| (s.clone(), n.clone()))).collect();
-    Ok(Kit { plugin_dir, mcp, notes, branches: mine.branches })
+    Ok(Kit { plugin_dir, mcp: Vec::new(), notes, branches: mine.branches })
 }
 
 #[cfg(test)]
@@ -817,7 +787,7 @@ mod tests {
         assert!(project_skills_dir(&p).join("find-root-cause").join("references").join("ways-to-look.md").is_file());
         assert!(catalog(&p).iter().find(|s| s.name == "find-root-cause").unwrap().files >= 2);
         let role = crate::roles::starting_roles().into_iter().find(|r| r.id == "devops").unwrap();
-        let session = kit_for(&role, None, &p).unwrap();
+        let session = kit_for(&role, &p).unwrap();
         assert!(session.plugin_dir.unwrap().join("skills").join("incident-response").join("templates").join("update-and-review.md").is_file());
         assert!(crate::session::skill_notes(&Kit { notes: session.notes, branches: session.branches, ..Default::default() }).unwrap().contains("Branch \"Something is down\""));
 
@@ -848,7 +818,7 @@ mod tests {
         assert_eq!(got[0].text.as_deref(), Some("# List"));
         save_kit(&p, "qa", RoleKit { skills: vec!["my-check".into()], ..Default::default() }).unwrap();
         let role = crate::roles::starting_roles().into_iter().find(|r| r.id == "qa").unwrap();
-        assert!(kit_for(&role, None, &p).unwrap().plugin_dir.unwrap().join("skills/my-check/templates/form.md").is_file());
+        assert!(kit_for(&role, &p).unwrap().plugin_dir.unwrap().join("skills/my-check/templates/form.md").is_file());
         // changed: one rewritten, one removed with its now empty folder, one renamed
         save_skill_folder(&p, "my-check", text, false, &[w("templates/form.md", "# New"), w("examples/good.md", "# Good")], &["references/list.md".to_string()]).unwrap();
         assert_eq!(fs::read_to_string(dir.join("templates/form.md")).unwrap(), "# New");
@@ -962,9 +932,25 @@ mod tests {
         long.insert("brainstorming".to_string(), "x".repeat(301));
         assert!(save_kit(&a, "product", RoleKit { skills: vec!["brainstorming".into()], mcp: vec![], notes: long, ..Default::default() }).is_err(), "a note of more than 300 letters is refused");
         let role = crate::roles::starting_roles().into_iter().find(|r| r.id == "product").unwrap();
-        let kit = kit_for(&role, None, &a).unwrap();
+        let kit = kit_for(&role, &a).unwrap();
         assert_eq!(kit.notes, vec![("brainstorming".to_string(), "Use it when the idea is vague.".to_string())]);
         let _ = base;
+    }
+
+    #[test]
+    fn the_skills_page_cannot_wipe_the_mcp_ticks() {
+        let p = temp("keep-mcp");
+        save_kit(&p, "qa", RoleKit { mcp: vec!["shadcn".into()], ..Default::default() }).unwrap();
+        // the Skills page saves its own (older) copy of the person: no tools in it, and a skill added
+        let saved = save_kit_keeping_mcp(&p, "qa", RoleKit { skills: vec!["bug-report".into()], mcp: vec![], ..Default::default() }).unwrap();
+        assert_eq!(saved.mcp, vec!["shadcn"]);
+        assert_eq!(load_kits(&p)["qa"].skills, vec!["bug-report"]);
+        // and it cannot add a tool either
+        let again = save_kit_keeping_mcp(&p, "qa", RoleKit { skills: vec!["bug-report".into()], mcp: vec!["other".into()], ..Default::default() }).unwrap();
+        assert_eq!(again.mcp, vec!["shadcn"]);
+        // a person with no entry yet starts with none
+        assert!(save_kit_keeping_mcp(&p, "ops", RoleKit { skills: vec!["x".into()], mcp: vec!["y".into()], ..Default::default() }).unwrap().mcp.is_empty());
+        let _ = fs::remove_dir_all(&p);
     }
 
     #[test]
@@ -1037,7 +1023,7 @@ mod tests {
         skill(&project_skills_dir(&project), "e2e-skill", "A harmless skill for a check. Use only when the user says pineapple.");
         let role = crate::roles::starting_roles().remove(2);
         save_kit(&project, &role.id, RoleKit { skills: vec!["e2e-skill".into()], mcp: vec![], ..Default::default() }).unwrap();
-        let kit = kit_for(&role, None, &project).unwrap();
+        let kit = kit_for(&role, &project).unwrap();
         println!("PLUGIN {}", kit.plugin_dir.unwrap().display());
     }
 }

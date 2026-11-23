@@ -2,6 +2,17 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.45.0, 2026-11-23
+
+MCP tools have their own place: one list for Kona, chosen per project and per person.
+
+- **MCP tools moved to the Access page.** A tool (an MCP server, for example shadcn's component search) is not a skill, so it is no longer under Skills. The Access page has a third section, MCP tools, after Servers and GitHub repos.
+- **One list for all of Kona.** When one project (or your Claude settings) has a tool, every project lists it. In another project it is off until you switch it on with Used here, and then you tick the people who may use it. Switching it off keeps your ticks. A project you set up before this keeps working with no click.
+- **It says whether it worked.** Each card tells, for every open conversation, whether the tool is connected, could not start, was still starting, or is not in that conversation yet because it began earlier. Before, a project with a `.mcp.json` and nothing ticked loaded no tool and said nothing.
+- **Remove** takes a tool out of Kona's list (nothing is uninstalled). It is refused while the project or your Claude settings still have the tool, because it would come straight back.
+- **A card never shows a tool's settings.** Only the program's name or the web address's host: arguments and settings can hold a token.
+- **Not in this version:** an Add button (a person adds a tool with `claude mcp add` or a `.mcp.json` file), the `/mcp` command in a chat, and tools for a chat that has no person.
+
 ## 0.44.0, 2026-11-22
 
 Stop and wait while a person works, one question at a time, a skill for UI details, and a chat-box fix.

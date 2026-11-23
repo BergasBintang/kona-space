@@ -57,6 +57,8 @@ export type Session = {
   turns: number;
   context?: number; // the memory: tokens Claude read for its last step (unknown until the first reply of this run)
   lastAt?: number; // when the conversation last moved (a message, a reply), in milliseconds; the cache goes cold an hour after it
+  /** the MCP tools Claude Code started for this conversation and how each went (its `init` record, sent with the first message); Kona's own board is left out. Unknown until then. */
+  mcp?: { name: string; status: string }[];
 };
 
 /** A message waiting for the person to finish: its text and its pictures (what the screen shows and what is sent). */
@@ -198,7 +200,8 @@ function onEvent(state: State, sessionId: string, r: any): State {
         const context = u && !r.isSidechain ? (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) : 0;
         return { ...next, draft: blocks.some((b) => b.type === "text") ? "" : next.draft, context: context > 0 ? context : next.context, lastAt: Date.now() };
       }
-      case "system": { // Claude Code says when it has made the memory smaller (what the owner asked for, or what it did by itself)
+      case "system": { // Claude Code says what it started (init, with the first message) and when it has made the memory smaller (what the owner asked for, or what it did by itself)
+        if (r.subtype === "init") return Array.isArray(r.mcp_servers) ? { ...s, mcp: r.mcp_servers.filter((m: any) => typeof m?.name === "string" && m.name !== "kona-board").map((m: any) => ({ name: m.name, status: String(m.status ?? "") })) } : s;
         if (r.subtype !== "compact_boundary") return s;
         const before = r.compact_metadata?.pre_tokens;
         return { ...push(s, { kind: "note", id: nextId("n"), tone: "info", text: typeof before === "number" ? `Memory made smaller: it was ${kilo(before)} tokens.` : "Memory made smaller." }), context: undefined };

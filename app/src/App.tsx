@@ -288,6 +288,8 @@ export default function App() {
   const names = useMemo(() => Object.fromEntries(roles.map((r) => [r.id, roleLabel(r)])), [roles]);
   // the conversation shown with a person: their latest session in this project that the owner did not put away
   const sessionOf = (roleId: string | null): Session | null => (roleId && project ? state.order.map((id) => state.sessions[id]).filter((s) => s.roleId === roleId && samePlace(s.folder, project.folder) && !dismissed[s.id]).pop() ?? null : null);
+  /** the open and ended conversations of this project, oldest first (the MCP section of the Access page reads what each started) */
+  const projectSessions = (): Session[] => (project ? state.order.map((id) => state.sessions[id]).filter((s) => samePlace(s.folder, project.folder)) : []);
   const shown = sessionOf(person);
   const current = shown; // (the account of the conversation that is open, for the plan bars)
   useEffect(() => { if (person && tab === "chat" && shown && seen[shown.id] !== shown.turns) setSeen((s) => ({ ...s, [shown.id]: shown.turns })); }, [person, tab, shown?.id, shown?.turns]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -509,7 +511,7 @@ export default function App() {
       case "settings": return <ProjectSettings project={project} accounts={accounts} groups={groupNames(projects)} runningHere={state.order.filter((id) => state.sessions[id].run !== "ended" && samePlace(state.sessions[id].folder, project.folder)).length}
         onProject={(next) => setProjects((cur) => (cur ?? []).map((p) => (p.id === next.id ? next : p)))}
         onRemoved={(id) => { setProjects((cur) => (cur ?? []).filter((p) => p.id !== id)); setProjectId(null); remember("kona.project", ""); setPlace("office"); setPerson(null); setWelcomeView("home"); setGreeted(false); }} />;
-      case "servers": return <ServersPage project={project} roles={roles} tab={serversTab} onOpenFile={(path) => { setFileTarget({ path, n: Date.now() }); openPlace("files"); }} />;
+      case "servers": return <ServersPage project={project} roles={roles} tab={serversTab} accountId={accountOf(project)} sessions={projectSessions()} onKits={setKits} onOpenFile={(path) => { setFileTarget({ path, n: Date.now() }); openPlace("files"); }} />;
       case "brain": return <BrainPlace project={project} tab={brainTab} onTab={setBrainTab} onAsk={askClaude} />;
       case "leftovers": return <Leftovers state={state} roles={roles} overview={loHere} folder={project?.folder}onRefresh={() => { void leftoverOverview().then(setLo); }} />;
       case "worktrees": return <Worktrees project={project} onChanged={() => {}} />;

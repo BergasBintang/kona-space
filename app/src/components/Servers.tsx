@@ -86,7 +86,7 @@ function KeyPath({ value, onChange, aria, what }: { value: string; onChange: (v:
   );
 }
 
-export function Servers({ project, roles }: { project: Project; roles: Role[] }) {
+export function Servers({ project, roles, extra }: { project: Project; roles: Role[]; /** more sections under the repos (the MCP tools) */ extra?: React.ReactNode }) {
   const [list, setList] = useState<Server[] | null>(null);
   const [draft, setDraft] = useState<Server | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -253,6 +253,7 @@ export function Servers({ project, roles }: { project: Project; roles: Role[] })
         {list === null && <p className="m-0 text-text-tertiary">Reading the list…</p>}
         {list && group("Servers", servers, "", "Add a server", "No servers yet. Until you add one, no role can run ssh, scp or sftp in this project.")}
         {list && group("GitHub repos", repos, "github", "Add a GitHub repo", "No GitHub repos yet.")}
+        {extra}
       </div>
 
       {/* the form is a dialog over the list, so adding or editing never needs a scroll. It closes only with Cancel or Esc (a stray click must not throw away what was typed) */}

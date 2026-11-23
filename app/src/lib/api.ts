@@ -14,7 +14,8 @@ export type RoleProfile = { persona: string; brief: string; model: string; mode:
 /** What one person may use in one project: their skills, their connectors, and for each skill a note on when to use it. */
 export type RoleKit = { skills: string[]; mcp: string[]; notes: Record<string, string>; /** tools (ids of the fixed list) this project asks of this person, and tools hidden for this project */ tools_add?: string[]; tools_skip?: string[]; /** the tree the person chooses by: the job, then a branch for each kind of work, then skills */ branches?: Branch[] };
 export type SkillInfo = { name: string; description: string; source: "project" | "computer" | "builtin"; tokens: number; /** the people (role ids) a built-in skill is written for */ roles?: string[]; /** how many files its folder holds: SKILL.md and what comes with it */ files?: number };
-export type McpInfo = { name: string; source: string; kind: string };
+/** One MCP tool as a project sees it (decision 102): where it is from, whether this project uses it, and the people ticked for it (kept while it is off). `detail` is the program's name or the web address's host, never arguments. */
+export type McpRow = { name: string; kind: string; detail: string; source: string; here: boolean; on: boolean; roles: string[] };
 export type ToolInfo = { id: string; name: string; install: string; builtin: boolean; program: string; flag: string };
 export type ToolStatus = { id: string; name: string; installed: boolean; version?: string | null; install: string };
 export type Hint = { id: string; because: string };
@@ -160,7 +161,11 @@ export const importSkill = (accountId: string | null, folder: string, name: stri
 export const skillFolder = (folder: string) => invoke<string>("skill_folder", { folder });
 export const roleKits = (folder: string) => invoke<Record<string, RoleKit>>("role_kits", { folder });
 export const saveRoleKit = (folder: string, roleId: string, kit: RoleKit) => invoke<RoleKit>("save_role_kit", { folder, roleId, kit });
-export const mcpCatalog = (accountId: string | null, folder: string) => invoke<McpInfo[]>("mcp_catalog", { accountId, folder });
+export const mcpCatalog = (accountId: string | null, folder: string) => invoke<McpRow[]>("mcp_catalog", { accountId, folder });
+export const mcpSetOn = (folder: string, name: string, on: boolean) => invoke<void>("mcp_set_on", { folder, name, on });
+/** exactly these people may use the tool in this project; gives back every person's choice as it is now */
+export const mcpSetRoles = (folder: string, name: string, roleIds: string[]) => invoke<Record<string, RoleKit>>("mcp_set_roles", { folder, name, roleIds });
+export const mcpRemove = (accountId: string | null, folder: string, name: string) => invoke<void>("mcp_remove", { accountId, folder, name });
 export const listAccounts = () => invoke<Account[]>("list_accounts");
 export const addAccount = async (label: string) => { try { return await invoke<Account>("add_account", { label }); } finally { statusCache.clear(); } };
 export const renameAccount = (id: string, label: string) => invoke<Account>("rename_account", { id, label });

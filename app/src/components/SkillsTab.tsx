@@ -1,10 +1,10 @@
 // The Skills tab of a person's sheet (decisions 50, 63 and 66). Two columns, said in words:
-//   on the left what this person has in this project: their skills (each with a note on when to use it), and their connectors;
+//   on the left what this person has in this project: their skills (each with a note on when to use it);
 //   on the right where to get more: the project's other skills, the skills that come with Kona, the skills on this computer, and a button to write a new one.
-// Every click is kept at once (nothing to save): giving a skill, taking it away, a note, a connector. A skill is a folder in the project (.kona\skills); taking a skill away from a person
+// Every click is kept at once (nothing to save): giving a skill, taking it away, a note. (The MCP tools moved to the Access page, decision 102.) A skill is a folder in the project (.kona\skills); taking a skill away from a person
 // leaves it in the project, and deleting it removes the folder. A new project starts with the skills that come with Kona and each person's starting tree (decision 67); an older project can take the tree with one button.
 import { useEffect, useMemo, useState } from "react";
-import { applyDefaultTree, computerSkills, defaultRoleKit, deleteSkill, importSkill, listRoles, mcpCatalog, roleKits, saveRoleKit, skillCatalog, type McpInfo, type Project, type Role, type RoleKit, type SkillInfo } from "../lib/api";
+import { applyDefaultTree, computerSkills, defaultRoleKit, deleteSkill, importSkill, listRoles, roleKits, saveRoleKit, skillCatalog, type Project, type Role, type RoleKit, type SkillInfo } from "../lib/api";
 import { Button } from "./ui";
 import { Help } from "./Help";
 import { SkillEditor } from "./SkillEditor";
@@ -16,7 +16,6 @@ export function SkillsTab({ role, project, accountId, kit, onKitSaved }: { role:
   const who = role.person || role.name;
   const [catalog, setCatalog] = useState<SkillInfo[] | null>(null);
   const [computer, setComputer] = useState<SkillInfo[] | null>(null);
-  const [servers, setServers] = useState<McpInfo[] | null>(null);
   const [find, setFind] = useState("");
   const [all, setAll] = useState(false);
   const [editor, setEditor] = useState<{ name?: string } | null>(null);
@@ -32,7 +31,6 @@ export function SkillsTab({ role, project, accountId, kit, onKitSaved }: { role:
   };
   useEffect(() => { void reload(); }, [project.folder, accountId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { let live = true; defaultRoleKit(role.id).then((k) => { if (live) setStart(k); }).catch(() => {}); return () => { live = false; }; }, [role.id]);
-  useEffect(() => { let live = true; mcpCatalog(accountId, project.folder).then((s) => { if (live) setServers(s); }).catch(() => { if (live) setServers([]); }); return () => { live = false; }; }, [accountId, project.folder]);
 
   /** keep a change of this person's list at once */
   const keep = async (next: Partial<RoleKit>) => {
@@ -94,17 +92,6 @@ export function SkillsTab({ role, project, accountId, kit, onKitSaved }: { role:
         <SkillTree role={role} project={project} kit={kit} infos={catalog} start={start}
           actions={{ keep, onChange: (name) => setEditor({ name }), onTakeAway: (name) => void takeAway(name), onDelete: (name) => void remove(name), onStart: (everyone) => void takeStart(everyone), deleting, setDeleting, busy, saves }} />
 
-        <section className="flex flex-col gap-2" aria-label="Connectors">
-          <div className="flex items-center gap-2"><h3 className="m-0 text-[16px] leading-6 font-bold">Connectors</h3><Help title="Connectors"><p className="m-0">Outside services {who} may reach from {project.name}, found in the project. What is not ticked is left out, so it costs nothing. To add one, use Claude Code (claude mcp add) and it shows up here.</p></Help></div>
-          {servers === null ? <span className="text-[14px] text-text-tertiary">Looking…</span>
-            : servers.length === 0 ? <p className="m-0 text-[14px] leading-5 text-text-tertiary">None found in this project.</p>
-            : servers.map((s) => (
-              <label key={s.name} className="flex cursor-pointer items-start gap-3 px-1 py-1.5 hover:bg-surface-3">
-                <input type="checkbox" checked={kit.mcp.includes(s.name)} onChange={(e) => void keep({ mcp: e.target.checked ? [...kit.mcp, s.name] : kit.mcp.filter((x) => x !== s.name) })} className="mt-1.5 h-4 w-4 shrink-0 accent-[var(--color-accent)]" />
-                <span className="flex min-w-0 flex-col"><span className="flex items-baseline gap-2"><span className="font-bold">{s.name}</span><span className="text-[12px] leading-5 text-text-tertiary">{s.kind}</span></span><span className="text-[13px] leading-5 text-text-secondary">{s.source}</span></span>
-              </label>
-            ))}
-        </section>
         {error && <p role="alert" className="m-0 text-[14px] leading-5 font-bold text-state-left">{error}</p>}
       </div>
 

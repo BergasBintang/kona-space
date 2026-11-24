@@ -14,7 +14,10 @@ import { Chevron } from "../Files";
 import { IconButton } from "../Icon";
 import { Select } from "../pick";
 import { Help } from "../Help";
-import { ACTOR_WORD, ActorMark, Defs, EdgeLabel, EdgeLine, labelSpot, STATUS_GLYPH, STATUS_WORD, StepBox, type Rect, type Spot } from "./JourneyArt";
+import { ACTOR_WORD, ActorMark, Defs, EdgeLabel, EdgeLine, labelSpot, STATUS_GLYPH, STATUS_WORD, StepBox, WAY_COLOUR, WAY_WORD, type Rect, type Spot, type Way } from "./JourneyArt";
+
+/** A line that touches the step being looked at either leaves it ("out") or comes into it ("in"). A line from a step to itself counts as leaving. */
+const wayOf = (e: { from: string; to: string }, active: string): Way => (e.from === active ? "out" : "in");
 import { JourneyTable } from "./JourneyTable";
 import { checkText, staleness, ticketFact, type CardFact, type Stale, type TicketFact } from "../../lib/brain/journeystale.ts";
 import { compareMarkers, placeOf, withDrafts, type Marker, type Scan } from "../../lib/brain/journeymarks.ts";
@@ -271,7 +274,7 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
                 if (!a || !b) return null;
                 const touches = active !== null && (e.from === active || e.to === active);
                 if (e.hub && !touches) return null; // the lines of a menu show only when it is pointed at
-                return <EdgeLine key={e.from + ">" + e.to} edge={e} from={a} to={b} bright={touches} dim={active !== null && !touches} veil={pin !== null && !touches} thin={e.hub && touches} />;
+                return <EdgeLine key={e.from + ">" + e.to} edge={e} from={a} to={b} way={touches ? wayOf(e, active) : null} dim={active !== null && !touches} veil={pin !== null && !touches} thin={e.hub && touches} />;
               })}
               {drawn!.steps.map((s) => (
                 <g key={s.id} onPointerEnter={() => setHover(s.id)} onPointerLeave={() => setHover(null)}>
@@ -282,9 +285,17 @@ export function JourneyView({ projectId, accountId, brain, onOpen }: { projectId
                   )}
                 </g>
               ))}
-              {labels.map(([e, spot]) => <EdgeLabel key={e.from + ">" + e.to} edge={e} spot={spot} dim={active !== null && !(e.from === active || e.to === active)} />)}
+              {labels.map(([e, spot]) => <EdgeLabel key={e.from + ">" + e.to} edge={e} spot={spot} way={active !== null && (e.from === active || e.to === active) ? wayOf(e, active) : null} dim={active !== null && !(e.from === active || e.to === active)} />)}
             </svg>
           </div>
+        </div>
+      )}
+      {drawn && drawn.steps.length > 0 && (
+        // the key of the two colours: always there so the page does not jump, and only filled while a step is looked at (it is true only then)
+        <div className={`flex h-5 items-center gap-5 text-[13px] leading-5 text-text-secondary ${active === null ? "invisible" : ""}`} aria-hidden={active === null}>
+          {(["in", "out"] as const).map((w) => (
+            <span key={w} className="flex items-center gap-2"><svg width="26" height="10" aria-hidden="true"><line x1="1" y1="5" x2="18" y2="5" stroke={WAY_COLOUR[w]} strokeWidth="2.25" /><path d="M16 1L25 5L16 9z" fill={WAY_COLOUR[w]} /></svg>{WAY_WORD[w]}</span>
+          ))}
         </div>
       )}
 

@@ -85,19 +85,24 @@ type Pt = [number, number];
 /** the point of the curve a fraction t of the way along it */
 const along = (p: Pt[], t: number): Pt => { const u = 1 - t; return [u * u * u * p[0][0] + 3 * u * u * t * p[1][0] + 3 * u * t * t * p[2][0] + t * t * t * p[3][0], u * u * u * p[0][1] + 3 * u * u * t * p[1][1] + 3 * u * t * t * p[2][1] + t * t * t * p[3][1]]; };
 
+/** The two ways a line can touch the step being looked at: it comes in (teal, how you get there) or goes out (brown, where it leads). */
+export type Way = "in" | "out";
+export const WAY_COLOUR: Record<Way, string> = { in: "var(--color-accent)", out: "var(--color-state-waiting)" };
+export const WAY_WORD: Record<Way, string> = { in: "Comes in", out: "Goes out" };
+
 /** The line only. Its words are drawn by EdgeLabel, in a layer above the boxes, so a box never cuts them. */
-export function EdgeLine({ edge, from, to, bright, dim, veil = false, thin = false }: { edge: Edge; from: Placed; to: Placed; bright: boolean; dim: boolean; /** a step is pinned and this line is not joined to it: almost gone */ veil?: boolean; /** one of many lines of a menu: fine */ thin?: boolean }) {
+export function EdgeLine({ edge, from, to, way = null, dim, veil = false, thin = false }: { edge: Edge; from: Placed; to: Placed; /** the line is joined to the step being looked at: it comes into that step ("in") or leaves it ("out") */ way?: Way | null; dim: boolean; /** a step is pinned and this line is not joined to it: almost gone */ veil?: boolean; /** one of many lines of a menu: fine */ thin?: boolean }) {
   const { d } = curve(edge, from, to);
-  const stroke = bright ? "var(--color-text)" : "var(--color-line-strong)";
+  const stroke = way ? WAY_COLOUR[way] : "var(--color-line-strong)";
   return (
-    <g opacity={veil ? 0.06 : dim ? 0.25 : 1} aria-hidden="true" data-edge={`${edge.from}>${edge.to}`}>
-      <path d={d} fill="none" stroke={stroke} strokeWidth={thin ? 1.25 : bright ? 2.25 : 1.5} strokeDasharray={edge.kind === "error" ? "5 4" : undefined} markerEnd={`url(#journey-arrow${bright ? "-bright" : ""})`} />
+    <g opacity={veil ? 0.06 : dim ? 0.25 : 1} aria-hidden="true" data-edge={`${edge.from}>${edge.to}`} data-way={way ?? undefined}>
+      <path d={d} fill="none" stroke={stroke} strokeWidth={thin ? 1.25 : way ? 2.25 : 1.5} strokeDasharray={edge.kind === "error" ? "5 4" : undefined} markerEnd={`url(#journey-arrow${way ? `-${way}` : ""})`} />
     </g>
   );
 }
 
 /** The words on a line, on a patch of the map's colour so they stay readable over a crossing line. */
-export function EdgeLabel({ edge, spot, dim }: { edge: Edge; spot: Spot; dim: boolean }) {
+export function EdgeLabel({ edge, spot, dim, way = null }: { edge: Edge; spot: Spot; dim: boolean; way?: Way | null }) {
   const { lx, ly } = spot;
   const label = edge.label.length > 26 ? edge.label.slice(0, 25) + "…" : edge.label;
   if (!label) return null;
@@ -105,7 +110,7 @@ export function EdgeLabel({ edge, spot, dim }: { edge: Edge; spot: Spot; dim: bo
   return (
     <g opacity={dim ? 0.25 : 1} aria-hidden="true" data-edge-label={`${edge.from}>${edge.to}`} pointerEvents="none">
       <rect x={lx - text.length * 3 - 4} y={ly - 11} width={text.length * 6 + 8} height={15} fill="var(--color-ground)" opacity={0.92} />
-      <text x={lx} y={ly} textAnchor="middle" fontSize={11} fill="var(--color-text-secondary)" fontFamily="var(--font-sans)">{text}</text>
+      <text x={lx} y={ly} textAnchor="middle" fontSize={11} fontWeight={way ? 700 : undefined} fill={way ? WAY_COLOUR[way] : "var(--color-text-secondary)"} fontFamily="var(--font-sans)">{text}</text>
     </g>
   );
 }
@@ -142,12 +147,14 @@ export function labelSpot(edge: Edge, from: Placed, to: Placed, boxes: Placed[],
   return { lx: c.lx, ly: c.ly };
 }
 
-/** the arrow heads, one for a quiet line and one for a bright one */
+/** the arrow heads: one for a quiet line, one for a line coming into the step being looked at and one for a line leaving it */
 export function Defs() {
   return (
     <defs>
       <marker id="journey-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--color-line-strong)" /></marker>
-      <marker id="journey-arrow-bright" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--color-text)" /></marker>
+      {(["in", "out"] as const).map((w) => (
+        <marker key={w} id={`journey-arrow-${w}`} viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill={WAY_COLOUR[w]} /></marker>
+      ))}
     </defs>
   );
 }

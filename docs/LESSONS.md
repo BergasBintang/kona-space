@@ -1089,3 +1089,13 @@ The owner closed the last ten tickets (T-0018 to T-0027), so all 27 are Done, an
 | The window test with real conversations could not run: both signed-in Kona accounts answered "Failed to refresh OAuth token" | The sign-ins had expired hours before; emptying their `.oauth_refresh.lock` folders (with the owner's yes) did not help | Do not count a real-conversation step as proven when the sign-in is dead. Prove the parts that need no conversation separately (here `tests/mcp-status-live.mjs`: the real window command, then the real tool server program), and say plainly what is left |
 | My own slip again: a `python3 -` heredoc with nothing in it started an interactive Python that hung for two minutes | Lesson 22 | Never start an interpreter "to check". Use the file tools or node with a file |
 | The new step of the window test and its second message failed with "Cannot read properties of null (reading 'focus')" | The test talked to a person while the Access page was shown, and the person's door is only on the office | A test that talks to a person opens the project (the office) first, every time |
+
+## 47. Search the notes, and which way a Journey line goes (2026-11-24, decision 108, 0.50.0)
+
+| Seen | Cause | Keep |
+|---|---|---|
+| The owner could not use Ctrl+F to find a note | On the Notes page an open note already takes Ctrl+F for "Find on this page" | A shortcut is checked against the ones already in use before it is chosen (a search for the key in the code takes a minute). Ctrl+K went to the new box, and the Map got its own handler so it does not take the owner to another page |
+| The list of notes by topic would have matched every search | It names every note | A search skips what Kona writes itself (a note with `generated:`) |
+| A colour for in and out would be lost on anyone who cannot tell teal from brown | Colour alone | Back a colour with a second clue: here the dashes of an error line stay, and the key names the two ways in words |
+| I looked for the dev window under the wrong program name (`kona.exe`), then said the build was running without proof | The dev program is `app.exe` | To see whether the dev window is open, look for `app.exe`, not `kona.exe`; the build log says "Running `target\debug\app.exe`" when it opens |
+| The owner closed the dev window before looking at the changes | They asked for the window first, then asked to ship | A release that goes out unseen says so in the changelog and in the report ("Not seen yet"), and the note names what is left to look at |

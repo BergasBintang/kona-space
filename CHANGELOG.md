@@ -2,6 +2,14 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.50.0, 2026-11-24
+
+Notes are easier to find, on the Notes page and on the Map, and the lines of a focused Journey step tell you which way they go.
+
+- **Search the notes.** A box at the top of the Notes list, and a box above the picked note on the Map. Type any part of a word: the notes that hold every word you typed are listed, title matches first, then topic, ticket and id, then the text (a note that matched only in its text shows the matching words under its title). Enter opens or picks the first one and Esc clears the box. On the Map the other dots turn pale while you search, and a result you pick moves to the middle of the map. The list Kona writes itself ("Every note by topic") is left out, since it names every note. Ctrl+K goes to the box on both pages; Ctrl+F stays the find inside the open note.
+- **Journey: which way a line goes.** While a step is pointed at or pinned, the lines that come into it are teal and the lines that leave it are brown, with arrowheads and words in the same colour. Error lines keep their dashes, so colour is never the only clue. A small key (Comes in, Goes out) shows under the map only while a step is focused.
+- **Not seen yet:** the three changes were checked by tests, the type check and the build, not by clicking them in the real window (the dev window was closed before it could be looked at). The teal and brown have not been judged on the cream paper.
+
 ## 0.49.0, 2026-11-24
 
 Workers can now read whether each tool server really started for each person.

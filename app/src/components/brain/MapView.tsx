@@ -8,6 +8,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { groupCircle, type Brain } from "../../lib/brain/engine.ts";
 import { placeNames, type Box, type Placed } from "../../lib/brain/labels.ts";
 import { Button } from "../ui";
+import { findNotes } from "../../lib/brain/finder.ts";
+import { usePageActive } from "../../lib/pageactive";
 import { Chip, LAYER_WORD } from "./NoteView";
 
 const W = 880, H = 560;
@@ -38,6 +40,22 @@ export function MapView({ brain, onOpen }: { brain: Brain; onOpen: (id: string) 
     return m;
   }, [brain]);
   const [hover, setHover] = useState<string | null>(null);
+  // the search box above the picked note: the notes that match are listed, the other dots turn dim, and a picked result is moved to the middle of the map
+  const [search, setSearch] = useState("");
+  const searchBox = useRef<HTMLInputElement>(null);
+  const pageActive = usePageActive();
+  const found = useMemo(() => findNotes(brain, search), [brain, search]);
+  const foundIds = useMemo(() => new Set(found.map((f) => f.id)), [found]);
+  const searching = search.trim() !== "";
+  useEffect(() => {
+    if (!pageActive) return; // a minimized page does not take Ctrl+K
+    const key = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== "k") return;
+      e.preventDefault(); searchBox.current?.focus(); searchBox.current?.select();
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [pageActive]);
   const centre = brain.centreNote();
   const note = sel ? brain.notes.get(sel) ?? null : null;
   const linked = useMemo(() => new Set(sel ? brain.edges.filter((e) => e.s === sel || e.t === sel).flatMap((e) => [e.s, e.t]) : []), [brain, sel]);
@@ -78,6 +96,12 @@ export function MapView({ brain, onOpen }: { brain: Brain; onOpen: (id: string) 
   const drag = useRef<{ id: number; cx: number; cy: number; from: View; moved: boolean } | null>(null);
   useEffect(() => setView(null), [fit]);
   const v = view ?? fit;
+  /** Pick a note from the search: its dot is picked and the map is moved so the dot is in the middle (the zoom stays). */
+  const goTo = (id: string) => {
+    setSel(id);
+    const p = pos.get(id);
+    if (p) setView({ x: p.x - v.w / 2, y: p.y - (v.w * asp) / 2, w: v.w });
+  };
 
   /** Zoom by a factor around a point of the picture (0..1 across and down; the middle by default). */
   const zoomBy = useCallback((f: number, fx = 0.5, fy = 0.5) => {
@@ -146,7 +170,7 @@ export function MapView({ brain, onOpen }: { brain: Brain; onOpen: (id: string) 
             const r = radius(id);
             const on = sel === id;
             const at = labelAt.get(id);
-            const dim = sel && !on && !linked.has(id);
+            const dim = sel ? !on && !linked.has(id) : searching && !foundIds.has(id);
             const fill = n.layer === "project" ? "var(--color-accent)" : n.layer === "starter" ? "var(--color-text-secondary)" : "var(--color-surface-1)";
             return (
               <g key={id} opacity={dim ? 0.3 : 1} className="cursor-pointer" onClick={() => setSel(id)} onPointerEnter={() => setHover(id)} onPointerLeave={() => setHover((h) => (h === id ? null : h))}
@@ -178,7 +202,31 @@ export function MapView({ brain, onOpen }: { brain: Brain; onOpen: (id: string) 
       </div>
 
       <aside className="flex min-h-0 flex-col gap-3 overflow-y-auto border border-line-subtle bg-surface-1 p-4" aria-label="Selected note">
-        {!note && <p className="m-0 text-[14px] leading-5 text-text-tertiary">Pick a dot to see its note: what it says, what it links to and what links to it.</p>}
+        <div role="search" className="flex shrink-0 flex-col gap-1">
+          <input ref={searchBox} type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search the notes" aria-label="Search the notes" title="Search the notes (Ctrl+K)"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && found[0]) { e.preventDefault(); goTo(found[0].id); }
+              else if (e.key === "Escape" && search) { e.preventDefault(); e.stopPropagation(); setSearch(""); }
+            }}
+            className="h-10 w-full border border-line-strong bg-inset px-3 text-[14px] text-text placeholder:text-text-tertiary" />
+          {searching && <span className="text-[12px] leading-4 text-text-tertiary" aria-live="polite">{found.length === 0 ? "Nothing found" : `${found.length} ${found.length === 1 ? "note" : "notes"}`}</span>}
+        </div>
+        {searching && found.length > 0 && (
+          <div role="list" aria-label="Notes found" className="flex max-h-60 shrink-0 flex-col gap-0.5 overflow-y-auto border-b border-line-subtle pb-3">
+            {found.map((f) => {
+              const n = brain.notes.get(f.id)!;
+              return (
+                <button key={n.id} type="button" role="listitem" title={n.title} aria-current={sel === n.id ? "true" : undefined} onClick={() => goTo(n.id)}
+                  className={`flex flex-col gap-0.5 px-2.5 py-1.5 text-left ${sel === n.id ? "bg-surface-3" : "hover:bg-surface-2"}`}>
+                  <span className={`line-clamp-2 text-[13px] leading-4.5 ${sel === n.id ? "font-bold" : ""} text-text`}>{n.title}</span>
+                  <span className="truncate text-[12px] leading-4 text-text-tertiary">{LAYER_WORD[n.layer]}{n.tickets.length ? ` · ${n.tickets.join(", ")}` : ""}</span>
+                  {f.snippet && <span className="line-clamp-2 text-[12px] leading-4 text-text-secondary">{f.snippet}</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {!note && !searching && <p className="m-0 text-[14px] leading-5 text-text-tertiary">Pick a dot to see its note: what it says, what it links to and what links to it.</p>}
         {note && (
           <>
             <h3 className="m-0 text-[17px] leading-6 font-bold">{note.title}</h3>

@@ -16,6 +16,8 @@ import { Chevron } from "../Files";
 import { Report } from "./Report";
 import { JourneyView } from "./JourneyView";
 import { Help } from "../Help";
+import { findNotes } from "../../lib/brain/finder.ts";
+import { usePageActive } from "../../lib/pageactive";
 
 export type BrainTab = "map" | "notes" | "journey" | "ask" | "report";
 /** The pages of the Brain, shown as tabs in the sheet's title bar (App.tsx holds which one is open). */
@@ -40,11 +42,26 @@ export function BrainPlace({ project, tab, onTab, onAsk }: { project: Project; t
   const goTab = (t: BrainTab) => { own.current = t; onTab(t); };
   useEffect(() => { if (tab !== own.current) setOpen(null); own.current = tab; }, [tab]);
 
+  // the search box of the Notes list. Ctrl+K goes to it (Ctrl+F stays the find inside the open note); the Map has its own box and its own Ctrl+K.
+  const [search, setSearch] = useState("");
+  const searchBox = useRef<HTMLInputElement>(null);
+  const pageActive = usePageActive();
+  useEffect(() => {
+    if (!pageActive || tab !== "notes") return; // a minimized page does not take Ctrl+K
+    const key = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== "k") return;
+      e.preventDefault();
+      searchBox.current?.focus(); searchBox.current?.select();
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [pageActive, tab]);
+
   const load = useCallback(() => {
     loadBrain(project.id).then((d) => { setData(d); setError(null); }).catch((e) => setError(String(e)));
     wantedList(project.id).then(setWanted).catch(() => setWanted([]));
   }, [project.id]);
-  useEffect(() => { setData(null); setOpen(null); setTurns([]); load(); }, [load]);
+  useEffect(() => { setData(null); setOpen(null); setTurns([]); setSearch(""); load(); }, [load]);
   useEffect(() => { if (!notice) return; const t = setTimeout(() => setNotice(null), 9000); return () => clearTimeout(t); }, [notice]);
 
   const raw = useMemo<RawNote[]>(() => [...(data?.notes ?? []).map((n) => ({ ...n, layer: n.layer as Layer })), ...starterNotes], [data]);
@@ -84,6 +101,8 @@ export function BrainPlace({ project, tab, onTab, onAsk }: { project: Project; t
   const groups = [...named.map((g) => ({ key: g.key, label: g.label, notes: sorted.filter((n) => g.ids.has(n.id)) })), { key: "\u0000other", label: "Other notes", notes: sorted.filter((n) => !inGroup.has(n.id)) }].filter((g) => g.notes.length > 0);
   const fold = (key: string) => setFolded((s) => { const n = new Set(s); if (n.has(key)) n.delete(key); else n.add(key); return n; });
   const openNoteObj = open ? brain.notes.get(open) ?? null : null;
+  const searching = search.trim() !== "";
+  const found = useMemo(() => findNotes(brain, search), [brain, search]);
 
   let body: React.ReactNode;
   let fill = false; // the map fills the page down to the bottom edge; the other pages are lists that scroll
@@ -111,9 +130,29 @@ export function BrainPlace({ project, tab, onTab, onAsk }: { project: Project; t
       </div>
       <div className="flex min-h-0 flex-1 gap-6">
         <div className="flex min-h-0 w-[250px] shrink-0 flex-col gap-3">
+          <div role="search" className="flex shrink-0 flex-col gap-1">
+            <input ref={searchBox} type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search the notes" aria-label="Search the notes" title="Search the notes (Ctrl+K)"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && found[0]) { e.preventDefault(); openNote(found[0].id); }
+                else if (e.key === "Escape" && search) { e.preventDefault(); e.stopPropagation(); setSearch(""); }
+              }}
+              className="h-10 w-full border border-line-strong bg-inset px-3 text-[14px] text-text placeholder:text-text-tertiary" />
+            {searching && <span className="text-[12px] leading-4 text-text-tertiary" aria-live="polite">{found.length === 0 ? "Nothing found" : `${found.length} ${found.length === 1 ? "note" : "notes"}`}</span>}
+          </div>
           <div role="list" aria-label="Notes" className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
             {open === "" && <span className={`${row} bg-surface-3`}><span className="text-[14px] leading-5 font-bold">New note</span><span className="text-[12px] leading-4 text-text-tertiary">Not saved yet</span></span>}
-            {groups.map((g) => {
+            {searching && found.map((f) => {
+              const n = brain.notes.get(f.id)!;
+              return (
+                <button key={n.id} type="button" role="listitem" title={n.title} aria-current={open === n.id ? "true" : undefined} onClick={() => openNote(n.id)}
+                  className={`${row} ${open === n.id ? "bg-surface-3" : "hover:bg-surface-2"}`}>
+                  <span className={`line-clamp-2 text-[13px] leading-[18px] ${open === n.id ? "font-bold text-text" : "text-text"}`}>{n.title}</span>
+                  <span className="truncate text-[12px] leading-4 text-text-tertiary">{LAYER_WORD[n.layer]}{n.tickets.length ? ` · ${n.tickets.join(", ")}` : ""}</span>
+                  {f.snippet && <span className="line-clamp-2 text-[12px] leading-4 text-text-secondary">{f.snippet}</span>}
+                </button>
+              );
+            })}
+            {!searching && groups.map((g) => {
               const closed = folded.has(g.key);
               return (
                 <div key={g.key} role="presentation" className="flex flex-col gap-0.5">

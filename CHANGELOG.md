@@ -2,6 +2,12 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.49.0, 2026-11-24
+
+Workers can now read whether each tool server really started for each person.
+
+- **A worker can read how each tool server started for each person.** `list_connections` says, under each server, whether it is connected, could not start, or is still starting in each person's open conversation (the one asking is marked "you"); `list_team` says it next to each tool a person may use. The open window keeps what Claude Code reported in a small file in Kona's data folder; when the window is gone the answer says it does not know. Not seen yet: a real worker reading it in a real conversation (the sign-ins of both Kona accounts could not be refreshed on the day). The wording of the people line in `list_connections` is also plainer ("Who may use it").
+
 ## 0.48.0, 2026-11-24
 
 Every worker now starts knowing what Kona is and who is on the team, and a tool server that comes from another project asks before it is switched on.

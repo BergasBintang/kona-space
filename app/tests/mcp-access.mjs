@@ -135,7 +135,7 @@ try {
   await wait(2000);
   const first = transcript(B);
   ok("a conversation was saved", first.length === 1);
-  ok(`${jiro.person} called the tool of the probe server`, first[0]?.uses.some((u) => u.startsWith("mcp__probe__echo_probe") && u.includes("pineapple")), first[0]?.uses.join(" | ").slice(0, 300));
+  ok(`${jiro.person} called the tool of the probe server`, first[0]?.uses.some((u) => u.startsWith("mcp__probe__echo_probe") && u.includes("pineapple")), (first[0]?.uses.join(" | ").slice(0, 300) ?? "") + " reply: " + (first[0]?.reply ?? "").slice(0, 300));
   ok("the tool answered through Claude Code", first[0]?.results.some((r) => r.includes("KONA-MCP-OK:pineapple")), first[0]?.results.join(" | ").slice(0, 200));
   ok("the tool that was not ticked was never used", !first[0]?.uses.some((u) => u.includes("vault")));
   const opened3 = await openAccess();
@@ -147,12 +147,25 @@ try {
   const first1 = await shadcnLine();
   ok("the real shadcn tool says how it started: connected, or still starting", first1.includes(`${jiro.person}: connected`) || first1.includes(`${jiro.person}: still starting when the conversation began`), first1);
   if (!first1.includes(": connected")) {
+    await openProject(NAME_B);
     ok(`${jiro.person} answers a second message in the same conversation`, await talk(who, "Say only the word ok."));
     await wait(1500);
     await openAccess();
     ok("the real shadcn tool says connected after the next message (the card follows each message)", await c.waitFor(`${card("shadcn")}.innerText.includes(${JSON.stringify(jiro.person + ": connected")})`, 8000, 200), await shadcnLine());
   }
   ok("the tool that is off says nothing about conversations", !/connected|could not|began before|keeps it/.test(await c.ev(`${card("vault")}.innerText`)));
+
+  // 4b. the worker reads the same thing the card shows (decision 107): the window writes it for the board's tool server, and the person asks for it in a real conversation
+  await openProject(NAME_B);
+  ok(`${jiro.person} reads the connections and the team with the board's tools`, await talk(who, "Call the list_connections tool and the list_team tool of the kona-board server, one after the other. Then reply with only the one sentence of list_connections that says how probe started for you."));
+  await wait(2000);
+  const read = transcript(B)[0];
+  const conn = read?.uses.findIndex((u) => u.startsWith("mcp__kona-board__list_connections")) ?? -1;
+  ok("the real conversation called list_connections and list_team", conn >= 0 && read.uses.some((u) => u.startsWith("mcp__kona-board__list_team")), read?.uses.join(" | ").slice(-300));
+  const connResult = read?.results.find((r) => r.includes("tool servers known")) ?? "";
+  ok("list_connections says probe is used here, not the project's own, and who may use it", /probe/.test(connResult) && connResult.includes("this project does not have it itself") && connResult.includes(`${jiro.person} the ${jiro.name}`), connResult.slice(0, 400));
+  ok("it says how probe started for the person who asks, marked as the one asking", connResult.includes(`${jiro.person} the ${jiro.name} (you): connected`), connResult.slice(0, 700));
+  ok("list_team names the person and says the tool is connected", (read?.results.find((r) => r.includes("The team has")) ?? "").includes("probe (connected)"), (read?.results.find((r) => r.includes("The team has")) ?? "").slice(0, 300));
 
   // 5. switch off: the ticks stay, the open conversation keeps it
   ok("Not used here is pressed", await press("Not used here", card("probe")) && await c.waitFor(`!${card("probe")}.innerText.includes('People who may use it')`, 5000, 100));

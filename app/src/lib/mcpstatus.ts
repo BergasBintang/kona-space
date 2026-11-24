@@ -13,6 +13,21 @@ export type McpLine = {
   state: "connected" | "failed" | "starting" | "waiting" | "older" | "still";
 };
 
+/** What the board's tool server is told about one person (decision 107): their newest open conversation, and the servers Claude Code listed when it began (null: no message sent yet). */
+export type McpPerson = { role: string; session: string; servers: McpLoaded[] | null };
+
+/** The people of one project who have an open conversation, as the tool server file keeps them. Oldest first, like the sessions. */
+export function mcpPeople(sessions: McpSession[]): McpPerson[] {
+  const out: McpPerson[] = [];
+  const seen = new Set<string>();
+  for (const s of [...sessions].reverse()) {
+    if (!s.roleId || s.run === "ended" || seen.has(s.roleId)) continue;
+    seen.add(s.roleId);
+    out.push({ role: s.roleId, session: s.id, servers: s.mcp ? s.mcp.map((m) => ({ name: m.name, status: m.status })) : null });
+  }
+  return out.reverse();
+}
+
 /** One line for each open conversation of a person that has to do with this tool. `allowed` is the people ticked for it, `on` whether the project uses it. */
 export function mcpLines(name: string, on: boolean, allowed: string[], sessions: McpSession[]): McpLine[] {
   const out: McpLine[] = [];

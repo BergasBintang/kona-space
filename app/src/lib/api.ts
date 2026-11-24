@@ -164,7 +164,9 @@ export const saveRoleKit = (folder: string, roleId: string, kit: RoleKit) => inv
 export const mcpCatalog = (accountId: string | null, folder: string) => invoke<McpRow[]>("mcp_catalog", { accountId, folder });
 export const mcpSetOn = (folder: string, name: string, on: boolean) => invoke<void>("mcp_set_on", { folder, name, on });
 /** exactly these people may use the tool in this project; gives back every person's choice as it is now */
-export const mcpSetRoles = (folder: string, name: string, roleIds: string[]) => invoke<Record<string, RoleKit>>("mcp_set_roles", { folder, name, roleIds });
+/** Tell the board's tool server what the open conversations of a project say about their tool servers, so a worker can read it (decision 107). */
+export const mcpStatusSave = (folder: string, people: { role: string; session: string; servers: { name: string; status: string }[] | null }[]) => invoke<void>("mcp_status_save", { folder, people });
+export const mcpSetRoles =(folder: string, name: string, roleIds: string[]) => invoke<Record<string, RoleKit>>("mcp_set_roles", { folder, name, roleIds });
 export const mcpRemove = (accountId: string | null, folder: string, name: string) => invoke<void>("mcp_remove", { accountId, folder, name });
 export const listAccounts = () => invoke<Account[]>("list_accounts");
 export const addAccount = async (label: string) => { try { return await invoke<Account>("add_account", { label }); } finally { statusCache.clear(); } };

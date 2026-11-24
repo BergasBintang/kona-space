@@ -14,6 +14,7 @@ mod leftovers;
 mod lock;
 mod live;
 mod mcp;
+mod mcpstatus;
 mod mock;
 mod needs;
 mod office_map;
@@ -877,6 +878,12 @@ fn mcp_set_on(projects: State<'_, Projects>, folder: String, name: String, on: b
     connectors::set_on(&project_folder(&projects, &folder)?, &name, on)
 }
 
+/// What the open conversations of a project say about their tool servers (decision 107). The window keeps it in Kona's data folder so a worker's `list_connections` can say it.
+#[tauri::command]
+fn mcp_status_save(app: AppHandle, projects: State<'_, Projects>, folder: String, people: Vec<mcpstatus::Person>) -> Result<(), String> {
+    mcpstatus::save(&kona_base(&app)?, &project_folder(&projects, &folder)?, people)
+}
+
 /// Who may use a connector in this project: exactly these people. Gives back every person's choice as it is now.
 #[tauri::command]
 fn mcp_set_roles(roles: State<'_, Roles>, projects: State<'_, Projects>, folder: String, name: String, role_ids: Vec<String>) -> Result<std::collections::HashMap<String, skills::RoleKit>, String> {
@@ -1128,7 +1135,7 @@ pub fn run() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![cost_hours, read_skill_files, save_skill_folder, default_role_kit, apply_default_tree, check_claude, save_tool, delete_tool, read_skill, write_skill, delete_skill, start_session, send_message, answer_permission, interrupt_session, stop_session, list_projects, add_project, remove_project, set_project_group, set_project_sessions, rename_project, cost_rows, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, office_say, mockup_ticket_draft, note_check, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, mcp_set_on, mcp_set_roles, mcp_remove, workflow_list, workflow_save, workflow_delete, run_list, run_save, run_delete, office_map_load, office_map_save, office_map_reset, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, git_marks, read_file, mock_base, mock_cards, mock_files, project_claim, project_release, projects_taken, live_base, live_status, live_start, live_stop, live_data, live_delete_data, live_accounts, journey_markers, journey_check, brain_chat, mock_page_text, terminal::term_open, terminal::term_write, terminal::term_resize, terminal::term_close, terminal::term_close_all, terminal::term_buttons_load, terminal::term_buttons_save])
+        .invoke_handler(tauri::generate_handler![cost_hours, read_skill_files, save_skill_folder, default_role_kit, apply_default_tree, check_claude, save_tool, delete_tool, read_skill, write_skill, delete_skill, start_session, send_message, answer_permission, interrupt_session, stop_session, list_projects, add_project, remove_project, set_project_group, set_project_sessions, rename_project, cost_rows, set_project_account, get_settings, set_settings, backup_now, list_backups, delete_backup, earlier_sessions, ssh_list, ssh_save, ssh_remove, ssh_fingerprints, ssh_key_state, session_transcript, write_note_with_haiku, office_say, mockup_ticket_draft, note_check, brain_load, brain_save, brain_delete, brain_wanted, brain_wanted_add, brain_wanted_remove, leftovers, leftover_stop, leftover_ignore, session_temp, session_temp_clean, worktree_status, worktree_overview, worktree_merge, worktree_remove, list_tickets, create_ticket, update_ticket, remove_ticket, get_persona, save_persona, persona_prompt, default_persona, list_tools, check_tools, project_hints, list_roles, save_role, reset_role, skill_catalog, computer_skills, import_skill, skill_folder, role_kits, save_role_kit, mcp_catalog, mcp_status_save, mcp_set_on, mcp_set_roles, mcp_remove, workflow_list, workflow_save, workflow_delete, run_list, run_save, run_delete, office_map_load, office_map_save, office_map_reset, workflow_start, list_accounts, add_account, rename_account, remove_account, account_status, sign_in_account, list_dir, git_marks, read_file, mock_base, mock_cards, mock_files, project_claim, project_release, projects_taken, live_base, live_status, live_start, live_stop, live_data, live_delete_data, live_accounts, journey_markers, journey_check, brain_chat, mock_page_text, terminal::term_open, terminal::term_write, terminal::term_resize, terminal::term_close, terminal::term_close_all, terminal::term_buttons_load, terminal::term_buttons_save])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         // a Live mockup's program never outlives Kona

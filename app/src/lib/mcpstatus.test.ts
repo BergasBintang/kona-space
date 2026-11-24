@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mcpLines, type McpSession } from "./mcpstatus.ts";
+import { mcpLines, mcpPeople, type McpSession } from "./mcpstatus.ts";
 
 const s = (id: string, roleId: string | null, mcp?: { name: string; status: string }[], run = "ready"): McpSession => ({ id, roleId, run, mcp });
 
@@ -40,4 +40,19 @@ test("ended conversations and conversations without a person are ignored; the ne
     s("4", "frontend", [{ name: "shadcn", status: "failed" }], "ended"),
   ]);
   assert.deepEqual(lines, [{ roleId: "frontend", state: "connected" }]);
+});
+
+test("the tool server is told each person's newest open conversation and what Claude Code listed in it", () => {
+  const people = mcpPeople([
+    s("1", "frontend", [{ name: "shadcn", status: "failed" }], "ended"),
+    s("2", "frontend", [{ name: "shadcn", status: "connected" }]),
+    s("3", "design"),
+    s("4", null, [{ name: "shadcn", status: "connected" }]),
+    s("5", "qa", [{ name: "shadcn", status: "connected" }], "ended"),
+  ]);
+  assert.deepEqual(people, [
+    { role: "frontend", session: "2", servers: [{ name: "shadcn", status: "connected" }] },
+    { role: "design", session: "3", servers: null },
+  ], "an ended conversation and one without a person are left out; no message yet is null, not an empty list");
+  assert.deepEqual(mcpPeople([]), []);
 });

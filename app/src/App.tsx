@@ -44,7 +44,8 @@ import { checkForUpdate } from "./lib/update";
 import { useSyncTick } from "./lib/sync";
 import { sendToSession } from "./lib/send";
 import { UpdateCard } from "./components/UpdateCard";
-import { getSettings, earlierSessions, HISTORY_PAGE, projectClaim, projectRelease, projectsTaken, saveNote, wantedRemove, officeSay, officeMapLoad, officeMapSave, officeMapReset, mockupTicketDraft, type Earlier } from "./lib/api";
+import { mcpPeople } from "./lib/mcpstatus";
+import { mcpStatusSave, getSettings, earlierSessions, HISTORY_PAGE, projectClaim, projectRelease, projectsTaken, saveNote, wantedRemove, officeSay, officeMapLoad, officeMapSave, officeMapReset, mockupTicketDraft, type Earlier } from "./lib/api";
 
 const remembered = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const remember = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* the choice is just not kept */ } };
@@ -290,6 +291,23 @@ export default function App() {
   const sessionOf = (roleId: string | null): Session | null => (roleId && project ? state.order.map((id) => state.sessions[id]).filter((s) => s.roleId === roleId && samePlace(s.folder, project.folder) && !dismissed[s.id]).pop() ?? null : null);
   /** the open and ended conversations of this project, oldest first (the MCP section of the Access page reads what each started) */
   const projectSessions = (): Session[] => (project ? state.order.map((id) => state.sessions[id]).filter((s) => samePlace(s.folder, project.folder)) : []);
+  // A worker's `list_connections` says how each tool server started in each person's open conversation. Claude Code tells only this window, so the window keeps it for the
+  // board's tool server in a small file for each project (decision 107). Written when it changes; a project whose conversations all ended is written as empty once.
+  const saidMcp = useRef(new Map<string, { folder: string; json: string }>());
+  useEffect(() => {
+    const keyOf = (p: string) => p.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+    const all = state.order.map((id) => state.sessions[id]);
+    const folders = new Map<string, string>();
+    for (const s of all) folders.set(keyOf(s.folder), s.folder);
+    for (const [k, v] of saidMcp.current) if (!folders.has(k)) folders.set(k, v.folder);
+    for (const [k, folder] of folders) {
+      const people = mcpPeople(all.filter((s) => keyOf(s.folder) === k));
+      const json = JSON.stringify(people);
+      if (saidMcp.current.get(k)?.json === json || (!saidMcp.current.has(k) && people.length === 0)) continue;
+      saidMcp.current.set(k, { folder, json });
+      mcpStatusSave(folder, people).catch(() => {}); // not a project of Kona's: nothing to tell (a worker there reads "not known just now")
+    }
+  }, [state.sessions, state.order]);
   const shown = sessionOf(person);
   const current = shown; // (the account of the conversation that is open, for the plan bars)
   useEffect(() => { if (person && tab === "chat" && shown && seen[shown.id] !== shown.turns) setSeen((s) => ({ ...s, [shown.id]: shown.turns })); }, [person, tab, shown?.id, shown?.turns]); // eslint-disable-line react-hooks/exhaustive-deps

@@ -208,12 +208,17 @@ const MODES: [(&str, &str); 4] = [
 fn list_team(ctx: &Ctx) -> String {
     let kits = crate::skills::load_kits(&ctx.project);
     let on = crate::connectors::on_set(&ctx.project);
+    let live = crate::mcpstatus::load(&ctx.base, &ctx.project);
     let mut out = vec![format!("The team has {} people. Each does one thing at a time in a project. Hand work to someone with create_ticket (role: their name or job).", ctx.team.len())];
     for r in &ctx.team {
         let kit = kits.get(&r.id).cloned().unwrap_or_default();
         let how = MODES.iter().find(|m| m.0 == r.mode).map(|m| m.1).unwrap_or("Works in the mode the owner chose");
         let list = |v: &[String]| if v.is_empty() { "none".to_string() } else { v.join(", ") };
-        let servers: Vec<String> = kit.mcp.iter().map(|s| if on.contains(s) { s.clone() } else { format!("{s} (ticked, but switched off in this project, so not loaded)") }).collect();
+        let person = live.as_ref().and_then(|l| l.iter().find(|p| p.role == r.id));
+        let servers: Vec<String> = kit.mcp.iter().map(|s| {
+            if !on.contains(s) { return format!("{s} (ticked, but switched off in this project, so not loaded)"); }
+            match person.and_then(|p| crate::mcpstatus::state_of(p, s, true, true)) { Some(st) => format!("{s} ({})", st.say()), None => s.clone() }
+        }).collect();
         let job = crate::session::job_text(&r.brief);
         out.push(format!("\n{}{}\n  Group: {}. Model: {}. {}.\n  Job: {}\n  Skills here: {}\n  Tool servers here: {}",
             r.the(), if r.id == ctx.role { " (you)" } else { "" }, r.group, r.model, how,
@@ -223,19 +228,32 @@ fn list_team(ctx: &Ctx) -> String {
 }
 
 /// The tool servers (MCP) Kona knows for this project, as the owner's Connections screen, Access tab, shows them. Read only: the owner switches servers on and off.
-/// Whether a server really started in a conversation is not known here (Claude Code reports it only to the open window), so it is not said.
+/// Whether a server really started in each person's open conversation is said too (decision 107): the open window writes what Claude Code reported when each conversation began.
 fn list_connections(ctx: &Ctx) -> String {
     if ctx.base.as_os_str().is_empty() { return "Kona did not give this session its data folder, so the list cannot be read. Ask the owner to look at the Connections screen, Access tab.".into(); }
     let rows = crate::connectors::catalog_read_only(&ctx.base, ctx.config_dir.as_deref(), &ctx.project);
     if rows.is_empty() { return "Kona knows no tool servers for this project.".into(); }
     let who = |ids: &[String]| ids.iter().map(|id| ctx.team.iter().find(|r| &r.id == id).map(|r| r.the()).unwrap_or_else(|| id.clone())).collect::<Vec<_>>().join(", ");
     let on_n = rows.iter().filter(|r| r.on).count();
+    let live = crate::mcpstatus::load(&ctx.base, &ctx.project);
     let mut out = vec![format!("{} tool servers known, {} used in this project. A server is loaded in a conversation only when it is used in this project and the person is ticked for it.", rows.len(), on_n)];
     for r in &rows {
         let used = if r.on && !r.here { "Used here, but this project does not have it itself: it runs from the copy Kona kept from another project" } else if r.on { "Used here" } else { "Not used here (off in this project: nobody gets it)" };
-        let people = if r.roles.is_empty() { "nobody ticked".to_string() } else if r.on { format!("may use it: {}", who(&r.roles)) } else { format!("ticked earlier, kept for later: {}", who(&r.roles)) };
+        let people = if r.roles.is_empty() { "Nobody is ticked for it".to_string() } else if r.on { format!("Who may use it: {}", who(&r.roles)) } else { format!("Ticked earlier and kept for later: {}", who(&r.roles)) };
         out.push(format!("- {} ({}: {}). {}. {}. {}.", r.name, r.kind, r.detail, r.source, used, people));
+        // how it went in each person's open conversation: the person who asks is marked, as in list_team
+        let seen: Vec<String> = live.iter().flatten().filter_map(|p| {
+            let st = crate::mcpstatus::state_of(p, &r.name, r.on, r.roles.contains(&p.role))?;
+            let name = ctx.team.iter().find(|t| t.id == p.role).map(|t| t.the()).unwrap_or_else(|| p.role.clone());
+            Some(format!("{name}{}: {}", if p.session == ctx.session { " (you)" } else { "" }, st.say()))
+        }).collect();
+        if !seen.is_empty() { out.push(format!("  In the open conversations: {}.", seen.join("; "))); }
     }
+    out.push(match &live {
+        Some(l) if !l.is_empty() => "\"In the open conversations\" is what Claude Code reported when each conversation began. A server that was changed since is not in a conversation that began before.".into(),
+        Some(_) => "No conversation is open in this project that the window knows of, so nothing is said about how a server started.".into(),
+        None => "How each server started in the open conversations is not known just now (Kona's window has not said). The owner sees it on the Connections screen, Access tab.".into(),
+    });
     out.push("A server that comes from another project (\"Found in ...\") is only a copy in Kona's list. It does nothing until the owner switches it on here.".into());
     out.join("\n")
 }
@@ -252,7 +270,7 @@ fn tools() -> Value {
          "inputSchema": {"type": "object", "properties": {"status": {"type": "string", "enum": ["backlog", "ready", "in-progress", "review", "done"]}}}},
         {"name": "list_team", "description": "Who is on the team in this Kona: each person's name, job, what they do, how freely they work, and the skills and tool servers they may use in this project. Use it to know who does what, and before you hand work to someone.",
          "inputSchema": {"type": "object", "properties": {}}},
-        {"name": "list_connections", "description": "The tool servers (MCP) Kona knows for this project, as the owner's Connections screen (Access tab) shows them: each one's name, where it comes from (this project, or found in another project and which), whether it is used in this project, and which people may use it. Read only: only the owner switches servers on or off. Use it instead of `claude mcp list`, which does not show what Kona allows.",
+        {"name": "list_connections", "description": "The tool servers (MCP) Kona knows for this project, as the owner's Connections screen (Access tab) shows them: each one's name, where it comes from (this project, or found in another project and which), whether it is used in this project, which people may use it, and how it started in each person's open conversation (connected, could not start, still starting). Read only: only the owner switches servers on or off. Use it instead of `claude mcp list`, which does not show what Kona allows.",
          "inputSchema": {"type": "object", "properties": {}}},
         {"name": "get_ticket", "description": "Read one ticket in full: description, done-when text, next step, sessions and history.",
          "inputSchema": {"type": "object", "properties": {"id": {"type": "string", "description": "For example T-0012"}}, "required": ["id"]}},
@@ -482,10 +500,43 @@ mod tests {
         // switched off here: reported as off, the person is only kept for later
         std::fs::write(c.project.join(".kona").join("mcp-on.json"), r#"{"on": []}"#).unwrap();
         let said = list_connections(&c);
-        assert!(said.contains("Not used here") && said.contains("ticked earlier, kept for later: Jiro the Frontend"), "{said}");
+        assert!(said.contains("Not used here") && said.contains("Ticked earlier and kept for later: Jiro the Frontend"), "{said}");
         // reading never changes Kona's list
         assert!(std::fs::read_to_string(c.base.join("mcp-servers.json")).unwrap().contains("Other Project"));
     }
+    #[test]
+    fn a_worker_reads_how_each_server_started_in_each_persons_open_conversation() {
+        use crate::mcpstatus::{self, Loaded, Person};
+        let c = ctx("live");
+        let base = c.project.join("base");
+        std::fs::create_dir_all(&base).unwrap();
+        std::fs::write(base.join("mcp-servers.json"), r#"{"servers": {"shadcn": {"def": {"command": "npx", "args": ["shadcn@latest", "mcp"]}, "origin": "Other Project"}, "playwright": {"def": {"command": "npx", "args": ["@playwright/mcp"]}, "origin": "Other Project"}}}"#).unwrap();
+        std::fs::create_dir_all(c.project.join(".kona")).unwrap();
+        std::fs::write(c.project.join(".kona").join("mcp-on.json"), r#"{"on": ["shadcn", "playwright"]}"#).unwrap();
+        std::fs::write(c.project.join(".kona").join("role-kits.json"), r#"{"frontend": {"mcp": ["shadcn", "playwright"]}, "backend": {"mcp": ["playwright"]}}"#).unwrap();
+        let mut c = c;
+        c.base = base.clone();
+        // the window has said nothing yet
+        let said = list_connections(&c);
+        assert!(!said.contains("In the open conversations:") && said.contains("not known just now"), "{said}");
+        let on = |n: &str, s: &str| Loaded { name: n.into(), status: s.into() };
+        mcpstatus::save(&base, &c.project, vec![
+            Person { role: "frontend".into(), session: "s-front".into(), servers: Some(vec![on("shadcn", "connected"), on("playwright", "failed")]) },
+            Person { role: "backend".into(), session: "abc12345-0000".into(), servers: None },
+        ]).unwrap();
+        let said = list_connections(&c);
+        assert!(said.contains("Jiro the Frontend: connected") && said.contains("Jiro the Frontend: could not start it"), "{said}");
+        assert!(said.contains("Kit the Backend (you): not known yet"), "the one asking is marked, and a conversation with no message yet is not guessed: {said}");
+        assert!(!said.contains("not known just now"), "{said}");
+        // the team list says it per person, next to what each may use
+        let team = list_team(&c);
+        assert!(team.contains("shadcn (connected)") && team.contains("playwright (could not start it") && team.contains("playwright (not known yet"), "{team}");
+        // every conversation ended: the list says nobody is open, and no server is described
+        mcpstatus::save(&base, &c.project, vec![]).unwrap();
+        let said = list_connections(&c);
+        assert!(said.contains("No conversation is open") && !said.contains("In the open conversations:"), "{said}");
+    }
+
     fn note(c: &Ctx, id: &str) -> String {
         std::fs::read_to_string(brain::dir(&c.project).join(format!("{id}.md"))).unwrap_or_default()
     }

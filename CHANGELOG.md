@@ -2,6 +2,14 @@
 
 Newest first. How versions are named: `docs/VERSIONING.md`.
 
+## 0.51.0, 2026-11-24
+
+Two new skills for products with users in Indonesia: one checks a project against the personal data law, one writes the Terms and Conditions and the privacy notice.
+
+- **`uu-pdp-audit` (Bejo, Security).** Finds the personal data in a project and goes through twelve areas of Law 27 of 2022 (UU PDP): what is collected, the legal basis and consent, children, people's rights, keeping and deleting, security, a data failure, other parties, data sent abroad, the officer, and the notices. Each area is rated Met, Partly, Missing or Cannot tell, with the file and line, and what cannot be told from the code becomes a question for the owner. It reports and changes nothing. The checklist was written from the articles of the law, not from the GitHub skill that inspired it, whose leak deadline (14 days) is wrong: the law says written notice within 3 x 24 hours.
+- **`write-terms-and-privacy` (Bejo, and Nobo, Content).** Fills a facts sheet from the code and the owner, then writes Terms and Conditions and a privacy notice in Indonesian (the same parts in English) so that every promise has a fact behind it. What is not known stays `[TBD: ...]` (a company name is never invented), consent is its own unticked choice, and a sentence about what the company does is not written unless the code shows it is true. Bejo now also has `humanize-indonesian` and `humanize-text` for the last pass.
+- **Not checked.** No lawyer and no native Indonesian editor has read the skills or what they wrote. The article numbers were read on a public site that lists the law article by article (the official PDF has no readable text), and whether the government rules the law promises and the supervising agency exist now was not verified. Both skills say so in every output. Tried in two real conversations with Bejo on a made-up project; the language pass was added after the first one and checked once.
+
 ## 0.50.0, 2026-11-24
 
 Notes are easier to find, on the Notes page and on the Map, and the lines of a focused Journey step tell you which way they go.

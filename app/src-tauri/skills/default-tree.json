@@ -83,10 +83,16 @@
     { "branch": "Looking at what exists", "when": "code or a project is already there", "skills": [
       ["security-check", "Holes in code or a feature"],
       ["find-secrets", "Keys and passwords that leaked"],
-      ["check-dependencies", "Risky packages"]
+      ["check-dependencies", "Risky packages"],
+      ["uu-pdp-audit", "Indonesian personal data law, checked in the code"]
     ] },
     { "branch": "Before it is built", "when": "a design or plan", "skills": [
       ["threat-model", "How it could be attacked"]
+    ] },
+    { "branch": "Telling users what we do", "when": "terms or a privacy notice must be written or fixed", "skills": [
+      ["write-terms-and-privacy", "Terms and a privacy notice from real facts"],
+      ["humanize-indonesian", "Indonesian that sounds machine-made or translated"],
+      ["humanize-text", "English that sounds machine-made"]
     ] }
   ],
   "devops": [
@@ -120,6 +126,7 @@
     ] },
     { "branch": "Writing", "when": "making or improving a text", "skills": [
       ["write-an-article", "Articles and guides"],
+      ["write-terms-and-privacy", "Terms and a privacy notice from real facts"],
       ["plain-words", "Any text that reads stiff"],
       ["humanize-text", "English that sounds machine-made"],
       ["humanize-indonesian", "Indonesian that sounds machine-made or translated"]
